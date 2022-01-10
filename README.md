@@ -11,8 +11,8 @@ Public repository for the biodata resource inventory performed in 2022.
 * **checked_by** = curator initials
 * **kes_check** = kes determination where 0 = not an article describing data resource OR 1 = an article describing data resource
 * **hji_check** = hji determination where 0 = not an article describing data resource OR 1 = an article describing data resource
-* **curation_sum** = sum of curator values (checks)
+* **curation_sum** = sum of curator values (iii_checks)
 * **number_of_checks** = number of checks (by different curators)
-* **curation_score** = curation_sum/number_of_checks (gives a "confidence score"" as done in Wren 2017)
+* **curation_score** = curation_sum/number_of_checks (gives a "confidence score"" as done in Wren 2017); note that value other than 0 or 1 indiciate lack of agreement between curators
 * **kes_notes** = raw notes documented by kes
 * **hji_notes** = raw notes documented by hji
