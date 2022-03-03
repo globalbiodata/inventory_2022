@@ -2,19 +2,22 @@ import pandas as pd
 from transformers import AutoTokenizer
 from datasets import ClassLabel, Dataset
 from torch.utils.data import DataLoader
-# Dataset, DatasetDict, , load_dataset, Features
 
 class DataHandler:
   """
   Handles generating training, validation and testing dataloaders used for training and evaluation
   """
-  def __init__(self, train_file, val_file, test_file, model_huggingface_version):
+  def __init__(self, model_huggingface_version, train_file, val_file = None, test_file = None):
     """
     :param train_file: path to train file
     :param val_file: path to val file
     :param test_file: path to test file
     :param model_huggingface_version: Hugginface model version used to instantiate the tokenizer
     """
+    if val_file:
+      self.train_only = False
+    else:
+      self.train_only = True
     train_df, val_df, test_df = self.get_data_splits(train_file, val_file, test_file)
     self.train_df = train_df
     self.val_df = val_df
@@ -54,8 +57,9 @@ class DataHandler:
     :param test_df: df containing test data
     """
     self.train_df['abstract_no_xml'] = self.train_df['abstract'].apply(lambda x: self.get_parsed_xml(x))
-    self.val_df['abstract_no_xml'] = self.val_df['abstract'].apply(lambda x: self.get_parsed_xml(x))
-    self.test_df['abstract_no_xml'] = self.test_df['abstract'].apply(lambda x: self.get_parsed_xml(x))
+    if not self.train_only:
+      self.val_df['abstract_no_xml'] = self.val_df['abstract'].apply(lambda x: self.get_parsed_xml(x))
+      self.test_df['abstract_no_xml'] = self.test_df['abstract'].apply(lambda x: self.get_parsed_xml(x))
 
   def concatenate_title_abstracts(self):
     """
@@ -67,8 +71,9 @@ class DataHandler:
     :param test_df: df containing test data
     """
     self.train_df['title_abstract'] = self.train_df['title'] + '-' + self.train_df['abstract_no_xml']
-    self.val_df['title_abstract'] = self.val_df['title'] + '-' + self.val_df['abstract_no_xml']
-    self.test_df['title_abstract'] = self.test_df['title'] + '-' + self.test_df['abstract_no_xml']
+    if not self.train_only:
+      self.val_df['title_abstract'] = self.val_df['title'] + '-' + self.val_df['abstract_no_xml']
+      self.test_df['title_abstract'] = self.test_df['title'] + '-' + self.test_df['abstract_no_xml']
 
   def get_data_splits(self, train_path, val_path, test_path):
     """
@@ -80,9 +85,13 @@ class DataHandler:
     :return: train, val, test dataframes
     """
     train_df = pd.read_csv(train_path)
-    val_df = pd.read_csv(val_path)
-    test_df = pd.read_csv(test_path)
-    print("Train:", len(train_df), "Val:", len(val_df), "Test:", len(test_df))
+    if not self.train_only:
+      val_df = pd.read_csv(val_path)
+      test_df = pd.read_csv(test_path)
+      print("Train:", len(train_df), "Val:", len(val_df), "Test:", len(test_df))
+    else:
+      val_df = None
+      test_df = None
     return train_df, val_df, test_df
 
   def get_predictive_text_and_labels(self, train_df, val_df, test_df, predictive_field, score_field):
@@ -105,12 +114,15 @@ class DataHandler:
     train_text = train_df[predictive_field].tolist()
     train_labels = train_df[score_field].tolist()
 
-    val_text = val_df[predictive_field].tolist()
-    val_labels = val_df[score_field].tolist()
+    if not self.train_only:
+      val_text = val_df[predictive_field].tolist()
+      val_labels = val_df[score_field].tolist()
 
-    test_text = test_df[predictive_field].tolist()
-    test_labels = test_df[score_field].tolist()
-    return train_text, val_text, test_text, train_labels, val_labels, test_labels
+      test_text = test_df[predictive_field].tolist()
+      test_labels = test_df[score_field].tolist()
+      return train_text, val_text, test_text, train_labels, val_labels, test_labels
+    else:
+      return train_text, None, None, train_labels, None, None
 
   def tokenize_function(self, examples, tokenizer, max_len):
     """
@@ -163,7 +175,6 @@ class DataHandler:
     dataset = self.get_tokenized_dataset(text_arr, tokenizer, class_label, max_len, labels)
     if num_datapoints != -1:
       dataset = dataset.select(range(num_datapoints))
-    print(len(dataset))
     return DataLoader(dataset, shuffle = shuffle, batch_size = batch_size)
 
   def generate_dataloaders(self, predictive_field, score_field, class_names, batch_size, max_len, sanity_check = False, num_datapoints = -1):
@@ -191,5 +202,6 @@ class DataHandler:
     else:
       num_datapoints = -1 
     self.train_dataloader = self.get_dataloader(train_text, train_labels, self.tokenizer, class_label, batch_size, max_len, True, num_datapoints)
-    self.val_dataloader = self.get_dataloader(val_text, val_labels, self.tokenizer, class_label, batch_size, max_len)
-    self.test_dataloader = self.get_dataloader(test_text, test_labels, self.tokenizer, class_label, batch_size, max_len)
+    if not self.train_only:
+      self.val_dataloader = self.get_dataloader(val_text, val_labels, self.tokenizer, class_label, batch_size, max_len)
+      self.test_dataloader = self.get_dataloader(test_text, test_labels, self.tokenizer, class_label, batch_size, max_len)
