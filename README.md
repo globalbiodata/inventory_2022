@@ -63,6 +63,9 @@ After training, a checkpoint will be saved under ```output_dir```.
 |biomed_roberta_rct_500|'allenai/dsp_roberta_base_dapt_biomed_tapt_rct_500'|2e-5|16|0|False|
 
 ### Prediction
+Requires a checkpoint from a trained model to be under ```output_dir/checkpoint```
+``` python predict.py --input-file data/val.csv```
+
 
 ## II. NER Model
 ######
