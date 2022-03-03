@@ -10,7 +10,7 @@ Public repository for the biodata resource inventory performed in 2022.
 ### Training
 
 #### Usage
-1. ``` pip install -r requierments.txt```
+1. ``` pip install -r requirements.txt```
 2. For sanity checking: <br>
 ``` python train.py --num-training 100 --num-epochs 1 --sanity-check ```
 
