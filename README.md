@@ -26,7 +26,7 @@ There are a number of other parameters that can be passed as command line argume
 | val-file | Location of validation file | 'data/val.csv'| 
 | test-file | Location of test file |'data/test.csv' | 
 | model-name | Name of model to try. Can be one of: ['bert', 'biobert', 'scibert', 'pubmedbert', 'pubmedbert_pmc', 'bluebert', 'bluebert_mimic3', 'sapbert', 'sapbert_mean_token', 'bioelectra', 'bioelectra_pmc', 'electramed', 'biomed_roberta', 'biomed_roberta_chemprot', 'biomed_roberta_rct_500'] | 'scibert'| 
-| predictive-field | Field in the dataframes to use for prediction. Can be one of ['title', 'abstract', 'title-abstract'] | 'title'| 
+| predictive-field | Field in the dataframes to use for prediction. Can be one of ['title', 'abstract', 'title_abstract'] | 'title'| 
 | labels-field | Field in the dataframes corresponding to the scores (0, 1) | 'curation_score'| 
 | descriptive-labels | Descriptive labels corresponding to the [0, 1] numeric scores |['not-bio-resource', 'bio-resource'] | 
 | sanity-check | True for sanity-check. Runs training on a smaller subset of the entire training data. | False | 
