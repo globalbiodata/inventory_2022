@@ -39,7 +39,7 @@ There are a number of other parameters that can be passed as command line argume
 | weight-decay | Weight Decay for Learning Rate | 0.0 | 
 | lr-scheduler | True if using a Learning Rate Scheduler. More info here: https://huggingface.co/docs/transformers/main_classes/optimizer_schedules | False| 
 
-A checkpoint will be saved under ```output_dir```.
+After training, a checkpoint will be saved under ```output_dir```.
 <!-- #### Experiments -->
 
 #### Hyperparameters
