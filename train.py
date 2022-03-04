@@ -286,8 +286,7 @@ def get_args():
         metavar='PRED',
         type=str,
         default='title',
-        help="""Field in the dataframes to use for prediction.
-        Can be one of ['title', 'abstract', 'title-abstract']""")
+        help='Field in the dataframes to use for prediction')
     data_info.add_argument(
         '-labs',
         '--labels-field',
@@ -298,10 +297,11 @@ def get_args():
     data_info.add_argument(
         '-desc',
         '--descriptive-labels',
-        metavar='DESC',
+        metavar='LAB',
         type=str,
+        nargs=2,
         default=['not-bio-resource', 'bio-resource'],
-        help="Descriptive labels corresponding to the [0, 1] numeric scores")
+        help='Descriptive labels corresponding to the [0, 1] numeric scores')
 
     model_params.add_argument('-m',
                               '--model-name',
@@ -327,6 +327,7 @@ def get_args():
                               type=float,
                               default=0.0,
                               help='Weight Decay for Learning Rate')
+
     runtime_params.add_argument('-check',
                                 '--sanity-check',
                                 action='store_true',
@@ -371,9 +372,18 @@ def get_args():
         'biomed_roberta_chemprot', 'biomed_roberta_rct_500'
     ]
 
+    predictor_choices = ['title', 'abstract', 'title-abstract']
+
     if args.model_name not in model_choices:
-        parser.error(f'Invalid --model "{args.model_name}". Must be one of: ' +
-                     ', '.join(model_choices))
+        parser.error(
+            f'Invalid --model-name "{args.model_name}". Must be one of: ' +
+            ', '.join(model_choices))
+
+    predictor_choices = ['title', 'abstract', 'title-abstract']
+
+    if args.predictive_field not in predictor_choices:
+        parser.error(f'Invalid --predictive-field "{args.predictive_field}". '
+                     f'Must be one of: title, abstract, title-abstract')
 
     return args
 
@@ -381,7 +391,7 @@ def get_args():
 # ---------------------------------------------------------------------------
 if __name__ == '__main__':
 
-    args, _ = get_args()
+    args = get_args()
 
     if not os.path.exists(args.output_dir):
         os.mkdir(args.output_dir)
