@@ -9,9 +9,14 @@ from utils import *
 from transformers import AdamW, get_scheduler
 from tqdm.auto import tqdm
 from datasets import load_metric
+from typing import NamedTuple
 import plotly.express as px
 import copy
 import pandas as pd
+
+
+class Args(NamedTuple):
+    """ Command-line arguments """
 
 
 # ---------------------------------------------------------------------------
@@ -238,87 +243,126 @@ class Trainer():
 
 
 # ---------------------------------------------------------------------------
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
+def get_args():
+    """ Parse command-line arguments """
 
-    parser.add_argument('--train-file',
+    parser = argparse.ArgumentParser(
+        description='Create profile from Bracken output',
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
+    inputs = parser.add_argument_group("Inputs and Outputs")
+    data_info = parser.add_argument_group("Information on Data")
+    model_params = parser.add_argument_group("Model Parameters")
+    runtime_params = parser.add_argument_group("Runtime Parameters")
+
+    inputs.add_argument('-t',
+                        '--train-file',
+                        metavar='FILE',
                         type=str,
                         default='data/train.csv',
                         help='Location of training file')
-    parser.add_argument('--val-file',
+    inputs.add_argument('-v',
+                        '--val-file',
+                        metavar='FILE',
                         type=str,
                         default='data/val.csv',
                         help='Location of validation file')
-    parser.add_argument('--test-file',
+    inputs.add_argument('-s',
+                        '--test-file',
+                        metavar='FILE',
                         type=str,
                         default='data/test.csv',
                         help='Location of test file')
-    parser.add_argument('--model-name',
+    inputs.add_argument('-o',
+                        '--output-dir',
+                        metavar='DIR',
                         type=str,
-                        default='scibert',
-                        help="""Name of model to try. Can be one of:
+                        default='output_dir/',
+                        help='Directory to output checkpt and plot losses')
+
+    data_info.add_argument(
+        '--predictive-field',
+        metavar='PRED',
+        type=str,
+        default='title',
+        help="""Field in the dataframes to use for prediction.
+        Can be one of ['title', 'abstract', 'title-abstract']""")
+    data_info.add_argument(
+        '--labels-field',
+        metavar='LABS',
+        type=str,
+        default='curation_score',
+        help="Field in the dataframes corresponding to the scores (0, 1)")
+    data_info.add_argument(
+        '--descriptive-labels',
+        metavar='DESC',
+        type=str,
+        default=['not-bio-resource', 'bio-resource'],
+        help="Descriptive labels corresponding to the [0, 1] numeric scores")
+
+    model_params.add_argument('--model-name',
+                              metavar='MODEL',
+                              type=str,
+                              default='scibert',
+                              help="""Name of model to try. Can be one of:
         ['bert', 'biobert', 'scibert', 'pubmedbert',
         'pubmedbert_pmc', 'bluebert', 'bluebert_mimic3',
         'sapbert', 'sapbert_mean_token', 'bioelectra',
         'bioelectra_pmc', 'electramed', 'biomed_roberta',
         'biomed_roberta_chemprot', 'biomed_roberta_rct_500']""")
-    parser.add_argument('--predictive-field',
-                        type=str,
-                        default='title',
-                        help="""Field in the dataframes to use for prediction.
-        Can be one of ['title', 'abstract', 'title-abstract']""")
-    parser.add_argument(
-        '--labels-field',
-        type=str,
-        default='curation_score',
-        help="Field in the dataframes corresponding to the scores (0, 1)")
-    parser.add_argument(
-        '--descriptive-labels',
-        type=str,
-        default=['not-bio-resource', 'bio-resource'],
-        help="Descriptive labels corresponding to the [0, 1] numeric scores")
-    parser.add_argument('--sanity-check',
-                        action='store_true',
-                        help="""True for sanity-check.
+    model_params.add_argument('--max-len',
+                              metavar='INT',
+                              type=int,
+                              default=256,
+                              help='Max Sequence Length')
+    model_params.add_argument('--learning-rate',
+                              metavar='NUM',
+                              type=float,
+                              default=2e-5,
+                              help='Learning Rate')
+    model_params.add_argument('--weight-decay',
+                              metavar='NUM',
+                              type=float,
+                              default=0.0,
+                              help='Weight Decay for Learning Rate')
+    runtime_params.add_argument('--sanity-check',
+                                action='store_true',
+                                help="""True for sanity-check.
         Runs training on a smaller subset of the entire training data.""")
-    parser.add_argument('--num-training',
-                        type=int,
-                        default=-1,
-                        help="""Number of data points to run training on.
+
+    runtime_params.add_argument(
+        '--num-training',
+        metavar='INT',
+        type=int,
+        default=-1,
+        help="""Number of data points to run training on.
         If -1, training is ran an all the data. Useful for debugging.""")
-    parser.add_argument(
-        '--output-dir',
-        type=str,
-        default='output_dir/',
-        help='Default directory to output checkpt and plot losses')
-    parser.add_argument('--num-epochs',
-                        type=int,
-                        default=10,
-                        help='Number of Epochs')
-    parser.add_argument('--batch-size',
-                        type=int,
-                        default=32,
-                        help='Batch Size')
-    parser.add_argument('--max-len',
-                        type=int,
-                        default=256,
-                        help='Max Sequence Length')
-    parser.add_argument('--learning-rate',
-                        type=float,
-                        default=2e-5,
-                        help='Learning Rate')
-    parser.add_argument('--weight-decay',
-                        type=float,
-                        default=0.0,
-                        help='Weight Decay for Learning Rate')
-    parser.add_argument('--lr-scheduler',
-                        action='store_true',
-                        help="""True if using a Learning Rate Scheduler.
+    runtime_params.add_argument('--num-epochs',
+                                metavar='INT',
+                                type=int,
+                                default=10,
+                                help='Number of Epochs')
+    runtime_params.add_argument('--batch-size',
+                                metavar='INT',
+                                type=int,
+                                default=32,
+                                help='Batch Size')
+
+    runtime_params.add_argument(
+        '--lr-scheduler',
+        action='store_true',
+        help="""True if using a Learning Rate Scheduler.
         More info here:
         https://huggingface.co/docs/transformers/main_classes/optimizer_schedules"""
-                        )
+    )
 
-    args, _ = parser.parse_known_args()
+    return parser.parse_args()
+
+
+# ---------------------------------------------------------------------------
+if __name__ == '__main__':
+
+    args, _ = get_args()
 
     if not os.path.exists(args.output_dir):
         os.mkdir(args.output_dir)
