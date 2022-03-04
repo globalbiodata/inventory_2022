@@ -1,3 +1,9 @@
+#!/usr/bin/env python3
+"""
+Purpose: Train BERT model for article classification
+Authors: Ana-Maria Istrate and Kenneth Schackart
+"""
+
 import os
 from utils import *
 from transformers import AdamW, get_scheduler
@@ -308,7 +314,7 @@ if __name__ == '__main__':
     parser.add_argument('--lr-scheduler',
                         action='store_true',
                         help="""True if using a Learning Rate Scheduler.
-        More info here: 
+        More info here:
         https://huggingface.co/docs/transformers/main_classes/optimizer_schedules"""
                         )
 
@@ -366,7 +372,7 @@ if __name__ == '__main__':
 
     # Save best checkpoint
     checkpt_filename = args.output_dir + 'checkpt_' + args.model_name + '_' + \
-    str(best_epoch + 1) + '_epochs'
+      str(best_epoch + 1) + '_epochs'
     trainer.save_best_model(checkpt_filename)
     print('Saved best checkpt to', checkpt_filename)
 
