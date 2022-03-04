@@ -258,19 +258,19 @@ def get_args():
     inputs.add_argument('-t',
                         '--train-file',
                         metavar='FILE',
-                        type=str,
+                        type=argparse.FileType('rt'),
                         default='data/train.csv',
                         help='Location of training file')
     inputs.add_argument('-v',
                         '--val-file',
                         metavar='FILE',
-                        type=str,
+                        type=argparse.FileType('rt'),
                         default='data/val.csv',
                         help='Location of validation file')
     inputs.add_argument('-s',
                         '--test-file',
                         metavar='FILE',
-                        type=str,
+                        type=argparse.FileType('rt'),
                         default='data/test.csv',
                         help='Location of test file')
     inputs.add_argument('-o',
@@ -402,8 +402,8 @@ if __name__ == '__main__':
     print('Generating train, val, test dataloaders ...')
     print('=' * 30)
     model_huggingface_version = MODEL_TO_HUGGINGFACE_VERSION[args.model_name]
-    data_handler = DataHandler(model_huggingface_version, args.train_file,
-                               args.val_file, args.test_file)
+    data_handler = DataHandler(model_huggingface_version, args.train_file.name,
+                               args.val_file.name, args.test_file.name)
     data_handler.parse_abstracts_xml()
     data_handler.concatenate_title_abstracts()
     data_handler.generate_dataloaders(args.predictive_field, args.labels_field,
