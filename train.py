@@ -372,8 +372,6 @@ def get_args():
         'biomed_roberta_chemprot', 'biomed_roberta_rct_500'
     ]
 
-    predictor_choices = ['title', 'abstract', 'title-abstract']
-
     if args.model_name not in model_choices:
         parser.error(
             f'Invalid --model-name "{args.model_name}". Must be one of: ' +
@@ -389,7 +387,8 @@ def get_args():
 
 
 # ---------------------------------------------------------------------------
-if __name__ == '__main__':
+def main() -> None:
+    """ Let's do this """
 
     args = get_args()
 
@@ -455,3 +454,8 @@ if __name__ == '__main__':
     trainer.plot_losses([train_losses, val_losses], ['Train Loss', 'Val Loss'],
                         img_filename)
     print('=' * 30)
+
+
+# ---------------------------------------------------------------------------
+if __name__ == '__main__':
+    main()
