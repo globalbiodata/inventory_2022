@@ -8,6 +8,7 @@ import copy
 import pandas as pd
 
 
+# ---------------------------------------------------------------------------
 class Trainer():
     """
   Handles training of the model
@@ -32,6 +33,8 @@ class Trainer():
         self.num_epochs = num_epochs
         self.num_training_steps = num_training_steps
         self.device = device
+
+# ---------------------------------------------------------------------------
 
     def get_metrics(self, dataloader):
         """
@@ -65,6 +68,8 @@ class Trainer():
         return precision.compute()['precision'], recall.compute(
         )['recall'], f1.compute()['f1'], total_loss
 
+# ---------------------------------------------------------------------------
+
     def train_epoch(self, progress_bar):
         """
     Handles training of the model over one epoch
@@ -91,6 +96,8 @@ class Trainer():
             self.optimizer.zero_grad()
             progress_bar.update(1)
         return train_loss / num_train
+
+# ---------------------------------------------------------------------------
 
     def train(self):
         """
@@ -168,6 +175,8 @@ class Trainer():
         self.best_f1_score = best_val_f1
         return best_model, best_epoch, train_losses, val_losses
 
+# ---------------------------------------------------------------------------
+
     def save_best_model(self, checkpt_filename):
         """
     Saves a model checkpoint, epoch and F1 score to file
@@ -183,6 +192,8 @@ class Trainer():
                 'epoch': self.best_epoch,
                 'f1_val': self.best_f1_score,
             }, checkpt_filename)
+
+# ---------------------------------------------------------------------------
 
     def plot_losses(self, losses, labels, img_filename):
         """
@@ -204,6 +215,7 @@ class Trainer():
         return fig
 
 
+# ---------------------------------------------------------------------------
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
