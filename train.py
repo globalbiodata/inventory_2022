@@ -20,10 +20,10 @@ class Trainer():
     :param optimizer: optimizer used
     :param train_dataloader: DataLoader containing data used for training
     :param val_dataloader: DataLoader containing data used for validation
-    :param lr_scheduler: learning rate scheduler; could be equal to None if no lr_scheduler is used
+    :param lr_scheduler: learning rate scheduler; None if no lr_scheduler
     :param num_epochs: number of epochs to train the model for
     :param num_training_steps: total number of training steps
-    :param device: device used for training; equal to 'cuda' if GPU is available
+    :param device: device used for training; 'cuda' if GPU is available
     """
         self.model = model
         self.optimizer = optimizer
@@ -38,10 +38,12 @@ class Trainer():
 
     def get_metrics(self, dataloader):
         """
-    Computes and returns metrics (P, R, F1 score) of a model on data present in a dataloader
+    Computes and returns metrics (P, R, F1 score) of a model on
+    data present in a dataloader
 
     :param model: model used to compute the metrics
-    :param dataloader: DataLoader containing tokenized text entries and corresponding labels
+    :param dataloader: DataLoader containing tokenized text entries and
+      corresponding labels
 
     :return: precision, recall, F1 score
     """
@@ -76,9 +78,9 @@ class Trainer():
 
     :param model: PyTorch model
     :param optimizer: optimizer used
-    :param lr_scheduler: learning rate scheduler; could be equal to None if no lr_scheduler is used
+    :param lr_scheduler: learning rate scheduler; None if no lr_scheduler
     :param train_dataloader: DataLoader containing data used for training
-    :param device: device used for training; equal to 'cuda' if GPU is available
+    :param device: device used for training; 'cuda' if GPU is available
     :param progress_bar: tqdm instance for tracking progress
     """
         train_loss = 0
@@ -107,16 +109,19 @@ class Trainer():
     :param train_dataloader: DataLoader containing data used for training
     :param val_dataloader: DataLoader containing data used for validation
     :param optimizer: optimizer used
-    :param lr_scheduler: learning rate scheduler; could be equal to None if no lr_scheduler is used
+    :param lr_scheduler: learning rate scheduler; None if no lr_scheduler
     :param num_epochs: number of epochs to train the model for
     :param num_training_steps:
     :param checkpt_name: name under which the checkpoint will be saved
-    :param device: device used for training; equal to 'cuda' if GPU is available
+    :param device: device used for training; 'cuda' if GPU is available
 
-    :return best_model: model checkpt that has the highest F1 score on the validation data
+    :return best_model: model checkpt that has the highest F1 score on
+      the validation data
     :return best_epoch: epoch corresponding to best_model
-    :return train_losses: list of training loss values over all epochs; helpful for plotting
-    :return val_losses: list of validation loss values over all epochs; helpful for plotting
+    :return train_losses: list of training loss values over all epochs;
+      helpful for plotting
+    :return val_losses: list of validation loss values over all epochs;
+    helpful for plotting
 
     """
         progress_bar = tqdm(range(num_training_steps))
@@ -159,17 +164,25 @@ class Trainer():
             train_losses.append(train_loss)
             val_losses.append(val_loss)
 
-            print("Epoch", (epoch + 1),
-                  ": Train Loss: %.5f Val Loss: %.5f" % (train_loss, val_loss))
             print(
-                "Train Precision: %.3f Train Recall: %.3f Train F1: %.3f Val Precision: %.3f Val Recall: %.3f Val F1: %.3f"
-                % (train_p, train_r, train_f1, val_p, val_r, val_f1))
+                "Epoch", (epoch + 1), """: Train Loss: %.5f
+                  Val Loss: %.5f""" % (train_loss, val_loss))
+            print("""Train Precision: %.3f
+                 Train Recall: %.3f
+                 Train F1: %.3f
+                 Val Precision: %.3f
+                 Val Recall: %.3f
+                 Val F1: %.3f""" %
+                  (train_p, train_r, train_f1, val_p, val_r, val_f1))
         print('Finished model training!')
         print('=' * 30)
-        print(
-            "Best Train Precision: %.3f Best Train Recall: %.3f Best Train F1: %.3f Best Val Precision: %.3f Best Val Recall: %.3f Best Val F1: %.3f"
-            % (best_train_p, best_train_r, best_train_f1, best_val_p,
-               best_val_r, best_val_f1))
+        print("""Best Train Precision: %.3f
+             Best Train Recall: %.3f
+             Best Train F1: %.3f
+             Best Val Precision: %.3f
+             Best Val Recall: %.3f
+             Best Val F1: %.3f""" % (best_train_p, best_train_r, best_train_f1,
+                                     best_val_p, best_val_r, best_val_f1))
         self.best_model = best_model
         self.best_epoch = best_epoch
         self.best_f1_score = best_val_f1
@@ -184,7 +197,8 @@ class Trainer():
     :param model: model to save
     :param epoch: num_epoch corresponding to trained model
     :param f1_score: F1 score obtained by the model on validation data
-    :param checkpt_filename: filename under which the model checkpoint will be saved
+    :param checkpt_filename: filename under which the model checkpoint
+    will be saved
     """
         torch.save(
             {
@@ -199,9 +213,11 @@ class Trainer():
         """
     Plots training and val losses
 
-    :param num_epochs: total number of epochs the model was trained on; corresponds to length of the losses array
+    :param num_epochs: total number of epochs the model was trained on;
+      corresponds to length of the losses array
     :param losses: array corresponding to [train_losses, val_losses]
-    :param labels: labels used for plotting; usually ['Train Loss', 'Val Loss']
+    :param labels: labels used for plotting;
+      usually ['Train Loss', 'Val Loss']
 
     :return: Generated plot
     """
@@ -231,20 +247,20 @@ if __name__ == '__main__':
                         type=str,
                         default='data/test.csv',
                         help='Location of test file')
-    parser.add_argument(
-        '--model-name',
-        type=str,
-        default='scibert',
-        help=
-        "Name of model to try. Can be one of: ['bert', 'biobert', 'scibert', 'pubmedbert', 'pubmedbert_pmc', 'bluebert', 'bluebert_mimic3', 'sapbert', 'sapbert_mean_token', 'bioelectra', 'bioelectra_pmc', 'electramed', 'biomed_roberta', 'biomed_roberta_chemprot', 'biomed_roberta_rct_500']"
-    )
-    parser.add_argument(
-        '--predictive-field',
-        type=str,
-        default='title',
-        help=
-        "Field in the dataframes to use for prediction. Can be one of ['title', 'abstract', 'title-abstract']"
-    )
+    parser.add_argument('--model-name',
+                        type=str,
+                        default='scibert',
+                        help="""Name of model to try. Can be one of:
+        ['bert', 'biobert', 'scibert', 'pubmedbert',
+        'pubmedbert_pmc', 'bluebert', 'bluebert_mimic3',
+        'sapbert', 'sapbert_mean_token', 'bioelectra',
+        'bioelectra_pmc', 'electramed', 'biomed_roberta',
+        'biomed_roberta_chemprot', 'biomed_roberta_rct_500']""")
+    parser.add_argument('--predictive-field',
+                        type=str,
+                        default='title',
+                        help="""Field in the dataframes to use for prediction.
+        Can be one of ['title', 'abstract', 'title-abstract']""")
     parser.add_argument(
         '--labels-field',
         type=str,
@@ -255,19 +271,15 @@ if __name__ == '__main__':
         type=str,
         default=['not-bio-resource', 'bio-resource'],
         help="Descriptive labels corresponding to the [0, 1] numeric scores")
-    parser.add_argument(
-        '--sanity-check',
-        action='store_true',
-        help=
-        "True for sanity-check. Runs training on a smaller subset of the entire training data."
-    )
-    parser.add_argument(
-        '--num-training',
-        type=int,
-        default=-1,
-        help=
-        "Number of data points to run training on. If -1, training is ran an all the data. Useful for debugging."
-    )
+    parser.add_argument('--sanity-check',
+                        action='store_true',
+                        help="""True for sanity-check.
+        Runs training on a smaller subset of the entire training data.""")
+    parser.add_argument('--num-training',
+                        type=int,
+                        default=-1,
+                        help="""Number of data points to run training on.
+        If -1, training is ran an all the data. Useful for debugging.""")
     parser.add_argument(
         '--output-dir',
         type=str,
@@ -293,12 +305,12 @@ if __name__ == '__main__':
                         type=float,
                         default=0.0,
                         help='Weight Decay for Learning Rate')
-    parser.add_argument(
-        '--lr-scheduler',
-        action='store_true',
-        help=
-        'True if using a Learning Rate Scheduler. More info here: https://huggingface.co/docs/transformers/main_classes/optimizer_schedules'
-    )
+    parser.add_argument('--lr-scheduler',
+                        action='store_true',
+                        help="""True if using a Learning Rate Scheduler.
+        More info here: 
+        https://huggingface.co/docs/transformers/main_classes/optimizer_schedules"""
+                        )
 
     args, _ = parser.parse_known_args()
 
@@ -353,8 +365,8 @@ if __name__ == '__main__':
     best_model, best_epoch, train_losses, val_losses = trainer.train()
 
     # Save best checkpoint
-    checkpt_filename = args.output_dir + 'checkpt_' + args.model_name + '_' + str(
-        best_epoch + 1) + '_epochs'
+    checkpt_filename = args.output_dir + 'checkpt_' + args.model_name + '_' + \
+    str(best_epoch + 1) + '_epochs'
     trainer.save_best_model(checkpt_filename)
     print('Saved best checkpt to', checkpt_filename)
 
