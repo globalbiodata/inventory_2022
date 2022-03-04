@@ -247,13 +247,13 @@ def get_args():
     """ Parse command-line arguments """
 
     parser = argparse.ArgumentParser(
-        description='Create profile from Bracken output',
+        description='Train BERT model for article classification',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-    inputs = parser.add_argument_group("Inputs and Outputs")
-    data_info = parser.add_argument_group("Information on Data")
-    model_params = parser.add_argument_group("Model Parameters")
-    runtime_params = parser.add_argument_group("Runtime Parameters")
+    inputs = parser.add_argument_group('Inputs and Outputs')
+    data_info = parser.add_argument_group('Information on Data')
+    model_params = parser.add_argument_group('Model Parameters')
+    runtime_params = parser.add_argument_group('Runtime Parameters')
 
     inputs.add_argument('-t',
                         '--train-file',
@@ -281,6 +281,7 @@ def get_args():
                         help='Directory to output checkpt and plot losses')
 
     data_info.add_argument(
+        '-pred',
         '--predictive-field',
         metavar='PRED',
         type=str,
@@ -288,67 +289,72 @@ def get_args():
         help="""Field in the dataframes to use for prediction.
         Can be one of ['title', 'abstract', 'title-abstract']""")
     data_info.add_argument(
+        '-labs',
         '--labels-field',
         metavar='LABS',
         type=str,
         default='curation_score',
-        help="Field in the dataframes corresponding to the scores (0, 1)")
+        help='Field in the dataframes corresponding to the scores (0, 1)')
     data_info.add_argument(
+        '-desc',
         '--descriptive-labels',
         metavar='DESC',
         type=str,
         default=['not-bio-resource', 'bio-resource'],
         help="Descriptive labels corresponding to the [0, 1] numeric scores")
 
-    model_params.add_argument('--model-name',
+    model_params.add_argument('-m',
+                              '--model-name',
                               metavar='MODEL',
                               type=str,
                               default='scibert',
-                              help="""Name of model to try. Can be one of:
-        ['bert', 'biobert', 'scibert', 'pubmedbert',
-        'pubmedbert_pmc', 'bluebert', 'bluebert_mimic3',
-        'sapbert', 'sapbert_mean_token', 'bioelectra',
-        'bioelectra_pmc', 'electramed', 'biomed_roberta',
-        'biomed_roberta_chemprot', 'biomed_roberta_rct_500']""")
-    model_params.add_argument('--max-len',
+                              help='Name of model')
+    model_params.add_argument('-max',
+                              '--max-len',
                               metavar='INT',
                               type=int,
                               default=256,
                               help='Max Sequence Length')
-    model_params.add_argument('--learning-rate',
+    model_params.add_argument('-rate',
+                              '--learning-rate',
                               metavar='NUM',
                               type=float,
                               default=2e-5,
                               help='Learning Rate')
-    model_params.add_argument('--weight-decay',
+    model_params.add_argument('-decay',
+                              '--weight-decay',
                               metavar='NUM',
                               type=float,
                               default=0.0,
                               help='Weight Decay for Learning Rate')
-    runtime_params.add_argument('--sanity-check',
+    runtime_params.add_argument('-check',
+                                '--sanity-check',
                                 action='store_true',
                                 help="""True for sanity-check.
         Runs training on a smaller subset of the entire training data.""")
-
     runtime_params.add_argument(
+        '-nt',
         '--num-training',
         metavar='INT',
         type=int,
         default=-1,
         help="""Number of data points to run training on.
         If -1, training is ran an all the data. Useful for debugging.""")
-    runtime_params.add_argument('--num-epochs',
+    runtime_params.add_argument('-ne',
+                                '--num-epochs',
                                 metavar='INT',
                                 type=int,
                                 default=10,
                                 help='Number of Epochs')
-    runtime_params.add_argument('--batch-size',
+    runtime_params.add_argument('-batch',
+                                '--batch-size',
                                 metavar='INT',
                                 type=int,
                                 default=32,
                                 help='Batch Size')
 
     runtime_params.add_argument(
+        '-lr',
         '--lr-scheduler',
         action='store_true',
         help="""True if using a Learning Rate Scheduler.
@@ -356,7 +362,20 @@ def get_args():
         https://huggingface.co/docs/transformers/main_classes/optimizer_schedules"""
     )
 
-    return parser.parse_args()
+    args = parser.parse_args()
+
+    model_choices = [
+        'bert', 'biobert', 'scibert', 'pubmedbert', 'pubmedbert_pmc',
+        'bluebert', 'bluebert_mimic3', 'sapbert', 'sapbert_mean_token',
+        'bioelectra', 'bioelectra_pmc', 'electramed', 'biomed_roberta',
+        'biomed_roberta_chemprot', 'biomed_roberta_rct_500'
+    ]
+
+    if args.model_name not in model_choices:
+        parser.error(f'Invalid --model "{args.model_name}". Must be one of: ' +
+                     ', '.join(model_choices))
+
+    return args
 
 
 # ---------------------------------------------------------------------------
