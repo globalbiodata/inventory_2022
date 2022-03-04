@@ -9,14 +9,10 @@ from utils import *
 from transformers import AdamW, get_scheduler
 from tqdm.auto import tqdm
 from datasets import load_metric
-from typing import NamedTuple
+from typing import List, NamedTuple, TextIO
 import plotly.express as px
 import copy
 import pandas as pd
-
-
-class Args(NamedTuple):
-    """ Command-line arguments """
 
 
 # ---------------------------------------------------------------------------
@@ -243,6 +239,27 @@ class Trainer():
 
 
 # ---------------------------------------------------------------------------
+class Args(NamedTuple):
+    """ Command-line arguments """
+    train_file: TextIO
+    val_file: TextIO
+    test_file: TextIO
+    output_dir: str
+    predictive_field: str
+    labels_field: str
+    descriptive_labels: str
+    model_name: str
+    max_len: int
+    learning_rate: float
+    weight_decay: float
+    sanity_check: bool
+    num_training: int
+    num_epochs: int
+    batch_size: int
+    lr_scheduler: bool
+
+
+# ---------------------------------------------------------------------------
 def get_args():
     """ Parse command-line arguments """
 
@@ -383,13 +400,16 @@ def get_args():
         parser.error(f'Invalid --predictive-field "{args.predictive_field}". '
                      f'Must be one of: title, abstract, title-abstract')
 
-    return args
+    return Args(args.train_file, args.val_file, args.test_file,
+                args.output_dir, args.predictive_field, args.labels_field,
+                args.descriptive_labels, args.model_name, args.max_len,
+                args.learning_rate, args.weight_decay, args.sanity_check,
+                args.num_training, args.num_epochs, args.batch_size,
+                args.lr_scheduler)
 
 
 # ---------------------------------------------------------------------------
-def main() -> None:
-    """ Let's do this """
-
+if __name__ == '__main__':
     args = get_args()
 
     if not os.path.exists(args.output_dir):
@@ -454,8 +474,3 @@ def main() -> None:
     trainer.plot_losses([train_losses, val_losses], ['Train Loss', 'Val Loss'],
                         img_filename)
     print('=' * 30)
-
-
-# ---------------------------------------------------------------------------
-if __name__ == '__main__':
-    main()
