@@ -90,12 +90,12 @@ Metrics for the checkpoint above: ```F1: 0.9489051095	Precision: 0.9701492537	Re
 * **kes_notes** = raw notes documented by kes
 * **hji_notes** = raw notes documented by hji
 
-#### (likely temporary until we update the above file) For new variables within check classification conflicts CSV files, e.g. manual_checks_conflicts_2022-02-25.csv:
+#### (likely temporary until we update the above file) For new variables within check classification conflicts CSV files, e.g. manual_checks_conflicts_2022-03-11.csv:
 
 **FYI** 44/172 easily harmonized
 
 * **index** = added index based manual_checks_all_2022-02-15.csv so can keep order as needed (esp needed if any chance of duplication of "id")
-* **next steps** = "discuss" = discuss with kes, "kes review" = suggest for review (these seem like potentially clear/clearish mistakes; may be more based on the discussion for those that are less clear), or blank = no step (plan to merge as is into manual_checks_all_YYYY-MM-DD.csv - either now harmonized or so tricky that it should probably stay at 0.5 - that is, we shouldn't try to force agreement, could as Michaela's team to take a look though)
+
 
 ### Element Extraction
 
