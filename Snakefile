@@ -29,6 +29,7 @@ rule train:
         source activate {params.env}
         (./train.py \
             -m {wildcards.model} \
+            -ne {wildcards.epochs} \
             -t {input.train} \
             -v {input.val} \
             -s {input.test} \
