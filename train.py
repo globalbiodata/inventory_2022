@@ -4,22 +4,24 @@ Purpose: Train BERT model for article classification
 Authors: Ana-Maria Istrate and Kenneth Schackart
 """
 
-import os
-from utils import *
-from transformers import AdamW, get_scheduler
-from tqdm.auto import tqdm
-from datasets import load_metric
-from typing import List, NamedTuple, TextIO
-import plotly.express as px
 import copy
+import os
+from typing import List, NamedTuple, TextIO
+
 import pandas as pd
+import plotly.express as px
+from datasets import load_metric
+from tqdm.auto import tqdm
+from transformers import AdamW, get_scheduler
+
+from utils import *
 
 
 # ---------------------------------------------------------------------------
 class Trainer():
     """
-  Handles training of the model
-  """
+    Handles training of the model
+    """
     def __init__(self, model, optimizer, train_dataloader, val_dataloader,
                  lr_scheduler, num_epochs, num_training_steps, device):
         """
