@@ -1,0 +1,31 @@
+# Environments
+project_env: './env'
+
+# Directories
+checkpoint_dir: 'checkpoints'
+
+# Input files
+train_data: 'data/train.csv'
+test_data: 'data/test.csv'
+val_data: 'data/val.csv'
+
+### Parameters
+## train
+# Models
+models:
+  ['scibert']
+  # ['bert', 'biobert', 'scibert', 'pubmedbert', 'pubmedbert_pmc',
+  #   'bluebert', 'bluebert_mimic3', 'sapbert', 'sapbert_mean_token',
+  #   'bioelectra', 'bioelectra_pmc', 'electramed', 'biomed_roberta',
+  #   'biomed_roberta_chemprot', 'biomed_roberta_rct_500'
+  #   ]
+
+# Number of epochs
+epochs:
+  ['10']
+
+# Number of threads, each gets 5 Gb
+train_threads: 12
+
+# Time for job
+train_time: '24:00:00'
