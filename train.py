@@ -305,7 +305,8 @@ def get_args():
         metavar='PRED',
         type=str,
         default='title',
-        help='Field in the dataframes to use for prediction')
+        help='Field in the dataframes to use for prediction',
+        choices=['title', 'abstract', 'title-abstract'])
     data_info.add_argument(
         '-labs',
         '--labels-field',
@@ -322,12 +323,19 @@ def get_args():
         default=['not-bio-resource', 'bio-resource'],
         help='Descriptive labels corresponding to the [0, 1] numeric scores')
 
-    model_params.add_argument('-m',
-                              '--model-name',
-                              metavar='MODEL',
-                              type=str,
-                              default='scibert',
-                              help='Name of model')
+    model_params.add_argument(
+        '-m',
+        '--model-name',
+        metavar='MODEL',
+        type=str,
+        default='scibert',
+        help='Name of model',
+        choices=[
+            'bert', 'biobert', 'scibert', 'pubmedbert', 'pubmedbert_pmc',
+            'bluebert', 'bluebert_mimic3', 'sapbert', 'sapbert_mean_token',
+            'bioelectra', 'bioelectra_pmc', 'electramed', 'biomed_roberta',
+            'biomed_roberta_chemprot', 'biomed_roberta_rct_500'
+        ])
     model_params.add_argument('-max',
                               '--max-len',
                               metavar='INT',
@@ -383,24 +391,6 @@ def get_args():
     )
 
     args = parser.parse_args()
-
-    model_choices = [
-        'bert', 'biobert', 'scibert', 'pubmedbert', 'pubmedbert_pmc',
-        'bluebert', 'bluebert_mimic3', 'sapbert', 'sapbert_mean_token',
-        'bioelectra', 'bioelectra_pmc', 'electramed', 'biomed_roberta',
-        'biomed_roberta_chemprot', 'biomed_roberta_rct_500'
-    ]
-
-    if args.model_name not in model_choices:
-        parser.error(
-            f'Invalid --model-name "{args.model_name}". Must be one of: ' +
-            ', '.join(model_choices))
-
-    predictor_choices = ['title', 'abstract', 'title-abstract']
-
-    if args.predictive_field not in predictor_choices:
-        parser.error(f'Invalid --predictive-field "{args.predictive_field}". '
-                     f'Must be one of: title, abstract, title-abstract')
 
     return Args(args.train_file, args.val_file, args.test_file,
                 args.output_dir, args.predictive_field, args.labels_field,
