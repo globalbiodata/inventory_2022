@@ -2,7 +2,9 @@
 project_env: './env'
 
 # Directories
-checkpoint_dir: 'checkpoints'
+checkpoint_dir: 'out/checkpoints'
+benchmark_dir: 'out/benchmarks'
+log_dir: 'out/logs'
 
 # Input files
 train_data: 'data/train.csv'

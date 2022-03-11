@@ -20,13 +20,18 @@ rule train:
         out_dir=config["checkpoint_dir"],
         time=config["train_time"],
     threads: config["train_threads"]
+    log:
+        config["logk_dir"] + "/{model}_{epochs}.log",
+    benchmark:
+        config["benchmark_dir"] + "/{model}_{epochs}.txt"
     shell:
         """
         source activate {params.env}
-        ./train.py \
+        (./train.py \
             -m {wildcards.model} \
             -t {input.train} \
             -v {input.val} \
             -s {input.test} \
-            -o {params.out_dir}
+            -o {params.out_dir} \
+        )2> {log}
         """
