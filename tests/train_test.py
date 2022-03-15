@@ -58,9 +58,9 @@ def run_bad_option(flag: str) -> None:
     retval, out = getstatusoutput(f'{PRG} {flag} {bad}')
     assert retval != 0
     assert out.lower().startswith('usage:')
-    assert re.search(f'Invalid {flag}', out)
+    assert re.search('invalid choice', out)
     assert re.search(bad, out)
-    assert re.search('Must be one of:', out)
+    assert re.search('choose from', out)
 
 
 # ---------------------------------------------------------------------------
