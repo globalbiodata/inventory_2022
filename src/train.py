@@ -230,7 +230,7 @@ class Trainer():
 
         :return: Generated plot
         """
-        x = [i for i in range(self.num_epochs)]
+        x = list(range(self.num_epochs))
         df = pd.DataFrame({'Epoch': x})
         for loss_arr, label in zip(losses, labels):
             df[label] = loss_arr
@@ -385,10 +385,7 @@ def get_args():
         '-lr',
         '--lr-scheduler',
         action='store_true',
-        help="""True if using a Learning Rate Scheduler.
-        More info here:
-        https://huggingface.co/docs/transformers/main_classes/optimizer_schedules"""
-    )
+        help="True if using a Learning Rate Scheduler.")
 
     args = parser.parse_args()
 
@@ -452,11 +449,11 @@ def main() -> None:
     trainer = Trainer(model, optimizer, train_dataloader, val_dataloader,
                       lr_scheduler, args.num_epochs, num_training_steps,
                       device)
-    best_model, best_epoch, train_losses, val_losses = trainer.train()
+    _, best_epoch, train_losses, val_losses = trainer.train()
 
     # Save best checkpoint
     checkpt_filename = args.output_dir + 'checkpt_' + args.model_name + '_' + \
-      str(best_epoch + 1) + '_epochs'
+        str(best_epoch + 1) + '_epochs'
     trainer.save_best_model(checkpt_filename)
     print('Saved best checkpt to', checkpt_filename)
 
