@@ -1,7 +1,4 @@
-import argparse
-from data_handler import *
-import torch
-from transformers import AutoModelForSequenceClassification
+''' Common data structures '''
 
 # Mapping from generic model name to the Huggingface Version used to initialize the model
 MODEL_TO_HUGGINGFACE_VERSION = {

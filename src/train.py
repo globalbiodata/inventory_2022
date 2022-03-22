@@ -4,16 +4,20 @@ Purpose: Train BERT model for article classification
 Authors: Ana-Maria Istrate and Kenneth Schackart
 """
 
+import argparse
 import copy
 import os
 from typing import List, NamedTuple, TextIO
 
 import pandas as pd
 import plotly.express as px
+import torch
 from datasets import load_metric
 from tqdm.auto import tqdm
-from transformers import AdamW, get_scheduler
+from transformers import (AdamW, AutoModelForSequenceClassification,
+                          get_scheduler)
 
+from data_handler import *
 from utils import *
 
 
