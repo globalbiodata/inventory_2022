@@ -66,7 +66,7 @@ class Trainer():
         total_loss = 0
         num_seen_datapoints = 0
         for batch in dataloader:
-            batch = {k: v.to(device) for k, v in batch.items()}
+            batch = {k: v.to(self.device) for k, v in batch.items()}
             with torch.no_grad():
                 outputs = self.model(**batch)
             num_seen_datapoints += len(batch['input_ids'])
@@ -107,7 +107,7 @@ class Trainer():
             train_loss += loss.item()
             self.optimizer.step()
             if self.lr_scheduler:
-                lr_scheduler.step()
+                self.lr_scheduler.step()
             self.optimizer.zero_grad()
             progress_bar.update(1)
         return train_loss / num_train
@@ -137,7 +137,7 @@ class Trainer():
         helpful for plotting
 
         """
-        progress_bar = tqdm(range(num_training_steps))
+        progress_bar = tqdm(range(self.num_training_steps))
         self.model.train()
         best_model = self.model
         train_losses = []
@@ -401,13 +401,13 @@ def get_args():
 
 
 # ---------------------------------------------------------------------------
-if __name__ == '__main__':
+def main() -> None:
+    """ Main function """
+
     args = get_args()
 
     if not os.path.exists(args.output_dir):
         os.mkdir(args.output_dir)
-
-    print(f'args={args}')
 
     # Train, val, test dataloaders generation
     print('Generating train, val, test dataloaders ...')
@@ -466,3 +466,8 @@ if __name__ == '__main__':
     trainer.plot_losses([train_losses, val_losses], ['Train Loss', 'Val Loss'],
                         img_filename)
     print('=' * 30)
+
+
+# ---------------------------------------------------------------------------
+if __name__ == '__main__':
+    main()
