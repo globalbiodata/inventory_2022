@@ -13,6 +13,8 @@ import pandas as pd
 import plotly.express as px
 import torch
 from datasets import load_metric
+from torch._C import NoneType
+from torch.utils.data.dataloader import DataLoader
 from tqdm.auto import tqdm
 from transformers import (AdamW, AutoModelForSequenceClassification,
                           get_scheduler)
@@ -22,12 +24,25 @@ from utils import MODEL_TO_HUGGINGFACE_VERSION
 
 
 # ---------------------------------------------------------------------------
+class Settings(NamedTuple):
+    """ Trainer settings """
+
+    model: str
+    optimizer: AdamW
+    train_dataloader: DataLoader
+    val_dataloader: DataLoader
+    lr_scheduler: NoneType
+    num_epochs: int
+    num_training_steps: int
+    device: torch.device
+
+
+# ---------------------------------------------------------------------------
 class Trainer():
     """
     Handles training of the model
     """
-    def __init__(self, model, optimizer, train_dataloader, val_dataloader,
-                 lr_scheduler, num_epochs, num_training_steps, device):
+    def __init__(self, settings: Settings):
         """
         :param model: PyTorch model
         :param optimizer: optimizer used
@@ -38,17 +53,16 @@ class Trainer():
         :param num_training_steps: total number of training steps
         :param device: device used for training; 'cuda' if GPU is available
         """
-        self.model = model
-        self.optimizer = optimizer
-        self.train_dataloader = train_dataloader
-        self.val_dataloader = val_dataloader
-        self.lr_scheduler = lr_scheduler
-        self.num_epochs = num_epochs
-        self.num_training_steps = num_training_steps
-        self.device = device
+        self.model = settings.model
+        self.optimizer = settings.optimizer
+        self.train_dataloader = settings.train_dataloader
+        self.val_dataloader = settings.val_dataloader
+        self.lr_scheduler = settings.lr_scheduler
+        self.num_epochs = settings.num_epochs
+        self.num_training_steps = settings.num_training_steps
+        self.device = settings.device
 
-# ---------------------------------------------------------------------------
-
+    # -----------------------------------------------------------------------
     def get_metrics(self, dataloader):
         """
         Computes and returns metrics (P, R, F1 score) of a model on
@@ -83,8 +97,7 @@ class Trainer():
         return precision.compute()['precision'], recall.compute(
         )['recall'], f1.compute()['f1'], total_loss
 
-# ---------------------------------------------------------------------------
-
+    # -----------------------------------------------------------------------
     def train_epoch(self, progress_bar):
         """
         Handles training of the model over one epoch
@@ -112,8 +125,7 @@ class Trainer():
             progress_bar.update(1)
         return train_loss / num_train
 
-# ---------------------------------------------------------------------------
-
+    # -----------------------------------------------------------------------
     def train(self):
         """
         Handles training of the model over all epochs
@@ -197,8 +209,7 @@ class Trainer():
         self.best_f1_score = best_val_f1
         return best_model, best_epoch, train_losses, val_losses
 
-# ---------------------------------------------------------------------------
-
+    # -----------------------------------------------------------------------
     def save_best_model(self, checkpt_filename):
         """
         Saves a model checkpoint, epoch and F1 score to file
@@ -216,8 +227,7 @@ class Trainer():
                 'f1_val': self.best_f1_score,
             }, checkpt_filename)
 
-# ---------------------------------------------------------------------------
-
+    # -----------------------------------------------------------------------
     def plot_losses(self, losses, labels, img_filename):
         """
         Plots training and val losses
@@ -446,9 +456,10 @@ def main() -> None:
     # Model Training
     print('Starting model training...')
     print('=' * 30)
-    trainer = Trainer(model, optimizer, train_dataloader, val_dataloader,
-                      lr_scheduler, args.num_epochs, num_training_steps,
-                      device)
+    settings = Settings(model, optimizer, train_dataloader, val_dataloader,
+                        lr_scheduler, args.num_epochs, num_training_steps,
+                        device)
+    trainer = Trainer(settings)
     _, best_epoch, train_losses, val_losses = trainer.train()
 
     # Save best checkpoint
