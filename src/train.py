@@ -7,7 +7,7 @@ Authors: Ana-Maria Istrate and Kenneth Schackart
 import argparse
 import copy
 import os
-from typing import List, NamedTuple, TextIO
+from typing import NamedTuple, TextIO
 
 import pandas as pd
 import plotly.express as px
@@ -17,8 +17,8 @@ from tqdm.auto import tqdm
 from transformers import (AdamW, AutoModelForSequenceClassification,
                           get_scheduler)
 
-from data_handler import *
-from utils import *
+from data_handler import DataHandler
+from utils import MODEL_TO_HUGGINGFACE_VERSION
 
 
 # ---------------------------------------------------------------------------
@@ -29,15 +29,15 @@ class Trainer():
     def __init__(self, model, optimizer, train_dataloader, val_dataloader,
                  lr_scheduler, num_epochs, num_training_steps, device):
         """
-    :param model: PyTorch model
-    :param optimizer: optimizer used
-    :param train_dataloader: DataLoader containing data used for training
-    :param val_dataloader: DataLoader containing data used for validation
-    :param lr_scheduler: learning rate scheduler; None if no lr_scheduler
-    :param num_epochs: number of epochs to train the model for
-    :param num_training_steps: total number of training steps
-    :param device: device used for training; 'cuda' if GPU is available
-    """
+        :param model: PyTorch model
+        :param optimizer: optimizer used
+        :param train_dataloader: DataLoader containing data used for training
+        :param val_dataloader: DataLoader containing data used for validation
+        :param lr_scheduler: learning rate scheduler; None if no lr_scheduler
+        :param num_epochs: number of epochs to train the model for
+        :param num_training_steps: total number of training steps
+        :param device: device used for training; 'cuda' if GPU is available
+        """
         self.model = model
         self.optimizer = optimizer
         self.train_dataloader = train_dataloader
@@ -51,15 +51,15 @@ class Trainer():
 
     def get_metrics(self, dataloader):
         """
-    Computes and returns metrics (P, R, F1 score) of a model on
-    data present in a dataloader
+        Computes and returns metrics (P, R, F1 score) of a model on
+        data present in a dataloader
 
-    :param model: model used to compute the metrics
-    :param dataloader: DataLoader containing tokenized text entries and
-      corresponding labels
+        :param model: model used to compute the metrics
+        :param dataloader: DataLoader containing tokenized text entries and
+        corresponding labels
 
-    :return: precision, recall, F1 score
-    """
+        :return: precision, recall, F1 score
+        """
         precision = load_metric("precision")
         recall = load_metric("recall")
         f1 = load_metric("f1")
@@ -87,15 +87,15 @@ class Trainer():
 
     def train_epoch(self, progress_bar):
         """
-    Handles training of the model over one epoch
+        Handles training of the model over one epoch
 
-    :param model: PyTorch model
-    :param optimizer: optimizer used
-    :param lr_scheduler: learning rate scheduler; None if no lr_scheduler
-    :param train_dataloader: DataLoader containing data used for training
-    :param device: device used for training; 'cuda' if GPU is available
-    :param progress_bar: tqdm instance for tracking progress
-    """
+        :param model: PyTorch model
+        :param optimizer: optimizer used
+        :param lr_scheduler: learning rate scheduler; None if no lr_scheduler
+        :param train_dataloader: DataLoader containing data used for training
+        :param device: device used for training; 'cuda' if GPU is available
+        :param progress_bar: tqdm instance for tracking progress
+        """
         train_loss = 0
         num_train = 0
         for batch in self.train_dataloader:
@@ -116,27 +116,27 @@ class Trainer():
 
     def train(self):
         """
-    Handles training of the model over all epochs
+        Handles training of the model over all epochs
 
-    :param model: PyTorch model
-    :param train_dataloader: DataLoader containing data used for training
-    :param val_dataloader: DataLoader containing data used for validation
-    :param optimizer: optimizer used
-    :param lr_scheduler: learning rate scheduler; None if no lr_scheduler
-    :param num_epochs: number of epochs to train the model for
-    :param num_training_steps:
-    :param checkpt_name: name under which the checkpoint will be saved
-    :param device: device used for training; 'cuda' if GPU is available
+        :param model: PyTorch model
+        :param train_dataloader: DataLoader containing data used for training
+        :param val_dataloader: DataLoader containing data used for validation
+        :param optimizer: optimizer used
+        :param lr_scheduler: learning rate scheduler; None if no lr_scheduler
+        :param num_epochs: number of epochs to train the model for
+        :param num_training_steps:
+        :param checkpt_name: name under which the checkpoint will be saved
+        :param device: device used for training; 'cuda' if GPU is available
 
-    :return best_model: model checkpt that has the highest F1 score on
-      the validation data
-    :return best_epoch: epoch corresponding to best_model
-    :return train_losses: list of training loss values over all epochs;
-      helpful for plotting
-    :return val_losses: list of validation loss values over all epochs;
-    helpful for plotting
+        :return best_model: model checkpt that has the highest F1 score on
+        the validation data
+        :return best_epoch: epoch corresponding to best_model
+        :return train_losses: list of training loss values over all epochs;
+        helpful for plotting
+        :return val_losses: list of validation loss values over all epochs;
+        helpful for plotting
 
-    """
+        """
         progress_bar = tqdm(range(num_training_steps))
         self.model.train()
         best_model = self.model
@@ -149,8 +149,6 @@ class Trainer():
         best_val_r = 0
         best_train_r = 0
         best_epoch = 0
-        best_train_loss = 0
-        best_val_loss = 0
 
         for epoch in range(self.num_epochs):
             # training
@@ -169,8 +167,6 @@ class Trainer():
                 best_train_p = train_p
                 best_val_r = val_r
                 best_train_r = train_r
-                best_val_loss = val_loss
-                best_train_loss = train_loss
                 best_model = copy.deepcopy(self.model)
                 best_epoch = epoch
 
@@ -205,14 +201,14 @@ class Trainer():
 
     def save_best_model(self, checkpt_filename):
         """
-    Saves a model checkpoint, epoch and F1 score to file
+        Saves a model checkpoint, epoch and F1 score to file
 
-    :param model: model to save
-    :param epoch: num_epoch corresponding to trained model
-    :param f1_score: F1 score obtained by the model on validation data
-    :param checkpt_filename: filename under which the model checkpoint
-    will be saved
-    """
+        :param model: model to save
+        :param epoch: num_epoch corresponding to trained model
+        :param f1_score: F1 score obtained by the model on validation data
+        :param checkpt_filename: filename under which the model checkpoint
+        will be saved
+        """
         torch.save(
             {
                 'model_state_dict': self.best_model.state_dict(),
@@ -224,16 +220,16 @@ class Trainer():
 
     def plot_losses(self, losses, labels, img_filename):
         """
-    Plots training and val losses
+        Plots training and val losses
 
-    :param num_epochs: total number of epochs the model was trained on;
-      corresponds to length of the losses array
-    :param losses: array corresponding to [train_losses, val_losses]
-    :param labels: labels used for plotting;
-      usually ['Train Loss', 'Val Loss']
+        :param num_epochs: total number of epochs the model was trained on;
+        corresponds to length of the losses array
+        :param losses: array corresponding to [train_losses, val_losses]
+        :param labels: labels used for plotting;
+        usually ['Train Loss', 'Val Loss']
 
-    :return: Generated plot
-    """
+        :return: Generated plot
+        """
         x = [i for i in range(self.num_epochs)]
         df = pd.DataFrame({'Epoch': x})
         for loss_arr, label in zip(losses, labels):
