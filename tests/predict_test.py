@@ -7,7 +7,7 @@ import os
 # import string
 from subprocess import getstatusoutput
 
-PRG = './predict.py'
+PRG = 'src/predict.py'
 
 
 # ---------------------------------------------------------------------------

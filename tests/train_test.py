@@ -7,7 +7,7 @@ import re
 import string
 from subprocess import getstatusoutput
 
-PRG = './train.py'
+PRG = 'src/train.py'
 
 
 # ---------------------------------------------------------------------------
