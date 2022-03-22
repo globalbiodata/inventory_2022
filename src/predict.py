@@ -3,8 +3,8 @@ import argparse
 import torch
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
-from data_handler import *
-from utils import *
+from data_handler import DataHandler
+from utils import MODEL_TO_HUGGINGFACE_VERSION
 
 
 class Predictor():
