@@ -1,7 +1,10 @@
 import argparse
+import os
+from re import S
 
 import torch
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
+from typing import NamedTuple, TextIO
 
 from data_handler import DataHandler
 from utils import MODEL_TO_HUGGINGFACE_VERSION
@@ -12,7 +15,7 @@ class Predictor():
     """
     Handles prediction based on a trained model
     """
-    def __init__(self, model_huggingface_version, checkpoint_filepath):
+    def __init__(self, model_huggingface_version, checkpoint_fh):
         """
         """
 
@@ -20,7 +23,7 @@ class Predictor():
             "cuda") if torch.cuda.is_available() else torch.device("cpu")
         self.model = AutoModelForSequenceClassification.from_pretrained(
             model_huggingface_version, num_labels=2)
-        checkpoint = torch.load(checkpoint_filepath, map_location=self.device)
+        checkpoint = torch.load(checkpoint_fh, map_location=self.device)
         self.model.load_state_dict(checkpoint['model_state_dict'])
         self.model.to(self.device)
         self.model.eval()
@@ -53,7 +56,22 @@ class Predictor():
 
 
 # ---------------------------------------------------------------------------
-def get_args():
+class Args(NamedTuple):
+    """ Command-line arguments """
+    checkpoint: TextIO
+    infile: TextIO
+    out_dir: str
+    out_file: str
+    predictive_field: str
+    labels_field: str
+    descriptive_labels: str
+    model_name: str
+    max_len: int
+    batch_size: int
+
+
+# ---------------------------------------------------------------------------
+def get_args() -> Args:
     """ Parse command-line arguments """
 
     parser = argparse.ArgumentParser(
@@ -66,11 +84,11 @@ def get_args():
     runtime_params = parser.add_argument_group('Runtime Parameters')
 
     inputs.add_argument('-c',
-                        '--checkpoint-filepath',
+                        '--checkpoint',
                         metavar='CHKPT',
-                        type=str,
+                        type=argparse.FileType('rt'),
                         required=True,
-                        help='Location of saved checkpoint file.')
+                        help='Trained model checkpoint')
     inputs.add_argument(
         '-i',
         '--input_file',
@@ -79,18 +97,18 @@ def get_args():
         default='data/val.csv',
         help='Input file. Should contain columns in --predictive_field')
     inputs.add_argument('-o',
-                        '--output-dir',
+                        '--out-dir',
                         metavar='DIR',
                         type=str,
                         default='output_dir/',
                         help='Directory to output predictions')
     inputs.add_argument(
         '-of',
-        '--output_file',
+        '--out-file',
         metavar='STR',
         type=str,
-        default='output_dir/predictions.csv',
-        help='Output file containing predictions on input_file')
+        default='predictions.csv',
+        help='Output file containing predictions on --input_file')
 
     data_info.add_argument(
         '-pred',
@@ -143,7 +161,12 @@ def get_args():
                                 default=8,
                                 help='Batch Size')
 
-    return parser.parse_args()
+    args = parser.parse_args()
+
+    return Args(args.checkpoint, args.input_file, args.out_dir, args.out_file,
+                args.predictive_field, args.labels_field,
+                args.descriptive_labels, args.model_name, args.max_len,
+                args.batch_size)
 
 
 # ---------------------------------------------------------------------------
@@ -151,9 +174,14 @@ if __name__ == '__main__':
 
     args = get_args()
 
+    if not os.path.exists(args.out_dir):
+        os.mkdir(args.out_dir)
+
+    out_file = os.path.join(args.out_dir, args.out_file)
+
     print(f'args={args}')
     model_huggingface_version = MODEL_TO_HUGGINGFACE_VERSION[args.model_name]
-    predictor = Predictor(model_huggingface_version, args.checkpoint_filepath)
+    predictor = Predictor(model_huggingface_version, args.checkpoint)
 
     # Load data in a DataLoader
     data_handler = DataHandler(model_huggingface_version, args.input_file)
@@ -177,5 +205,5 @@ if __name__ == '__main__':
     print(pred_df[:20])
 
     # Save labels to file
-    pred_df.to_csv(args.output_file)
-    print('Saved predictions to', args.output_file)
+    pred_df.to_csv(out_file)
+    print('Saved predictions to', out_file)
