@@ -488,8 +488,8 @@ def main() -> None:
     args = get_args()
     out_dir = args.out_dir
 
-    if not os.path.exists(out_dir):
-        os.mkdir(out_dir)
+    if not os.path.isdir(out_dir):
+        os.makedirs(out_dir)
 
     model_name, train_dataloader, val_dataloader = get_dataloaders(args)
 

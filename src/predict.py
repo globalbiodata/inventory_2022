@@ -180,8 +180,8 @@ def main() -> None:
 
     args = get_args()
 
-    if not os.path.exists(args.out_dir):
-        os.mkdir(args.out_dir)
+    if not os.path.isdir(args.out_dir):
+        os.makedirs(args.out_dir)
 
     out_file = os.path.join(args.out_dir, args.out_file)
 
