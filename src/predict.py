@@ -1,10 +1,16 @@
+#!/usr/bin/env python3
+"""
+Purpose: Use trained BERT model for article classification
+Authors: Ana-Maria Istrate and Kenneth Schackart
+"""
+
 import argparse
 import os
-from re import S
+from typing import NamedTuple, TextIO
 
 import torch
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
-from typing import NamedTuple, TextIO
+from datasets import ClassLabel
 
 from data_handler import DataHandler
 from utils import MODEL_TO_HUGGINGFACE_VERSION
@@ -15,7 +21,7 @@ class Predictor():
     """
     Handles prediction based on a trained model
     """
-    def __init__(self, model_huggingface_version, checkpoint_fh):
+    def __init__(self, model_huggingface_version, checkpoint_fh, labels):
         """
         """
 
@@ -29,14 +35,13 @@ class Predictor():
         self.model.eval()
         self.tokenizer = AutoTokenizer.from_pretrained(
             model_huggingface_version)
-        self.class_labels = ClassLabel(num_classes=2,
-                                       names=args.descriptive_labels)
+        self.class_labels = ClassLabel(num_classes=2, names=labels)
 
     # -----------------------------------------------------------------------
     def predict(self, dataloader):
         """
   	    Generates predictions for a dataloader containing data
-    
+
   	    :param: dataloader: contains tokenized text
   	    :returns: predicted labels
   	    """
@@ -170,7 +175,8 @@ def get_args() -> Args:
 
 
 # ---------------------------------------------------------------------------
-if __name__ == '__main__':
+def main() -> None:
+    """ Main function """
 
     args = get_args()
 
@@ -179,12 +185,12 @@ if __name__ == '__main__':
 
     out_file = os.path.join(args.out_dir, args.out_file)
 
-    print(f'args={args}')
     model_huggingface_version = MODEL_TO_HUGGINGFACE_VERSION[args.model_name]
-    predictor = Predictor(model_huggingface_version, args.checkpoint)
+    predictor = Predictor(model_huggingface_version, args.checkpoint,
+                          args.descriptive_labels)
 
     # Load data in a DataLoader
-    data_handler = DataHandler(model_huggingface_version, args.input_file)
+    data_handler = DataHandler(model_huggingface_version, args.infile)
     data_handler.parse_abstracts_xml()
     data_handler.concatenate_title_abstracts()
     data_handler.generate_dataloaders(args.predictive_field, args.labels_field,
@@ -207,3 +213,8 @@ if __name__ == '__main__':
     # Save labels to file
     pred_df.to_csv(out_file)
     print('Saved predictions to', out_file)
+
+
+# ---------------------------------------------------------------------------
+if __name__ == '__main__':
+    main()
