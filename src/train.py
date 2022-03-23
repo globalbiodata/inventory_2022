@@ -309,7 +309,7 @@ def get_args():
                         default='data/test.csv',
                         help='Location of test file')
     inputs.add_argument('-o',
-                        '--output-dir',
+                        '--out-dir',
                         metavar='DIR',
                         type=str,
                         default='output_dir/',
@@ -320,7 +320,7 @@ def get_args():
         '--predictive-field',
         metavar='PRED',
         type=str,
-        default='title',
+        default='title-abstract',
         help='Field in the dataframes to use for prediction',
         choices=['title', 'abstract', 'title-abstract'])
     data_info.add_argument(
@@ -405,8 +405,8 @@ def get_args():
 
     args = parser.parse_args()
 
-    return Args(args.train_file, args.val_file, args.test_file,
-                args.output_dir, args.predictive_field, args.labels_field,
+    return Args(args.train_file, args.val_file, args.test_file, args.out_dir,
+                args.predictive_field, args.labels_field,
                 args.descriptive_labels, args.model_name, args.max_len,
                 args.learning_rate, args.weight_decay, args.sanity_check,
                 args.num_training, args.num_epochs, args.batch_size,
@@ -470,8 +470,8 @@ def main() -> None:
 
     args = get_args()
 
-    if not os.path.exists(args.output_dir):
-        os.mkdir(args.output_dir)
+    if not os.path.exists(args.out_dir):
+        os.mkdir(args.out_dir)
 
     model_name, train_dataloader, val_dataloader = get_dataloaders(args)
 
