@@ -124,13 +124,6 @@ def get_args() -> Args:
         help='Field in the dataframes to use for prediction',
         choices=['title', 'abstract', 'title_abstract'])
     data_info.add_argument(
-        '-labs',
-        '--labels-field',
-        metavar='LABS',
-        type=str,
-        default='curation_score',
-        help='Field in the dataframes corresponding to the scores (0, 1)')
-    data_info.add_argument(
         '-desc',
         '--descriptive-labels',
         metavar='LAB',
@@ -202,13 +195,6 @@ def main() -> None:
     predicted_labels = predictor.predict(dataloader)
     data_handler.train_df['predicted_label'] = predicted_labels
     pred_df = data_handler.train_df
-    true_labels = [
-        predictor.class_labels.int2str(int(x))
-        for x in data_handler.train_df['curation_score'].values
-    ]
-    pred_df['true_label'] = true_labels
-    pred_df = data_handler.train_df
-    print(pred_df[:20])
 
     # Save labels to file
     pred_df.to_csv(out_file)
