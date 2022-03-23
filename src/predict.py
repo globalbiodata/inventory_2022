@@ -7,13 +7,14 @@ from data_handler import DataHandler
 from utils import MODEL_TO_HUGGINGFACE_VERSION
 
 
+# ---------------------------------------------------------------------------
 class Predictor():
     """
-  Handles prediction based on a trained model
-  """
+    Handles prediction based on a trained model
+    """
     def __init__(self, model_huggingface_version, checkpoint_filepath):
         """
-    """
+        """
 
         self.device = torch.device(
             "cuda") if torch.cuda.is_available() else torch.device("cpu")
@@ -28,13 +29,14 @@ class Predictor():
         self.class_labels = ClassLabel(num_classes=2,
                                        names=args.descriptive_labels)
 
+    # -----------------------------------------------------------------------
     def predict(self, dataloader):
         """
-  	Generates predictions for a dataloader containing data
+  	    Generates predictions for a dataloader containing data
     
-  	:param: dataloader: contains tokenized text
-  	:returns: predicted labels
-  	"""
+  	    :param: dataloader: contains tokenized text
+  	    :returns: predicted labels
+  	    """
         all_predictions = []
         self.model.eval()
         for batch in dataloader:
@@ -50,61 +52,104 @@ class Predictor():
         return predicted_labels
 
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
+# ---------------------------------------------------------------------------
+def get_args():
+    """ Parse command-line arguments """
 
-    parser.add_argument(
-        '--checkpoint-filepath',
-        type=str,
-        default=
-        'output_dir/checkpt_biomed_roberta_title_abstract_512_10_epochs',
-        help='Location of saved checkpoint file.')
-    parser.add_argument(
+    parser = argparse.ArgumentParser(
+        description='Predict article classifications using trained BERT model',
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
+    inputs = parser.add_argument_group('Inputs and Outputs')
+    data_info = parser.add_argument_group('Information on Data')
+    model_params = parser.add_argument_group('Model Parameters')
+    runtime_params = parser.add_argument_group('Runtime Parameters')
+
+    inputs.add_argument('-c',
+                        '--checkpoint-filepath',
+                        metavar='CHKPT',
+                        type=str,
+                        required=True,
+                        help='Location of saved checkpoint file.')
+    inputs.add_argument(
+        '-i',
         '--input_file',
-        type=str,
+        metavar='FILE',
+        type=argparse.FileType('rt'),
         default='data/val.csv',
-        help='Input file. Should contain title/abstract information')
-    parser.add_argument(
+        help='Input file. Should contain columns in --predictive_field')
+    inputs.add_argument('-o',
+                        '--output-dir',
+                        metavar='DIR',
+                        type=str,
+                        default='output_dir/',
+                        help='Directory to output predictions')
+    inputs.add_argument(
+        '-of',
         '--output_file',
+        metavar='STR',
         type=str,
         default='output_dir/predictions.csv',
         help='Output file containing predictions on input_file')
-    parser.add_argument(
-        '--model-name',
+
+    data_info.add_argument(
+        '-pred',
+        '--predictive-field',
+        metavar='PRED',
         type=str,
-        default='biomed_roberta',
-        help=
-        "Name of model to try. Can be one of: ['bert', 'biobert', 'scibert', 'pubmedbert', 'pubmedbert_pmc', 'bluebert', 'bluebert_mimic3', 'sapbert', 'sapbert_mean_token', 'bioelectra', 'bioelectra_pmc', 'electramed', 'biomed_roberta', 'biomed_roberta_chemprot', 'biomed_roberta_rct_500']"
-    )
-    parser.add_argument(
-        '--descriptive-labels',
-        type=str,
-        default=['not-bio-resource', 'bio-resource'],
-        help="Descriptive labels corresponding to the [0, 1] numeric scores")
-    parser.add_argument('--batch-size', type=int, default=8, help='Batch Size')
-    parser.add_argument('--max_len',
-                        type=int,
-                        default=512,
-                        help='Max Sequence Length')
-    parser.add_argument(
-        '--predictive_field',
-        type=str,
-        default='title_abstract',
-        help=
-        "Field in the dataframes to use for prediction. Can be one of ['title', 'abstract', 'title-abstract']"
-    )
-    parser.add_argument(
-        '--labels_field',
+        default='title-abstract',
+        help='Field in the dataframes to use for prediction',
+        choices=['title', 'abstract', 'title-abstract'])
+    data_info.add_argument(
+        '-labs',
+        '--labels-field',
+        metavar='LABS',
         type=str,
         default='curation_score',
-        help="Field in the dataframes corresponding to the scores (0, 1)")
-    parser.add_argument(
-        '--descriptive_labels',
+        help='Field in the dataframes corresponding to the scores (0, 1)')
+    data_info.add_argument(
+        '-desc',
+        '--descriptive-labels',
+        metavar='LAB',
         type=str,
+        nargs=2,
         default=['not-bio-resource', 'bio-resource'],
-        help="Descriptive labels corresponding to the [0, 1] numeric scores")
+        help='Descriptive labels corresponding to the [0, 1] numeric scores')
 
-    args, _ = parser.parse_known_args()
+    model_params.add_argument(
+        '-m',
+        '--model-name',
+        metavar='MODEL',
+        type=str,
+        default='scibert',
+        help='Name of model',
+        choices=[
+            'bert', 'biobert', 'scibert', 'pubmedbert', 'pubmedbert_pmc',
+            'bluebert', 'bluebert_mimic3', 'sapbert', 'sapbert_mean_token',
+            'bioelectra', 'bioelectra_pmc', 'electramed', 'biomed_roberta',
+            'biomed_roberta_chemprot', 'biomed_roberta_rct_500'
+        ])
+    model_params.add_argument('-max',
+                              '--max-len',
+                              metavar='INT',
+                              type=int,
+                              default=256,
+                              help='Max Sequence Length')
+
+    runtime_params.add_argument('-batch',
+                                '--batch-size',
+                                metavar='INT',
+                                type=int,
+                                default=8,
+                                help='Batch Size')
+
+    return parser.parse_args()
+
+
+# ---------------------------------------------------------------------------
+if __name__ == '__main__':
+
+    args = get_args()
 
     print(f'args={args}')
     model_huggingface_version = MODEL_TO_HUGGINGFACE_VERSION[args.model_name]
