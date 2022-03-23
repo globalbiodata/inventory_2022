@@ -71,6 +71,9 @@ class Trainer():
         self.num_epochs = settings.num_epochs
         self.num_training_steps = settings.num_training_steps
         self.device = settings.device
+        self.best_model = settings.model
+        self.best_epoch = 0.
+        self.best_f1_score = 0.
 
     # -----------------------------------------------------------------------
     def get_metrics(self, dataloader) -> Metrics:
