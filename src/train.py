@@ -188,28 +188,23 @@ class Trainer():
             train_losses.append(train_metrics.loss)
             val_losses.append(val_metrics.loss)
 
-            print(
-                "Epoch", (epoch + 1), """: Train Loss: %.5f
-                  Val Loss: %.5f""" % (train_loss, val_metrics.loss))
-            print("""Train Precision: %.3f
-                 Train Recall: %.3f
-                 Train F1: %.3f
-                 Val Precision: %.3f
-                 Val Recall: %.3f
-                 Val F1: %.3f""" %
-                  (train_metrics.precision, train_metrics.recall,
-                   train_metrics.f1, val_metrics.precision, val_metrics.recall,
-                   val_metrics.f1))
+            print(f'Epoch {epoch + 1}:\n'
+                  f'Train Loss: {train_loss:.5f}\n'
+                  f'Val Loss: {val_metrics.loss:.5f}\n'
+                  f'Train Precision: {train_metrics.precision:.3f}\n'
+                  f'Train Recall: {train_metrics.recall:.3f}\n'
+                  f'Train F1: {train_metrics.f1:.3f}\n'
+                  f'Val Precision: {val_metrics.precision:.3f}\n'
+                  f'Val Recall: {val_metrics.recall:.3f}\n'
+                  f'Val F1: {val_metrics.f1:.3f}')
         print('Finished model training!')
         print('=' * 30)
-        print("""Best Train Precision: %.3f
-             Best Train Recall: %.3f
-             Best Train F1: %.3f
-             Best Val Precision: %.3f
-             Best Val Recall: %.3f
-             Best Val F1: %.3f""" %
-              (best_train.precision, best_train.recall, best_train.f1,
-               best_val.precision, best_val.recall, best_val.f1))
+        print(f'Best Train Precision: {best_train.precision:.3f}\n'
+             f'Best Train Recall: {best_train.recall:.3f}\n'
+             f'Best Train F1: {best_train.f1:.3f}\n'
+             f'Best Val Precision: {best_val.precision:.3f}\n'
+             f'Best Val Recall: {best_val.recall:.3f}\n'
+             f'Best Val F1: {best_val.f1:.3f}\n')
         self.best_model = best_model
         self.best_epoch = best_epoch
         self.best_f1_score = best_val.f1
