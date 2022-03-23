@@ -91,7 +91,7 @@ def get_args() -> Args:
     inputs.add_argument('-c',
                         '--checkpoint',
                         metavar='CHKPT',
-                        type=argparse.FileType('rt'),
+                        type=argparse.FileType('rb'),
                         required=True,
                         help='Trained model checkpoint')
     inputs.add_argument(
@@ -120,9 +120,9 @@ def get_args() -> Args:
         '--predictive-field',
         metavar='PRED',
         type=str,
-        default='title-abstract',
+        default='title_abstract',
         help='Field in the dataframes to use for prediction',
-        choices=['title', 'abstract', 'title-abstract'])
+        choices=['title', 'abstract', 'title_abstract'])
     data_info.add_argument(
         '-labs',
         '--labels-field',
