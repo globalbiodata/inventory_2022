@@ -7,7 +7,7 @@ Authors: Ana-Maria Istrate and Kenneth Schackart
 import argparse
 import copy
 import os
-from typing import NamedTuple, TextIO
+from typing import NamedTuple, TextIO, Tuple
 
 import pandas as pd
 import plotly.express as px
@@ -52,6 +52,9 @@ class Trainer():
     """
     Handles training of the model
     """
+
+    # pylint: disable=too-many-instance-attributes
+
     def __init__(self, settings: Settings):
         """
         :param model: PyTorch model
@@ -197,14 +200,15 @@ class Trainer():
                   f'Val Precision: {val_metrics.precision:.3f}\n'
                   f'Val Recall: {val_metrics.recall:.3f}\n'
                   f'Val F1: {val_metrics.f1:.3f}')
+
         print('Finished model training!')
         print('=' * 30)
         print(f'Best Train Precision: {best_train.precision:.3f}\n'
-             f'Best Train Recall: {best_train.recall:.3f}\n'
-             f'Best Train F1: {best_train.f1:.3f}\n'
-             f'Best Val Precision: {best_val.precision:.3f}\n'
-             f'Best Val Recall: {best_val.recall:.3f}\n'
-             f'Best Val F1: {best_val.f1:.3f}\n')
+              f'Best Train Recall: {best_train.recall:.3f}\n'
+              f'Best Train F1: {best_train.f1:.3f}\n'
+              f'Best Val Precision: {best_val.precision:.3f}\n'
+              f'Best Val Recall: {best_val.recall:.3f}\n'
+              f'Best Val F1: {best_val.f1:.3f}\n')
         self.best_model = best_model
         self.best_epoch = best_epoch
         self.best_f1_score = best_val.f1
@@ -410,19 +414,13 @@ def get_args():
 
 
 # ---------------------------------------------------------------------------
-def main() -> None:
-    """ Main function """
+def get_dataloaders(args: Args) -> Tuple[str, DataLoader, DataLoader]:
+    """ Generate the dataloaders """
 
-    args = get_args()
-
-    if not os.path.exists(args.output_dir):
-        os.mkdir(args.output_dir)
-
-    # Train, val, test dataloaders generation
     print('Generating train, val, test dataloaders ...')
     print('=' * 30)
-    model_huggingface_version = MODEL_TO_HUGGINGFACE_VERSION[args.model_name]
-    data_handler = DataHandler(model_huggingface_version, args.train_file.name,
+    model_name = MODEL_TO_HUGGINGFACE_VERSION[args.model_name]
+    data_handler = DataHandler(model_name, args.train_file.name,
                                args.val_file.name, args.test_file.name)
     data_handler.parse_abstracts_xml()
     data_handler.concatenate_title_abstracts()
@@ -435,11 +433,18 @@ def main() -> None:
     print('Finished generating dataloaders!')
     print('=' * 30)
 
-    # Model Initialization
-    print('Initializing', model_huggingface_version, 'model ...')
+    return model_name, train_dataloader, val_dataloader
+
+
+# ---------------------------------------------------------------------------
+def initialize_model(model_name: str, args: Args, train_dataloader: DataLoader,
+                     val_dataloader: DataLoader) -> Settings:
+    """ Initialize the model and get settings  """
+
+    print('Initializing', model_name, 'model ...')
     print('=' * 30)
-    model = AutoModelForSequenceClassification.from_pretrained(
-        model_huggingface_version, num_labels=2)
+    model = AutoModelForSequenceClassification.from_pretrained(model_name,
+                                                               num_labels=2)
     optimizer = AdamW(model.parameters(),
                       lr=args.learning_rate,
                       weight_decay=args.weight_decay)
@@ -455,12 +460,28 @@ def main() -> None:
         "cuda") if torch.cuda.is_available() else torch.device("cpu")
     model.to(device)
 
+    return Settings(model, optimizer, train_dataloader, val_dataloader,
+                    lr_scheduler, args.num_epochs, num_training_steps, device)
+
+
+# ---------------------------------------------------------------------------
+def main() -> None:
+    """ Main function """
+
+    args = get_args()
+
+    if not os.path.exists(args.output_dir):
+        os.mkdir(args.output_dir)
+
+    model_name, train_dataloader, val_dataloader = get_dataloaders(args)
+
+    settings = initialize_model(model_name, args, train_dataloader,
+                                val_dataloader)
+
     # Model Training
     print('Starting model training...')
     print('=' * 30)
-    settings = Settings(model, optimizer, train_dataloader, val_dataloader,
-                        lr_scheduler, args.num_epochs, num_training_steps,
-                        device)
+
     trainer = Trainer(settings)
     _, best_epoch, train_losses, val_losses = trainer.train()
 
