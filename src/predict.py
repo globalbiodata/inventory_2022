@@ -6,58 +6,15 @@ Authors: Ana-Maria Istrate and Kenneth Schackart
 
 import argparse
 import os
-from typing import NamedTuple, TextIO
+from typing import List, NamedTuple, TextIO
 
 import torch
-from transformers import AutoModelForSequenceClassification, AutoTokenizer
 from datasets import ClassLabel
+from torch.utils.data.dataloader import DataLoader
+from transformers import AutoModelForSequenceClassification as classifier
 
 from data_handler import DataHandler
 from utils import MODEL_TO_HUGGINGFACE_VERSION
-
-
-# ---------------------------------------------------------------------------
-class Predictor():
-    """
-    Handles prediction based on a trained model
-    """
-    def __init__(self, model_huggingface_version, checkpoint_fh, labels):
-        """
-        """
-
-        self.device = torch.device(
-            "cuda") if torch.cuda.is_available() else torch.device("cpu")
-        self.model = AutoModelForSequenceClassification.from_pretrained(
-            model_huggingface_version, num_labels=2)
-        checkpoint = torch.load(checkpoint_fh, map_location=self.device)
-        self.model.load_state_dict(checkpoint['model_state_dict'])
-        self.model.to(self.device)
-        self.model.eval()
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            model_huggingface_version)
-        self.class_labels = ClassLabel(num_classes=2, names=labels)
-
-    # -----------------------------------------------------------------------
-    def predict(self, dataloader):
-        """
-  	    Generates predictions for a dataloader containing data
-
-  	    :param: dataloader: contains tokenized text
-  	    :returns: predicted labels
-  	    """
-        all_predictions = []
-        self.model.eval()
-        for batch in dataloader:
-            batch = {k: v.to(self.device) for k, v in batch.items()}
-            with torch.no_grad():
-                outputs = self.model(**batch)
-            logits = outputs.logits
-            predictions = torch.argmax(logits, dim=-1).cpu().numpy()
-            all_predictions.extend(predictions)
-        predicted_labels = [
-            self.class_labels.int2str(int(x)) for x in all_predictions
-        ]
-        return predicted_labels
 
 
 # ---------------------------------------------------------------------------
@@ -168,6 +125,61 @@ def get_args() -> Args:
 
 
 # ---------------------------------------------------------------------------
+def get_datahandler(model_name: str, args: Args) -> DataHandler:
+    """ Generate the dataloader """
+
+    data_handler = DataHandler(model_name, args.infile)
+    data_handler.parse_abstracts_xml()
+    data_handler.concatenate_title_abstracts()
+    data_handler.generate_dataloaders(args.predictive_field, args.labels_field,
+                                      args.descriptive_labels, args.batch_size,
+                                      args.max_len)
+
+    return data_handler
+
+
+# ---------------------------------------------------------------------------
+def get_torch_device() -> torch.device:
+    """ Get device for torch """
+
+    return torch.device('cuda') if torch.cuda.is_available() else torch.device(
+        'cpu')
+
+
+# ---------------------------------------------------------------------------
+def get_model(model_name: str, checkpoint_fh: TextIO, device: torch.device):
+    """ Instatiate predictive model from checkpoint """
+
+    model = classifier.from_pretrained(model_name, num_labels=2)
+    checkpoint = torch.load(checkpoint_fh, map_location=device)
+    model.load_state_dict(checkpoint['model_state_dict'])
+    model.to(device)
+    model.eval()
+
+    return model
+
+
+# ---------------------------------------------------------------------------
+def predict(model, dataloader: DataLoader, class_labels: ClassLabel,
+            device: torch.device) -> List[str]:
+    """ Use model to predict article classifications """
+
+    all_predictions = []
+    model.eval()
+    for batch in dataloader:
+        batch = {k: v.to(device) for k, v in batch.items()}
+        with torch.no_grad():
+            outputs = model(**batch)
+        logits = outputs.logits
+        predictions = torch.argmax(logits, dim=-1).cpu().numpy()
+        all_predictions.extend(predictions)
+
+    predicted_labels = [class_labels.int2str(int(x)) for x in all_predictions]
+
+    return predicted_labels
+
+
+# ---------------------------------------------------------------------------
 def main() -> None:
     """ Main function """
 
@@ -178,21 +190,18 @@ def main() -> None:
 
     out_file = os.path.join(args.out_dir, args.out_file)
 
-    model_huggingface_version = MODEL_TO_HUGGINGFACE_VERSION[args.model_name]
-    predictor = Predictor(model_huggingface_version, args.checkpoint,
-                          args.descriptive_labels)
+    model_name = MODEL_TO_HUGGINGFACE_VERSION[args.model_name]
 
-    # Load data in a DataLoader
-    data_handler = DataHandler(model_huggingface_version, args.infile)
-    data_handler.parse_abstracts_xml()
-    data_handler.concatenate_title_abstracts()
-    data_handler.generate_dataloaders(args.predictive_field, args.labels_field,
-                                      args.descriptive_labels, args.batch_size,
-                                      args.max_len)
+    data_handler = get_datahandler(model_name, args)
     dataloader = data_handler.train_dataloader
 
+    device = get_torch_device()
+
+    model = get_model(model_name, args.checkpoint, device)
+    class_labels = ClassLabel(num_classes=2, names=args.descriptive_labels)
+
     # Predict labels
-    predicted_labels = predictor.predict(dataloader)
+    predicted_labels = predict(model, dataloader, class_labels, device)
     data_handler.train_df['predicted_label'] = predicted_labels
     pred_df = data_handler.train_df
 
