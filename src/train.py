@@ -262,7 +262,7 @@ class Args(NamedTuple):
     train_file: TextIO
     val_file: TextIO
     test_file: TextIO
-    output_dir: str
+    out_dir: str
     predictive_field: str
     labels_field: str
     descriptive_labels: str
@@ -312,8 +312,8 @@ def get_args():
                         '--out-dir',
                         metavar='DIR',
                         type=str,
-                        default='output_dir/',
-                        help='Directory to output checkpt and plot losses')
+                        default='out/',
+                        help='Directory to output checkpt and loss plot')
 
     data_info.add_argument(
         '-pred',
@@ -465,13 +465,31 @@ def initialize_model(model_name: str, args: Args, train_dataloader: DataLoader,
 
 
 # ---------------------------------------------------------------------------
+def make_filenames(out_dir: str, model_name: str) -> Tuple[str, str]:
+    """ Make output filenames """
+
+    partial_name = os.path.join(out_dir, model_name + '_')
+
+    return partial_name + 'checkpt.pt', partial_name + 'losses.png'
+
+
+# ---------------------------------------------------------------------------
+def test_make_filenames() -> None:
+    """ Test make_filenames """
+
+    assert make_filenames('out', 'scibert') == ('out/scibert_checkpt.pt',
+                                                'out/scibert_losses.png')
+
+
+# ---------------------------------------------------------------------------
 def main() -> None:
     """ Main function """
 
     args = get_args()
+    out_dir = args.out_dir
 
-    if not os.path.exists(args.out_dir):
-        os.mkdir(args.out_dir)
+    if not os.path.exists(out_dir):
+        os.mkdir(out_dir)
 
     model_name, train_dataloader, val_dataloader = get_dataloaders(args)
 
@@ -483,17 +501,14 @@ def main() -> None:
     print('=' * 30)
 
     trainer = Trainer(settings)
-    _, best_epoch, train_losses, val_losses = trainer.train()
+    _, _, train_losses, val_losses = trainer.train()
 
+    checkpt_filename, img_filename = make_filenames(out_dir, args.model_name)
     # Save best checkpoint
-    checkpt_filename = args.output_dir + 'checkpt_' + args.model_name + '_' + \
-        str(best_epoch + 1) + '_epochs'
     trainer.save_best_model(checkpt_filename)
     print('Saved best checkpt to', checkpt_filename)
 
     # Plot losses
-    img_filename = args.output_dir + args.model_name + '_' + str(
-        best_epoch + 1) + '_epochs.png'
     trainer.plot_losses([train_losses, val_losses], ['Train Loss', 'Val Loss'],
                         img_filename)
     print('=' * 30)
