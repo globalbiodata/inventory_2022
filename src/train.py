@@ -38,6 +38,16 @@ class Settings(NamedTuple):
 
 
 # ---------------------------------------------------------------------------
+class Metrics(NamedTuple):
+    """ Performance metrics  """
+
+    precision: float
+    recall: float
+    f1: float
+    loss: float
+
+
+# ---------------------------------------------------------------------------
 class Trainer():
     """
     Handles training of the model
@@ -63,7 +73,7 @@ class Trainer():
         self.device = settings.device
 
     # -----------------------------------------------------------------------
-    def get_metrics(self, dataloader):
+    def get_metrics(self, dataloader) -> Metrics:
         """
         Computes and returns metrics (P, R, F1 score) of a model on
         data present in a dataloader
@@ -94,8 +104,10 @@ class Trainer():
             f1.add_batch(predictions=predictions, references=batch["labels"])
             total_loss += loss.item()
         total_loss /= num_seen_datapoints
-        return precision.compute()['precision'], recall.compute(
-        )['recall'], f1.compute()['f1'], total_loss
+
+        return Metrics(precision.compute()['precision'],
+                       recall.compute()['recall'],
+                       f1.compute()['f1'], total_loss)
 
     # -----------------------------------------------------------------------
     def train_epoch(self, progress_bar):
@@ -154,47 +166,37 @@ class Trainer():
         best_model = self.model
         train_losses = []
         val_losses = []
-        best_val_f1 = 0
-        best_train_f1 = 0
-        best_val_p = 0
-        best_train_p = 0
-        best_val_r = 0
-        best_train_r = 0
-        best_epoch = 0
+        best_val = Metrics(0, 0, 0, 0)
 
         for epoch in range(self.num_epochs):
             # training
             train_loss = self.train_epoch(progress_bar)
             # evaluation
             self.model.eval()
-            train_p, train_r, train_f1, _ = self.get_metrics(
-                self.train_dataloader)
-            val_p, val_r, val_f1, val_loss = self.get_metrics(
-                self.val_dataloader)
+            train_metrics = self.get_metrics(self.train_dataloader)
+            val_metrics = self.get_metrics(self.val_dataloader)
 
-            if val_f1 > best_val_f1:
-                best_val_f1 = val_f1
-                best_train_f1 = train_f1
-                best_val_p = val_p
-                best_train_p = train_p
-                best_val_r = val_r
-                best_train_r = train_r
+            if val_metrics.f1 > best_val.f1:
+                best_val = val_metrics
+                best_train = train_metrics
                 best_model = copy.deepcopy(self.model)
                 best_epoch = epoch
 
-            train_losses.append(train_loss)
-            val_losses.append(val_loss)
+            train_losses.append(train_metrics.loss)
+            val_losses.append(val_metrics.loss)
 
             print(
                 "Epoch", (epoch + 1), """: Train Loss: %.5f
-                  Val Loss: %.5f""" % (train_loss, val_loss))
+                  Val Loss: %.5f""" % (train_loss, val_metrics.loss))
             print("""Train Precision: %.3f
                  Train Recall: %.3f
                  Train F1: %.3f
                  Val Precision: %.3f
                  Val Recall: %.3f
                  Val F1: %.3f""" %
-                  (train_p, train_r, train_f1, val_p, val_r, val_f1))
+                  (train_metrics.precision, train_metrics.recall,
+                   train_metrics.f1, val_metrics.precision, val_metrics.recall,
+                   val_metrics.f1))
         print('Finished model training!')
         print('=' * 30)
         print("""Best Train Precision: %.3f
@@ -202,11 +204,13 @@ class Trainer():
              Best Train F1: %.3f
              Best Val Precision: %.3f
              Best Val Recall: %.3f
-             Best Val F1: %.3f""" % (best_train_p, best_train_r, best_train_f1,
-                                     best_val_p, best_val_r, best_val_f1))
+             Best Val F1: %.3f""" %
+              (best_train.precision, best_train.recall, best_train.f1,
+               best_val.precision, best_val.recall, best_val.f1))
         self.best_model = best_model
         self.best_epoch = best_epoch
-        self.best_f1_score = best_val_f1
+        self.best_f1_score = best_val.f1
+
         return best_model, best_epoch, train_losses, val_losses
 
     # -----------------------------------------------------------------------
