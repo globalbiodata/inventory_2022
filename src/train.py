@@ -320,9 +320,9 @@ def get_args():
         '--predictive-field',
         metavar='PRED',
         type=str,
-        default='title-abstract',
+        default='title_abstract',
         help='Field in the dataframes to use for prediction',
-        choices=['title', 'abstract', 'title-abstract'])
+        choices=['title', 'abstract', 'title_abstract'])
     data_info.add_argument(
         '-labs',
         '--labels-field',
