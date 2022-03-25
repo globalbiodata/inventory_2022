@@ -61,7 +61,7 @@ def get_args() -> Args:
                         '--out-dir',
                         metavar='DIR',
                         type=str,
-                        default='output_dir/',
+                        default='out/',
                         help='Directory to output predictions')
     inputs.add_argument('-of',
                         '--out-file',
@@ -123,11 +123,9 @@ def get_args() -> Args:
 def get_dataloaders(args: Args, model_name: str) -> DataLoader:
     """ Generate the dataloaders """
 
-    data_fields = DataFields(args.predictive_field, None,
-                             args.descriptive_labels)
+    data_fields = DataFields(args.predictive_field, args.descriptive_labels)
 
-    dataloader_params = RunParams(model_name, args.batch_size, args.max_len,
-                                  None)
+    dataloader_params = RunParams(model_name, args.batch_size, args.max_len)
 
     dataloader = get_dataloader(args.infile, data_fields, dataloader_params)
 
