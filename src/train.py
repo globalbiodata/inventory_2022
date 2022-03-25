@@ -174,6 +174,7 @@ class Trainer():
         val_losses = []
         best_val = Metrics(0, 0, 0, 0)
         best_train = Metrics(0, 0, 0, 0)
+        best_epoch = 0
 
         for epoch in range(self.num_epochs):
             # training
