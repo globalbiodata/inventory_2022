@@ -19,8 +19,8 @@ from tqdm.auto import tqdm
 from transformers import (AdamW, AutoModelForSequenceClassification,
                           get_scheduler)
 
-from data_handler import DataHandler
-from utils import MODEL_TO_HUGGINGFACE_VERSION
+from data_handler import get_dataloader, DataFields, RunParams
+from utils import MODEL_TO_HUGGINGFACE_VERSION, CustomHelpFormatter
 
 
 # ---------------------------------------------------------------------------
@@ -270,7 +270,6 @@ class Args(NamedTuple):
     max_len: int
     learning_rate: float
     weight_decay: float
-    sanity_check: bool
     num_training: int
     num_epochs: int
     batch_size: int
@@ -283,7 +282,7 @@ def get_args():
 
     parser = argparse.ArgumentParser(
         description='Train BERT model for article classification',
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+        formatter_class=CustomHelpFormatter)
 
     inputs = parser.add_argument_group('Inputs and Outputs')
     data_info = parser.add_argument_group('Information on Data')
@@ -295,19 +294,19 @@ def get_args():
                         metavar='FILE',
                         type=argparse.FileType('rt'),
                         default='data/train.csv',
-                        help='Location of training file')
+                        help='Training data file')
     inputs.add_argument('-v',
                         '--val-file',
                         metavar='FILE',
                         type=argparse.FileType('rt'),
                         default='data/val.csv',
-                        help='Location of validation file')
+                        help='Validation data file')
     inputs.add_argument('-s',
                         '--test-file',
                         metavar='FILE',
                         type=argparse.FileType('rt'),
                         default='data/test.csv',
-                        help='Location of test file')
+                        help='Test data file')
     inputs.add_argument('-o',
                         '--out-dir',
                         metavar='DIR',
@@ -371,19 +370,13 @@ def get_args():
                               default=0.0,
                               help='Weight Decay for Learning Rate')
 
-    runtime_params.add_argument('-check',
-                                '--sanity-check',
-                                action='store_true',
-                                help="""True for sanity-check.
-        Runs training on a smaller subset of the entire training data.""")
     runtime_params.add_argument(
         '-nt',
         '--num-training',
         metavar='INT',
         type=int,
-        default=-1,
-        help="""Number of data points to run training on.
-        If -1, training is ran an all the data. Useful for debugging.""")
+        default=None,
+        help='Number of data points for training (default: all)')
     runtime_params.add_argument('-ne',
                                 '--num-epochs',
                                 metavar='INT',
@@ -397,43 +390,44 @@ def get_args():
                                 default=32,
                                 help='Batch Size')
 
-    runtime_params.add_argument(
-        '-lr',
-        '--lr-scheduler',
-        action='store_true',
-        help="True if using a Learning Rate Scheduler.")
+    runtime_params.add_argument('-lr',
+                                '--lr-scheduler',
+                                action='store_true',
+                                help='Use a Learning Rate Scheduler')
 
     args = parser.parse_args()
 
     return Args(args.train_file, args.val_file, args.test_file, args.out_dir,
                 args.predictive_field, args.labels_field,
                 args.descriptive_labels, args.model_name, args.max_len,
-                args.learning_rate, args.weight_decay, args.sanity_check,
+                args.learning_rate, args.weight_decay,
                 args.num_training, args.num_epochs, args.batch_size,
                 args.lr_scheduler)
 
 
 # ---------------------------------------------------------------------------
-def get_dataloaders(args: Args) -> Tuple[str, DataLoader, DataLoader]:
+def get_dataloaders(args: Args,
+                    model_name: str) -> Tuple[DataLoader, DataLoader]:
     """ Generate the dataloaders """
 
-    print('Generating train, val, test dataloaders ...')
+    print('Generating dataloaders ...')
     print('=' * 30)
-    model_name = MODEL_TO_HUGGINGFACE_VERSION[args.model_name]
-    data_handler = DataHandler(model_name, args.train_file.name,
-                               args.val_file.name, args.test_file.name)
-    data_handler.parse_abstracts_xml()
-    data_handler.concatenate_title_abstracts()
-    data_handler.generate_dataloaders(args.predictive_field, args.labels_field,
-                                      args.descriptive_labels, args.batch_size,
-                                      args.max_len, args.sanity_check,
-                                      args.num_training)
-    train_dataloader = data_handler.train_dataloader
-    val_dataloader = data_handler.val_dataloader
+
+    data_fields = DataFields(args.predictive_field, args.labels_field,
+                             args.descriptive_labels)
+
+    dataloader_params = RunParams(model_name, args.batch_size, args.max_len,
+                                  args.num_training)
+
+    train_dataloader = get_dataloader(args.train_file, data_fields,
+                                      dataloader_params)
+    val_dataloader = get_dataloader(args.val_file, data_fields,
+                                    dataloader_params)
+
     print('Finished generating dataloaders!')
     print('=' * 30)
 
-    return model_name, train_dataloader, val_dataloader
+    return train_dataloader, val_dataloader
 
 
 # ---------------------------------------------------------------------------
@@ -491,7 +485,9 @@ def main() -> None:
     if not os.path.isdir(out_dir):
         os.makedirs(out_dir)
 
-    model_name, train_dataloader, val_dataloader = get_dataloaders(args)
+    model_name = MODEL_TO_HUGGINGFACE_VERSION[args.model_name]
+
+    train_dataloader, val_dataloader = get_dataloaders(args, model_name)
 
     settings = initialize_model(model_name, args, train_dataloader,
                                 val_dataloader)
