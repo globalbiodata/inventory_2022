@@ -1,4 +1,9 @@
-''' Common data structures '''
+"""
+Purpose: Provide shared data structures and classes
+Authors: Ana-Maria Istrate and Kenneth Schackart
+"""
+
+import argparse
 
 # Mapping from generic model name to the Huggingface Version used to initialize the model
 MODEL_TO_HUGGINGFACE_VERSION = {
@@ -22,3 +27,30 @@ MODEL_TO_HUGGINGFACE_VERSION = {
     'biomed_roberta_rct_500':
     'allenai/dsp_roberta_base_dapt_biomed_tapt_rct_500'
 }
+
+
+# ---------------------------------------------------------------------------
+class CustomHelpFormatter(argparse.ArgumentDefaultsHelpFormatter):
+    """ Custom Argparse help formatter """
+    def _get_help_string(self, action):
+        """ Suppress defaults that are None """
+        if action.default is None:
+            return action.help
+        return super()._get_help_string(action)
+
+    def _format_action_invocation(self, action):
+        """ Show metavar only once """
+        if not action.option_strings:
+            metavar, = self._metavar_formatter(action, action.dest)(1)
+            return metavar
+        else:
+            parts = []
+            if action.nargs == 0:
+                parts.extend(action.option_strings)
+            else:
+                default = action.dest.upper()
+                args_string = self._format_args(action, default)
+                for option_string in action.option_strings:
+                    parts.append('%s' % option_string)
+                parts[-1] += ' %s' % args_string
+            return ', '.join(parts)
