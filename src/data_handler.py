@@ -18,15 +18,28 @@ from transformers import AutoTokenizer
 
 # ---------------------------------------------------------------------------
 class DataFields(NamedTuple):
-    """ Fields in data used for training and classification """
-    predictive: str  # Column used for prediction
-    labels: Optional[str]  # Column containing labels
-    descriptive_labels: List[str]  # Description of labels
+    """
+    Fields in data used for training and classification
+
+    `predictive`: Column used for prediction
+    `labels`: Column containing labels (optional)
+    `descriptive_labels`: Descriptions of the classification labels
+    """
+    predictive: str
+    labels: Optional[str]
+    descriptive_labels: List[str]
 
 
 # ---------------------------------------------------------------------------
 class RunParams(NamedTuple):
-    """ Model and run parameters """
+    """
+    Model and run parameters
+    
+    `model_name`: Huggingface model name
+    `batch_size`: Tokenization batch size
+    `max_len`: Tokenization max length
+    `num_train`: Number of training datapoints (optional)
+    """
     model_name: str  # Huggingface model name
     batch_size: int  # Tokenization batch size
     max_len: int  # Tokenization max length
@@ -56,7 +69,7 @@ def preprocess_data(file: TextIO) -> pd.DataFrame:
                  'labeled "title" and "abstract".')
 
     for col in ['title', 'abstract']:
-        df[col] = df[col].apply(lambda s: strip_xml(s))
+        df[col] = df[col].apply(strip_xml)
 
     df = concat_title_abstract(df)
 
