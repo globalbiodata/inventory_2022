@@ -22,6 +22,6 @@ def test_usage():
     """ Usage """
 
     for flag in ['-h', '--help']:
-        retval, out = getstatusoutput(f'python3 {PRG} {flag}')
+        retval, out = getstatusoutput(f'{PRG} {flag}')
         assert retval == 0
         assert out.lower().startswith('usage')
