@@ -52,7 +52,7 @@ def get_args() -> Args:
                         required=True,
                         help='Trained model checkpoint')
     inputs.add_argument('-i',
-                        '--input_file',
+                        '--input-file',
                         metavar='FILE',
                         type=argparse.FileType('rt'),
                         default='data/val.csv',
