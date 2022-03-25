@@ -7,7 +7,7 @@ Authors: Ana-Maria Istrate and Kenneth Schackart
 import argparse
 import copy
 import os
-from typing import NamedTuple, TextIO, Tuple
+from typing import List, NamedTuple, TextIO, Tuple
 
 import pandas as pd
 import plotly.express as px
@@ -93,7 +93,7 @@ class Trainer():
         precision = load_metric("precision")
         recall = load_metric("recall")
         f1 = load_metric("f1")
-        total_loss = 0
+        total_loss = 0.
         num_seen_datapoints = 0
         for batch in dataloader:
             batch = {k: v.to(self.device) for k, v in batch.items()}
@@ -266,7 +266,7 @@ class Args(NamedTuple):
     out_dir: str
     predictive_field: str
     labels_field: str
-    descriptive_labels: str
+    descriptive_labels: List[str]
     model_name: str
     max_len: int
     learning_rate: float
@@ -404,8 +404,11 @@ def get_dataloaders(args: Args,
     print('Generating dataloaders ...')
     print('=' * 30)
 
-    data_fields = DataFields(args.predictive_field, args.labels_field,
-                             args.descriptive_labels)
+    data_fields = DataFields(
+        args.predictive_field,
+        args.descriptive_labels,
+        args.labels_field,
+    )
 
     dataloader_params = RunParams(model_name, args.batch_size, args.max_len,
                                   args.num_training)
