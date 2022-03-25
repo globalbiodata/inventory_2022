@@ -43,7 +43,7 @@ def run_bad_file(flag: str) -> None:
 def test_bad_input_files() -> None:
     """ Dies on bad input files """
 
-    flags = ['-t', '--train-file', '-v', '--val-file', '-s', '--test-file']
+    flags = ['-t', '--train-file', '-v', '--val-file']
 
     for flag in flags:
         run_bad_file(flag)
