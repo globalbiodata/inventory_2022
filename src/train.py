@@ -261,7 +261,6 @@ class Args(NamedTuple):
     """ Command-line arguments """
     train_file: TextIO
     val_file: TextIO
-    test_file: TextIO
     out_dir: str
     predictive_field: str
     labels_field: str
@@ -301,12 +300,6 @@ def get_args():
                         type=argparse.FileType('rt'),
                         default='data/val.csv',
                         help='Validation data file')
-    inputs.add_argument('-s',
-                        '--test-file',
-                        metavar='FILE',
-                        type=argparse.FileType('rt'),
-                        default='data/test.csv',
-                        help='Test data file')
     inputs.add_argument('-o',
                         '--out-dir',
                         metavar='DIR',
@@ -314,29 +307,26 @@ def get_args():
                         default='out/',
                         help='Directory to output checkpt and loss plot')
 
-    data_info.add_argument(
-        '-pred',
-        '--predictive-field',
-        metavar='PRED',
-        type=str,
-        default='title_abstract',
-        help='Field in the dataframes to use for prediction',
-        choices=['title', 'abstract', 'title_abstract'])
-    data_info.add_argument(
-        '-labs',
-        '--labels-field',
-        metavar='LABS',
-        type=str,
-        default='curation_score',
-        help='Field in the dataframes corresponding to the scores (0, 1)')
-    data_info.add_argument(
-        '-desc',
-        '--descriptive-labels',
-        metavar='LAB',
-        type=str,
-        nargs=2,
-        default=['not-bio-resource', 'bio-resource'],
-        help='Descriptive labels corresponding to the [0, 1] numeric scores')
+    data_info.add_argument('-pred',
+                           '--predictive-field',
+                           metavar='PRED',
+                           type=str,
+                           default='title_abstract',
+                           help='Data column to use for prediction',
+                           choices=['title', 'abstract', 'title_abstract'])
+    data_info.add_argument('-labs',
+                           '--labels-field',
+                           metavar='LABS',
+                           type=str,
+                           default='curation_score',
+                           help='Data column with classification labels')
+    data_info.add_argument('-desc',
+                           '--descriptive-labels',
+                           metavar='LAB',
+                           type=str,
+                           nargs=2,
+                           default=['not-bio-resource', 'bio-resource'],
+                           help='Descriptions of the classification labels')
 
     model_params.add_argument(
         '-m',
@@ -397,12 +387,11 @@ def get_args():
 
     args = parser.parse_args()
 
-    return Args(args.train_file, args.val_file, args.test_file, args.out_dir,
+    return Args(args.train_file, args.val_file, args.out_dir,
                 args.predictive_field, args.labels_field,
                 args.descriptive_labels, args.model_name, args.max_len,
-                args.learning_rate, args.weight_decay,
-                args.num_training, args.num_epochs, args.batch_size,
-                args.lr_scheduler)
+                args.learning_rate, args.weight_decay, args.num_training,
+                args.num_epochs, args.batch_size, args.lr_scheduler)
 
 
 # ---------------------------------------------------------------------------
