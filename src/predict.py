@@ -38,7 +38,7 @@ def get_args() -> Args:
 
     parser = argparse.ArgumentParser(
         description='Predict article classifications using trained BERT model',
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+        formatter_class=CustomHelpFormatter)
 
     inputs = parser.add_argument_group('Inputs and Outputs')
     data_info = parser.add_argument_group('Information on Data')
@@ -51,43 +51,39 @@ def get_args() -> Args:
                         type=argparse.FileType('rb'),
                         required=True,
                         help='Trained model checkpoint')
-    inputs.add_argument(
-        '-i',
-        '--input_file',
-        metavar='FILE',
-        type=argparse.FileType('rt'),
-        default='data/val.csv',
-        help='Input file. Should contain columns in --predictive_field')
+    inputs.add_argument('-i',
+                        '--input_file',
+                        metavar='FILE',
+                        type=argparse.FileType('rt'),
+                        default='data/val.csv',
+                        help='Input file for prediction')
     inputs.add_argument('-o',
                         '--out-dir',
                         metavar='DIR',
                         type=str,
                         default='output_dir/',
                         help='Directory to output predictions')
-    inputs.add_argument(
-        '-of',
-        '--out-file',
-        metavar='STR',
-        type=str,
-        default='predictions.csv',
-        help='Output file containing predictions on --input_file')
+    inputs.add_argument('-of',
+                        '--out-file',
+                        metavar='STR',
+                        type=str,
+                        default='predictions.csv',
+                        help='Output filename')
 
-    data_info.add_argument(
-        '-pred',
-        '--predictive-field',
-        metavar='PRED',
-        type=str,
-        default='title_abstract',
-        help='Field in the dataframes to use for prediction',
-        choices=['title', 'abstract', 'title_abstract'])
-    data_info.add_argument(
-        '-desc',
-        '--descriptive-labels',
-        metavar='LAB',
-        type=str,
-        nargs=2,
-        default=['not-bio-resource', 'bio-resource'],
-        help='Descriptive labels corresponding to the [0, 1] numeric scores')
+    data_info.add_argument('-pred',
+                           '--predictive-field',
+                           metavar='PRED',
+                           type=str,
+                           default='title_abstract',
+                           help='Data column to use for prediction',
+                           choices=['title', 'abstract', 'title_abstract'])
+    data_info.add_argument('-desc',
+                           '--descriptive-labels',
+                           metavar='LAB',
+                           type=str,
+                           nargs=2,
+                           default=['not-bio-resource', 'bio-resource'],
+                           help='Descriptions of the classification labels')
 
     model_params.add_argument(
         '-m',
