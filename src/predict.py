@@ -26,7 +26,7 @@ class Args(NamedTuple):
     out_dir: str
     out_file: str
     predictive_field: str
-    descriptive_labels: str
+    descriptive_labels: List[str]
     model_name: str
     max_len: int
     batch_size: int
