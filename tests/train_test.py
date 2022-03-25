@@ -1,11 +1,12 @@
 """ Tests """
 
 import os
-import random
 import re
-# import shutil
-import string
 from subprocess import getstatusoutput
+
+import test_utils as tu
+
+# import shutil
 
 PRG = 'src/train.py'
 
@@ -31,7 +32,7 @@ def test_usage() -> None:
 def run_bad_file(flag: str) -> None:
     """ Dies on bad input file """
 
-    bad = random_string()
+    bad = tu.random_string()
 
     retval, out = getstatusoutput(f'{PRG} {flag} {bad}')
     assert retval != 0
@@ -50,48 +51,21 @@ def test_bad_input_files() -> None:
 
 
 # ---------------------------------------------------------------------------
-def run_bad_option(flag: str) -> None:
-    """ Dies on bad option """
-
-    bad = random_string()
-
-    retval, out = getstatusoutput(f'{PRG} {flag} {bad}')
-    assert retval != 0
-    assert out.lower().startswith('usage:')
-    assert re.search('invalid choice', out)
-    assert re.search(bad, out)
-    assert re.search('choose from', out)
-
-
-# ---------------------------------------------------------------------------
 def test_bad_model() -> None:
     """ Dies on bad model choice """
 
-    run_bad_option('--model-name')
+    tu.bad_model(PRG)
 
 
 # ---------------------------------------------------------------------------
 def test_bad_predictor() -> None:
     """ Dies on bad predictor choice """
 
-    run_bad_option('--predictive-field')
+    tu.bad_predictor(PRG)
 
 
 # ---------------------------------------------------------------------------
 def test_bad_descriptors() -> None:
     """ Incorrect number of descriptive labels """
 
-    label = random_string()
-
-    retval, out = getstatusoutput(f'{PRG} -desc {label}')
-    assert retval != 0
-    assert out.lower().startswith('usage:')
-    assert re.search('-desc/--descriptive-labels', out)
-    assert re.search('expected 2 arguments', out)
-
-
-# ---------------------------------------------------------------------------
-def random_string() -> str:
-    """ Generate a random string """
-
-    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=5))
+    tu.bad_descriptors(PRG)
