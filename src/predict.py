@@ -9,12 +9,13 @@ import os
 from typing import List, NamedTuple, TextIO
 
 import torch
+import pandas as pd
 from datasets import ClassLabel
 from torch.utils.data.dataloader import DataLoader
 from transformers import AutoModelForSequenceClassification as classifier
 
-from data_handler import DataHandler
-from utils import MODEL_TO_HUGGINGFACE_VERSION
+from data_handler import get_dataloader, DataFields, RunParams
+from utils import MODEL_TO_HUGGINGFACE_VERSION, CustomHelpFormatter
 
 
 # ---------------------------------------------------------------------------
@@ -25,7 +26,6 @@ class Args(NamedTuple):
     out_dir: str
     out_file: str
     predictive_field: str
-    labels_field: str
     descriptive_labels: str
     model_name: str
     max_len: int
@@ -119,23 +119,23 @@ def get_args() -> Args:
     args = parser.parse_args()
 
     return Args(args.checkpoint, args.input_file, args.out_dir, args.out_file,
-                args.predictive_field, args.labels_field,
-                args.descriptive_labels, args.model_name, args.max_len,
-                args.batch_size)
+                args.predictive_field, args.descriptive_labels,
+                args.model_name, args.max_len, args.batch_size)
 
 
 # ---------------------------------------------------------------------------
-def get_datahandler(model_name: str, args: Args) -> DataHandler:
-    """ Generate the dataloader """
+def get_dataloaders(args: Args, model_name: str) -> DataLoader:
+    """ Generate the dataloaders """
 
-    data_handler = DataHandler(model_name, args.infile)
-    data_handler.parse_abstracts_xml()
-    data_handler.concatenate_title_abstracts()
-    data_handler.generate_dataloaders(args.predictive_field, args.labels_field,
-                                      args.descriptive_labels, args.batch_size,
-                                      args.max_len)
+    data_fields = DataFields(args.predictive_field, None,
+                             args.descriptive_labels)
 
-    return data_handler
+    dataloader_params = RunParams(model_name, args.batch_size, args.max_len,
+                                  None)
+
+    dataloader = get_dataloader(args.infile, data_fields, dataloader_params)
+
+    return dataloader
 
 
 # ---------------------------------------------------------------------------
@@ -192,8 +192,7 @@ def main() -> None:
 
     model_name = MODEL_TO_HUGGINGFACE_VERSION[args.model_name]
 
-    data_handler = get_datahandler(model_name, args)
-    dataloader = data_handler.train_dataloader
+    dataloader = get_dataloaders(args, model_name)
 
     device = get_torch_device()
 
@@ -201,12 +200,12 @@ def main() -> None:
     class_labels = ClassLabel(num_classes=2, names=args.descriptive_labels)
 
     # Predict labels
+    df = pd.read_csv(open(args.infile.name))
     predicted_labels = predict(model, dataloader, class_labels, device)
-    data_handler.train_df['predicted_label'] = predicted_labels
-    pred_df = data_handler.train_df
+    df['predicted_label'] = predicted_labels
 
     # Save labels to file
-    pred_df.to_csv(out_file)
+    df.to_csv(out_file)
     print('Saved predictions to', out_file)
 
 
