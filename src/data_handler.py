@@ -3,6 +3,7 @@ Purpose: Preprocess and tokenize data, create DataLoader
 Authors: Ana-Maria Istrate and Kenneth Schackart
 """
 
+import io
 import random
 import re
 import sys
@@ -13,7 +14,7 @@ import pandas as pd
 from datasets import ClassLabel, Dataset
 from pandas.testing import assert_frame_equal
 from torch.utils.data import DataLoader
-from transformers import AutoTokenizer
+from transformers import AutoTokenizer, PreTrainedTokenizer
 
 
 # ---------------------------------------------------------------------------
@@ -26,24 +27,24 @@ class DataFields(NamedTuple):
     `descriptive_labels`: Descriptions of the classification labels
     """
     predictive: str
-    labels: Optional[str]
     descriptive_labels: List[str]
+    labels: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------
 class RunParams(NamedTuple):
     """
     Model and run parameters
-    
+
     `model_name`: Huggingface model name
     `batch_size`: Tokenization batch size
     `max_len`: Tokenization max length
     `num_train`: Number of training datapoints (optional)
     """
-    model_name: str  # Huggingface model name
-    batch_size: int  # Tokenization batch size
-    max_len: int  # Tokenization max length
-    num_train: Optional[int]  # Number of training datapoints
+    model_name: str
+    batch_size: int
+    max_len: int
+    num_train: Optional[int] = None
 
 
 # ---------------------------------------------------------------------------
@@ -80,7 +81,21 @@ def preprocess_data(file: TextIO) -> pd.DataFrame:
 def test_preprocess_data() -> None:
     """ Test preprocess_data() """
 
-    pass
+    in_fh = io.StringIO('title,abstract\n'
+                        'A Descriptive Title,A <i>detailed</i> abstract.\n'
+                        'Another title,Another abstract.')
+
+    out_df = pd.DataFrame([[
+        'A Descriptive Title', 'A detailed abstract.',
+        'A Descriptive Title - A detailed abstract.'
+    ],
+                           [
+                               'Another title', 'Another abstract.',
+                               'Another title - Another abstract.'
+                           ]],
+                          columns=['title', 'abstract', 'title_abstract'])
+
+    assert_frame_equal(preprocess_data(in_fh), out_df)
 
 
 # ---------------------------------------------------------------------------
@@ -176,12 +191,12 @@ def test_get_text_labels() -> None:
          ['Title 3', 'Abstract 3', 0]],
         columns=['title', 'abstract', 'score'])
 
-    fields = DataFields('title', None, ['yes', 'no'])
+    fields = DataFields('title', ['yes', 'no'])
 
     assert get_text_labels(df, fields) == (['Title 1', 'Title 2',
                                             'Title 3'], [])
 
-    fields = DataFields('title', 'score', ['yes', 'no'])
+    fields = DataFields('title', ['yes', 'no'], 'score')
 
     assert get_text_labels(df, fields) == (['Title 1', 'Title 2',
                                             'Title 3'], [0, 1, 0])
@@ -189,7 +204,7 @@ def test_get_text_labels() -> None:
 
 # ---------------------------------------------------------------------------
 def tokenize_text(text: List, labels: List, class_labels: ClassLabel,
-                  tokenizer: AutoTokenizer, max_len: int) -> Dataset:
+                  tokenizer: PreTrainedTokenizer, max_len: int) -> Dataset:
     """ Tokenize predictive text """
 
     data = {'text': text}
