@@ -50,7 +50,17 @@ class RunParams(NamedTuple):
 # ---------------------------------------------------------------------------
 def get_dataloader(file: TextIO, fields: DataFields,
                    run_params: RunParams) -> DataLoader:
-    """ Preprocess data and create dataloader """
+    """
+    Preprocess data and create dataloader
+    
+    Parameters:
+    `file`: Input file handle
+    `fields`: Fields in data used for training and classification
+    `run_params`: Model and run parameters
+
+    Returns:
+    A `DataLoader` with preprocessed data
+    """
 
     df = preprocess_data(file)
 
@@ -61,7 +71,15 @@ def get_dataloader(file: TextIO, fields: DataFields,
 
 # ---------------------------------------------------------------------------
 def preprocess_data(file: TextIO) -> pd.DataFrame:
-    """ Strip XML tags and concatenate title and abstract columns """
+    """
+    Strip XML tags and concatenate title and abstract columns
+    
+    Parameters:
+    `file`: Input file handle
+
+    Returns:
+    a `pd.DataFrame` of preprocessed data
+    """
 
     df = pd.read_csv(file)
 
@@ -100,7 +118,15 @@ def test_preprocess_data() -> None:
 
 # ---------------------------------------------------------------------------
 def strip_xml(text: str) -> str:
-    """ Strip XML tags from a text string """
+    """
+    Strip XML tags from a string
+    
+    Parameters:
+    `text`: String possibly containing XML tags
+
+    Returns:
+    String without XML tags
+    """
 
     return re.sub(r'<[\w/]+>', '', text)
 
@@ -117,7 +143,15 @@ def test_strip_xml() -> None:
 
 # ---------------------------------------------------------------------------
 def concat_title_abstract(df: pd.DataFrame) -> pd.DataFrame:
-    """ Concatenate abstract and title columns """
+    """
+    Concatenate abstract and title columns
+    
+    Parameters:
+    `df`: Dataframe with columns "title" and "abstract"
+
+    Returns:
+    A `pd.DataFrame` with new column "title_abstract"
+    """
 
     df['title_abstract'] = df['title'] + ' - ' + df['abstract']
 
@@ -143,7 +177,18 @@ def test_concat_title_abstract() -> None:
 # ---------------------------------------------------------------------------
 def generate_dataloader(df: pd.DataFrame, filename: str, fields: DataFields,
                         params: RunParams) -> DataLoader:
-    """ Generate dataloader from preprocessed data """
+    """
+    Generate dataloader from preprocessed data
+    
+    Parameters:
+    `df`: Dataframe to be converted to `DataLoader`
+    `filename`: Name of file from which `df` originates
+    `fields`: Fields in data used for training and classification
+    `params`: Model and run parameters
+
+    Returns:
+    A `DataLoader` of preprocessed data
+    """
 
     if fields.predictive not in df.columns:
         sys.exit(f'Predictive field column "{fields.predictive}" '
@@ -171,7 +216,16 @@ def generate_dataloader(df: pd.DataFrame, filename: str, fields: DataFields,
 
 # ---------------------------------------------------------------------------
 def get_text_labels(df: pd.DataFrame, fields: DataFields) -> Tuple[List, List]:
-    """ Get lists of predictive text and (optionally) labels """
+    """
+    Get lists of predictive text and (optionally) labels
+    
+    Parameters:
+    `df`: Dataframe containing `fields.predictive` and
+    (optionally) `fields.labels`
+
+    Returns:
+    A tuple of lists: predictive text, labels
+    """
 
     text = df[fields.predictive].tolist()
 
@@ -205,7 +259,19 @@ def test_get_text_labels() -> None:
 # ---------------------------------------------------------------------------
 def tokenize_text(text: List, labels: List, class_labels: ClassLabel,
                   tokenizer: PreTrainedTokenizer, max_len: int) -> Dataset:
-    """ Tokenize predictive text """
+    """
+    Tokenize predictive text
+    
+    Parameters:
+    `text`: A list of predictive text
+    `labels`: A list of labels of `text`
+    `class_labels`: Descriptive labels of data in `text`
+    `tokenizer`: Pretrained tokenizer
+    `max_len`: Max length used in tokenization
+
+    Returns:
+    A tokenized and possibly labeled `Dataset`
+    """
 
     data = {'text': text}
     if labels:

@@ -121,7 +121,16 @@ def get_args() -> Args:
 
 # ---------------------------------------------------------------------------
 def get_dataloaders(args: Args, model_name: str) -> DataLoader:
-    """ Generate the dataloaders """
+    """
+    Generate the dataloaders
+    
+    Parameters:
+    `args`: Command-line arguments
+    `model_name`: Huggingface model name
+
+    Returns:
+    A `DataLoader` of preprocessed data
+    """
 
     data_fields = DataFields(args.predictive_field, args.descriptive_labels)
 
@@ -134,7 +143,12 @@ def get_dataloaders(args: Args, model_name: str) -> DataLoader:
 
 # ---------------------------------------------------------------------------
 def get_torch_device() -> torch.device:
-    """ Get device for torch """
+    """
+    Get device for torch
+    
+    Returns:
+    `torch.device` either "cuda" or "cpu"
+    """
 
     return torch.device('cuda') if torch.cuda.is_available() else torch.device(
         'cpu')
@@ -142,7 +156,17 @@ def get_torch_device() -> torch.device:
 
 # ---------------------------------------------------------------------------
 def get_model(model_name: str, checkpoint_fh: TextIO, device: torch.device):
-    """ Instatiate predictive model from checkpoint """
+    """
+    Instatiate predictive model from checkpoint
+    
+    Params:
+    `model_name`: Huggingface model name
+    `checkpoint_fh`: Model checkpoint filehandle
+    `device`: The `torch.device` to use
+
+    Retturns:
+    Model instance from checkpoint
+    """
 
     model = classifier.from_pretrained(model_name, num_labels=2)
     checkpoint = torch.load(checkpoint_fh, map_location=device)
@@ -156,7 +180,15 @@ def get_model(model_name: str, checkpoint_fh: TextIO, device: torch.device):
 # ---------------------------------------------------------------------------
 def predict(model, dataloader: DataLoader, class_labels: ClassLabel,
             device: torch.device) -> List[str]:
-    """ Use model to predict article classifications """
+    """
+    Use model to predict article classifications
+    
+    Parameters:
+    `model`: Pretrained predictive model
+    `dataloader`: `DataLoader` with preprocessed data
+    `class_labels`: Class labels to apply in prediction
+    `device`: The `torch.device` to use
+    """
 
     all_predictions = []
     model.eval()
