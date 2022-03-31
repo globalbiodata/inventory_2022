@@ -188,6 +188,9 @@ def predict(model, dataloader: DataLoader, class_labels: ClassLabel,
     `dataloader`: `DataLoader` with preprocessed data
     `class_labels`: Class labels to apply in prediction
     `device`: The `torch.device` to use
+
+    Returns:
+    List of predicted labels
     """
 
     all_predictions = []
