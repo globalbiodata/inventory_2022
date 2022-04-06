@@ -52,7 +52,7 @@ def get_dataloader(file: TextIO, fields: DataFields,
                    run_params: RunParams) -> DataLoader:
     """
     Preprocess data and create dataloader
-    
+
     Parameters:
     `file`: Input file handle
     `fields`: Fields in data used for training and classification
@@ -73,7 +73,7 @@ def get_dataloader(file: TextIO, fields: DataFields,
 def preprocess_data(file: TextIO) -> pd.DataFrame:
     """
     Strip XML tags and concatenate title and abstract columns
-    
+
     Parameters:
     `file`: Input file handle
 
@@ -120,7 +120,7 @@ def test_preprocess_data() -> None:
 def strip_xml(text: str) -> str:
     """
     Strip XML tags from a string
-    
+
     Parameters:
     `text`: String possibly containing XML tags
 
@@ -145,7 +145,7 @@ def test_strip_xml() -> None:
 def concat_title_abstract(df: pd.DataFrame) -> pd.DataFrame:
     """
     Concatenate abstract and title columns
-    
+
     Parameters:
     `df`: Dataframe with columns "title" and "abstract"
 
@@ -179,7 +179,7 @@ def generate_dataloader(df: pd.DataFrame, filename: str, fields: DataFields,
                         params: RunParams) -> DataLoader:
     """
     Generate dataloader from preprocessed data
-    
+
     Parameters:
     `df`: Dataframe to be converted to `DataLoader`
     `filename`: Name of file from which `df` originates
@@ -218,7 +218,7 @@ def generate_dataloader(df: pd.DataFrame, filename: str, fields: DataFields,
 def get_text_labels(df: pd.DataFrame, fields: DataFields) -> Tuple[List, List]:
     """
     Get lists of predictive text and (optionally) labels
-    
+
     Parameters:
     `df`: Dataframe containing `fields.predictive` and
     (optionally) `fields.labels`
@@ -261,7 +261,7 @@ def tokenize_text(text: List, labels: List, class_labels: ClassLabel,
                   tokenizer: PreTrainedTokenizer, max_len: int) -> Dataset:
     """
     Tokenize predictive text
-    
+
     Parameters:
     `text`: A list of predictive text
     `labels`: A list of labels of `text`

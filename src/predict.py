@@ -123,7 +123,7 @@ def get_args() -> Args:
 def get_dataloaders(args: Args, model_name: str) -> DataLoader:
     """
     Generate the dataloaders
-    
+
     Parameters:
     `args`: Command-line arguments
     `model_name`: Huggingface model name
@@ -145,7 +145,7 @@ def get_dataloaders(args: Args, model_name: str) -> DataLoader:
 def get_torch_device() -> torch.device:
     """
     Get device for torch
-    
+
     Returns:
     `torch.device` either "cuda" or "cpu"
     """
@@ -158,7 +158,7 @@ def get_torch_device() -> torch.device:
 def get_model(model_name: str, checkpoint_fh: TextIO, device: torch.device):
     """
     Instatiate predictive model from checkpoint
-    
+
     Params:
     `model_name`: Huggingface model name
     `checkpoint_fh`: Model checkpoint filehandle
@@ -182,7 +182,7 @@ def predict(model, dataloader: DataLoader, class_labels: ClassLabel,
             device: torch.device) -> List[str]:
     """
     Use model to predict article classifications
-    
+
     Parameters:
     `model`: Pretrained predictive model
     `dataloader`: `DataLoader` with preprocessed data
