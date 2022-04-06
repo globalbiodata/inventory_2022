@@ -13,7 +13,6 @@ import pandas as pd
 import plotly.express as px
 import torch
 from datasets import load_metric
-from torch._C import NoneType
 from torch.utils.data.dataloader import DataLoader
 from tqdm.auto import tqdm
 from transformers import (AdamW, AutoModelForSequenceClassification,
@@ -46,7 +45,7 @@ class Args(NamedTuple):
 class Settings(NamedTuple):
     """
     Settings used for model training
-    
+
     `model`: Pretrained model
     `optimizer`: Training optimizer
     `train_dataloader`: `DataLoader` of training data
@@ -72,7 +71,7 @@ class Settings(NamedTuple):
 class Metrics(NamedTuple):
     """
     Performance metrics
-    
+
     `precision`: Model precision
     `recall`: Model recall
     `f1`: Model F1 score
@@ -238,6 +237,11 @@ def train(settings: Settings) -> Tuple:
             best_train = train_metrics
             best_model = copy.deepcopy(model)
             best_epoch = epoch
+
+        # Stop training once validation F1 goes down
+        # Overfitting has begun
+        if val_metrics.f1 < best_val.f1 and epoch > 0:
+            break
 
         train_losses.append(train_metrics.loss)
         val_losses.append(val_metrics.loss)
