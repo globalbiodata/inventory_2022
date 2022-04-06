@@ -44,13 +44,25 @@ class Args(NamedTuple):
 
 # ---------------------------------------------------------------------------
 class Settings(NamedTuple):
-    """ Trainer settings """
+    """
+    Settings used for model training
+    
+    `model`: Pretrained model
+    `optimizer`: Training optimizer
+    `train_dataloader`: `DataLoader` of training data
+    `val_dataloader`: `DataLoader` of validation data
+    `lr_scheduler`: Learning rate schedule (optional)
+    `num_epochs`: Maximum number of training epochs
+    `num_training_steps`: Maximum number of training steps
+    (`num_epochs` * `num_training`)
+    `device`: Torch device
+    """
 
     model: Any
     optimizer: AdamW
     train_dataloader: DataLoader
     val_dataloader: DataLoader
-    lr_scheduler: NoneType
+    lr_scheduler: Any
     num_epochs: int
     num_training_steps: int
     device: torch.device
@@ -58,12 +70,138 @@ class Settings(NamedTuple):
 
 # ---------------------------------------------------------------------------
 class Metrics(NamedTuple):
-    """ Performance metrics  """
+    """
+    Performance metrics
+    
+    `precision`: Model precision
+    `recall`: Model recall
+    `f1`: Model F1 score
+    `loss`: Model loss
+    """
 
     precision: float
     recall: float
     f1: float
     loss: float
+
+
+# ---------------------------------------------------------------------------
+def get_args():
+    """ Parse command-line arguments """
+
+    parser = argparse.ArgumentParser(
+        description='Train BERT model for article classification',
+        formatter_class=CustomHelpFormatter)
+
+    inputs = parser.add_argument_group('Inputs and Outputs')
+    data_info = parser.add_argument_group('Information on Data')
+    model_params = parser.add_argument_group('Model Parameters')
+    runtime_params = parser.add_argument_group('Runtime Parameters')
+
+    inputs.add_argument('-t',
+                        '--train-file',
+                        metavar='FILE',
+                        type=argparse.FileType('rt'),
+                        default='data/train.csv',
+                        help='Training data file')
+    inputs.add_argument('-v',
+                        '--val-file',
+                        metavar='FILE',
+                        type=argparse.FileType('rt'),
+                        default='data/val.csv',
+                        help='Validation data file')
+    inputs.add_argument('-o',
+                        '--out-dir',
+                        metavar='DIR',
+                        type=str,
+                        default='out/',
+                        help='Directory to output checkpt and loss plot')
+
+    data_info.add_argument('-pred',
+                           '--predictive-field',
+                           metavar='PRED',
+                           type=str,
+                           default='title_abstract',
+                           help='Data column to use for prediction',
+                           choices=['title', 'abstract', 'title_abstract'])
+    data_info.add_argument('-labs',
+                           '--labels-field',
+                           metavar='LABS',
+                           type=str,
+                           default='curation_score',
+                           help='Data column with classification labels')
+    data_info.add_argument('-desc',
+                           '--descriptive-labels',
+                           metavar='LAB',
+                           type=str,
+                           nargs=2,
+                           default=['not-bio-resource', 'bio-resource'],
+                           help='Descriptions of the classification labels')
+
+    model_params.add_argument(
+        '-m',
+        '--model-name',
+        metavar='MODEL',
+        type=str,
+        default='scibert',
+        help='Name of model',
+        choices=[
+            'bert', 'biobert', 'scibert', 'pubmedbert', 'pubmedbert_pmc',
+            'bluebert', 'bluebert_mimic3', 'sapbert', 'sapbert_mean_token',
+            'bioelectra', 'bioelectra_pmc', 'electramed', 'biomed_roberta',
+            'biomed_roberta_chemprot', 'biomed_roberta_rct_500'
+        ])
+    model_params.add_argument('-max',
+                              '--max-len',
+                              metavar='INT',
+                              type=int,
+                              default=256,
+                              help='Max Sequence Length')
+    model_params.add_argument('-rate',
+                              '--learning-rate',
+                              metavar='NUM',
+                              type=float,
+                              default=2e-5,
+                              help='Learning Rate')
+    model_params.add_argument('-decay',
+                              '--weight-decay',
+                              metavar='NUM',
+                              type=float,
+                              default=0.0,
+                              help='Weight Decay for Learning Rate')
+
+    runtime_params.add_argument(
+        '-nt',
+        '--num-training',
+        metavar='INT',
+        type=int,
+        default=None,
+        help='Number of data points for training (default: all)')
+    runtime_params.add_argument('-ne',
+                                '--num-epochs',
+                                metavar='INT',
+                                type=int,
+                                default=10,
+                                help='Number of Epochs')
+    runtime_params.add_argument('-batch',
+                                '--batch-size',
+                                metavar='INT',
+                                type=int,
+                                default=32,
+                                help='Batch Size')
+
+    runtime_params.add_argument('-lr',
+                                '--lr-scheduler',
+                                action='store_true',
+                                help='Use a Learning Rate Scheduler')
+
+    args = parser.parse_args()
+
+    return Args(args.train_file, args.val_file, args.out_dir,
+                args.predictive_field, args.labels_field,
+                args.descriptive_labels, args.model_name, args.max_len,
+                args.learning_rate, args.weight_decay, args.num_training,
+                args.num_epochs, args.batch_size, args.lr_scheduler)
 
 
 # ---------------------------------------------------------------------------
@@ -311,125 +449,6 @@ def test_make_filenames() -> None:
 
     assert make_filenames('out', 'scibert') == ('out/scibert_checkpt.pt',
                                                 'out/scibert_losses.png')
-
-
-# ---------------------------------------------------------------------------
-def get_args():
-    """ Parse command-line arguments """
-
-    parser = argparse.ArgumentParser(
-        description='Train BERT model for article classification',
-        formatter_class=CustomHelpFormatter)
-
-    inputs = parser.add_argument_group('Inputs and Outputs')
-    data_info = parser.add_argument_group('Information on Data')
-    model_params = parser.add_argument_group('Model Parameters')
-    runtime_params = parser.add_argument_group('Runtime Parameters')
-
-    inputs.add_argument('-t',
-                        '--train-file',
-                        metavar='FILE',
-                        type=argparse.FileType('rt'),
-                        default='data/train.csv',
-                        help='Training data file')
-    inputs.add_argument('-v',
-                        '--val-file',
-                        metavar='FILE',
-                        type=argparse.FileType('rt'),
-                        default='data/val.csv',
-                        help='Validation data file')
-    inputs.add_argument('-o',
-                        '--out-dir',
-                        metavar='DIR',
-                        type=str,
-                        default='out/',
-                        help='Directory to output checkpt and loss plot')
-
-    data_info.add_argument('-pred',
-                           '--predictive-field',
-                           metavar='PRED',
-                           type=str,
-                           default='title_abstract',
-                           help='Data column to use for prediction',
-                           choices=['title', 'abstract', 'title_abstract'])
-    data_info.add_argument('-labs',
-                           '--labels-field',
-                           metavar='LABS',
-                           type=str,
-                           default='curation_score',
-                           help='Data column with classification labels')
-    data_info.add_argument('-desc',
-                           '--descriptive-labels',
-                           metavar='LAB',
-                           type=str,
-                           nargs=2,
-                           default=['not-bio-resource', 'bio-resource'],
-                           help='Descriptions of the classification labels')
-
-    model_params.add_argument(
-        '-m',
-        '--model-name',
-        metavar='MODEL',
-        type=str,
-        default='scibert',
-        help='Name of model',
-        choices=[
-            'bert', 'biobert', 'scibert', 'pubmedbert', 'pubmedbert_pmc',
-            'bluebert', 'bluebert_mimic3', 'sapbert', 'sapbert_mean_token',
-            'bioelectra', 'bioelectra_pmc', 'electramed', 'biomed_roberta',
-            'biomed_roberta_chemprot', 'biomed_roberta_rct_500'
-        ])
-    model_params.add_argument('-max',
-                              '--max-len',
-                              metavar='INT',
-                              type=int,
-                              default=256,
-                              help='Max Sequence Length')
-    model_params.add_argument('-rate',
-                              '--learning-rate',
-                              metavar='NUM',
-                              type=float,
-                              default=2e-5,
-                              help='Learning Rate')
-    model_params.add_argument('-decay',
-                              '--weight-decay',
-                              metavar='NUM',
-                              type=float,
-                              default=0.0,
-                              help='Weight Decay for Learning Rate')
-
-    runtime_params.add_argument(
-        '-nt',
-        '--num-training',
-        metavar='INT',
-        type=int,
-        default=None,
-        help='Number of data points for training (default: all)')
-    runtime_params.add_argument('-ne',
-                                '--num-epochs',
-                                metavar='INT',
-                                type=int,
-                                default=10,
-                                help='Number of Epochs')
-    runtime_params.add_argument('-batch',
-                                '--batch-size',
-                                metavar='INT',
-                                type=int,
-                                default=32,
-                                help='Batch Size')
-
-    runtime_params.add_argument('-lr',
-                                '--lr-scheduler',
-                                action='store_true',
-                                help='Use a Learning Rate Scheduler')
-
-    args = parser.parse_args()
-
-    return Args(args.train_file, args.val_file, args.out_dir,
-                args.predictive_field, args.labels_field,
-                args.descriptive_labels, args.model_name, args.max_len,
-                args.learning_rate, args.weight_decay, args.num_training,
-                args.num_epochs, args.batch_size, args.lr_scheduler)
 
 
 # ---------------------------------------------------------------------------
