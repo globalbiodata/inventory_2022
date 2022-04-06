@@ -208,14 +208,14 @@ def save_loss_plot(train_losses: List[float], val_losses: List[float],
     `labels`: Series labels for the two losses
     """
     df = pd.DataFrame({
-        'Epoch': list(range(num_epochs)),
+        'Epoch': list(range(num_epochs + 1)),
         'Train': train_losses,
         'Validation': val_losses
     })
 
     fig = px.line(df,
-                  x="Training Epoch",
-                  y=['Train', 'Valication'],
+                  x='Epoch',
+                  y=['Train', 'Validation'],
                   title='Train and Validation Losses')
 
     fig.write_image(filename)
