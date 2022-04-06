@@ -71,8 +71,10 @@ def train(settings: Settings) -> Tuple:
         train_loss = train_epoch(settings, progress_bar)
 
         model.eval()
-        train_metrics = get_metrics(model, settings.train_dataloader)
-        val_metrics = get_metrics(model, settings.val_dataloader)
+        train_metrics = get_metrics(model, settings.train_dataloader,
+                                    settings.device)
+        val_metrics = get_metrics(model, settings.val_dataloader,
+                                  settings.device)
 
         if val_metrics.f1 > best_val.f1:
             best_val = val_metrics
@@ -101,8 +103,6 @@ def train(settings: Settings) -> Tuple:
           f'Best Val Precision: {best_val.precision:.3f}\n'
           f'Best Val Recall: {best_val.recall:.3f}\n'
           f'Best Val F1: {best_val.f1:.3f}\n')
-    best_model = best_model
-    best_epoch = best_epoch
 
     return best_model, best_epoch, best_val.f1, train_losses, val_losses
 
