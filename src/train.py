@@ -7,7 +7,7 @@ Authors: Ana-Maria Istrate and Kenneth Schackart
 import argparse
 import copy
 import os
-from typing import List, NamedTuple, TextIO, Tuple
+from typing import Any, List, NamedTuple, TextIO, Tuple
 
 import pandas as pd
 import plotly.express as px
@@ -27,7 +27,7 @@ from utils import MODEL_TO_HUGGINGFACE_VERSION, CustomHelpFormatter
 class Settings(NamedTuple):
     """ Trainer settings """
 
-    model: str
+    model: Any
     optimizer: AdamW
     train_dataloader: DataLoader
     val_dataloader: DataLoader
@@ -48,214 +48,388 @@ class Metrics(NamedTuple):
 
 
 # ---------------------------------------------------------------------------
-class Trainer():
+def train(settings: Settings) -> Tuple:
     """
-    Handles training of the model
+    Train the classifier
+
+    Parameters:
+    `settings`: Model settings (NamedTuple)
     """
 
-    # pylint: disable=too-many-instance-attributes
+    model = settings.model
+    model.train()
+    progress_bar = tqdm(range(settings.num_training_steps))
+    best_model = model
+    train_losses = []
+    val_losses = []
+    best_val = Metrics(0, 0, 0, 0)
+    best_train = Metrics(0, 0, 0, 0)
+    best_epoch = 0
 
-    def __init__(self, settings: Settings):
-        """
-        :param model: PyTorch model
-        :param optimizer: optimizer used
-        :param train_dataloader: DataLoader containing data used for training
-        :param val_dataloader: DataLoader containing data used for validation
-        :param lr_scheduler: learning rate scheduler; None if no lr_scheduler
-        :param num_epochs: number of epochs to train the model for
-        :param num_training_steps: total number of training steps
-        :param device: device used for training; 'cuda' if GPU is available
-        """
-        self.model = settings.model
-        self.optimizer = settings.optimizer
-        self.train_dataloader = settings.train_dataloader
-        self.val_dataloader = settings.val_dataloader
-        self.lr_scheduler = settings.lr_scheduler
-        self.num_epochs = settings.num_epochs
-        self.num_training_steps = settings.num_training_steps
-        self.device = settings.device
-        self.best_model = settings.model
-        self.best_epoch = 0.
-        self.best_f1_score = 0.
+    for epoch in range(settings.num_epochs):
 
-    # -----------------------------------------------------------------------
-    def get_metrics(self, dataloader) -> Metrics:
-        """
-        Computes and returns metrics (P, R, F1 score) of a model on
-        data present in a dataloader
+        train_loss = train_epoch(settings, progress_bar)
 
-        :param model: model used to compute the metrics
-        :param dataloader: DataLoader containing tokenized text entries and
-        corresponding labels
+        model.eval()
+        train_metrics = get_metrics(model, settings.train_dataloader)
+        val_metrics = get_metrics(model, settings.val_dataloader)
 
-        :return: precision, recall, F1 score
-        """
-        precision = load_metric("precision")
-        recall = load_metric("recall")
-        f1 = load_metric("f1")
-        total_loss = 0.
-        num_seen_datapoints = 0
-        for batch in dataloader:
-            batch = {k: v.to(self.device) for k, v in batch.items()}
-            with torch.no_grad():
-                outputs = self.model(**batch)
-            num_seen_datapoints += len(batch['input_ids'])
-            logits = outputs.logits
-            loss = outputs.loss
-            predictions = torch.argmax(logits, dim=-1)
-            precision.add_batch(predictions=predictions,
-                                references=batch["labels"])
-            recall.add_batch(predictions=predictions,
-                             references=batch["labels"])
-            f1.add_batch(predictions=predictions, references=batch["labels"])
-            total_loss += loss.item()
-        total_loss /= num_seen_datapoints
+        if val_metrics.f1 > best_val.f1:
+            best_val = val_metrics
+            best_train = train_metrics
+            best_model = copy.deepcopy(model)
+            best_epoch = epoch
 
-        return Metrics(precision.compute()['precision'],
-                       recall.compute()['recall'],
-                       f1.compute()['f1'], total_loss)
+        train_losses.append(train_metrics.loss)
+        val_losses.append(val_metrics.loss)
 
-    # -----------------------------------------------------------------------
-    def train_epoch(self, progress_bar):
-        """
-        Handles training of the model over one epoch
+        print(f'Epoch {epoch + 1}:\n'
+              f'Train Loss: {train_loss:.5f}\n'
+              f'Val Loss: {val_metrics.loss:.5f}\n'
+              f'Train Precision: {train_metrics.precision:.3f}\n'
+              f'Train Recall: {train_metrics.recall:.3f}\n'
+              f'Train F1: {train_metrics.f1:.3f}\n'
+              f'Val Precision: {val_metrics.precision:.3f}\n'
+              f'Val Recall: {val_metrics.recall:.3f}\n'
+              f'Val F1: {val_metrics.f1:.3f}')
 
-        :param model: PyTorch model
-        :param optimizer: optimizer used
-        :param lr_scheduler: learning rate scheduler; None if no lr_scheduler
-        :param train_dataloader: DataLoader containing data used for training
-        :param device: device used for training; 'cuda' if GPU is available
-        :param progress_bar: tqdm instance for tracking progress
-        """
-        train_loss = 0
-        num_train = 0
-        for batch in self.train_dataloader:
-            batch = {k: v.to(self.device) for k, v in batch.items()}
-            num_train += len(batch['input_ids'])
-            outputs = self.model(**batch)
-            loss = outputs.loss
-            loss.backward()
-            train_loss += loss.item()
-            self.optimizer.step()
-            if self.lr_scheduler:
-                self.lr_scheduler.step()
-            self.optimizer.zero_grad()
-            progress_bar.update(1)
-        return train_loss / num_train
+    print('Finished model training!')
+    print('=' * 30)
+    print(f'Best Train Precision: {best_train.precision:.3f}\n'
+          f'Best Train Recall: {best_train.recall:.3f}\n'
+          f'Best Train F1: {best_train.f1:.3f}\n'
+          f'Best Val Precision: {best_val.precision:.3f}\n'
+          f'Best Val Recall: {best_val.recall:.3f}\n'
+          f'Best Val F1: {best_val.f1:.3f}\n')
+    best_model = best_model
+    best_epoch = best_epoch
 
-    # -----------------------------------------------------------------------
-    def train(self):
-        """
-        Handles training of the model over all epochs
+    return best_model, best_epoch, best_val.f1, train_losses, val_losses
 
-        :param model: PyTorch model
-        :param train_dataloader: DataLoader containing data used for training
-        :param val_dataloader: DataLoader containing data used for validation
-        :param optimizer: optimizer used
-        :param lr_scheduler: learning rate scheduler; None if no lr_scheduler
-        :param num_epochs: number of epochs to train the model for
-        :param num_training_steps:
-        :param checkpt_name: name under which the checkpoint will be saved
-        :param device: device used for training; 'cuda' if GPU is available
 
-        :return best_model: model checkpt that has the highest F1 score on
-        the validation data
-        :return best_epoch: epoch corresponding to best_model
-        :return train_losses: list of training loss values over all epochs;
-        helpful for plotting
-        :return val_losses: list of validation loss values over all epochs;
-        helpful for plotting
+# ---------------------------------------------------------------------------
+def train_epoch(settings: Settings, progress_bar: tqdm) -> float:
+    """
+    Perform one epoch of model training
 
-        """
-        progress_bar = tqdm(range(self.num_training_steps))
-        self.model.train()
-        best_model = self.model
-        train_losses = []
-        val_losses = []
-        best_val = Metrics(0, 0, 0, 0)
-        best_train = Metrics(0, 0, 0, 0)
-        best_epoch = 0
+    Parameters:
+    `settings`: Model settings (NamedTuple)
+    `progress_bar`: tqdm instance for tracking progress
 
-        for epoch in range(self.num_epochs):
-            # training
-            train_loss = self.train_epoch(progress_bar)
-            # evaluation
-            self.model.eval()
-            train_metrics = self.get_metrics(self.train_dataloader)
-            val_metrics = self.get_metrics(self.val_dataloader)
+    Return: Train loss per observation
+    """
+    train_loss = 0
+    num_train = 0
+    for batch in settings.train_dataloader:
+        batch = {k: v.to(settings.device) for k, v in batch.items()}
+        num_train += len(batch['input_ids'])
+        outputs = settings.model(**batch)
+        loss = outputs.loss
+        loss.backward()
+        train_loss += loss.item()
+        settings.optimizer.step()
+        if settings.lr_scheduler:
+            settings.lr_scheduler.step()
+        settings.optimizer.zero_grad()
+        progress_bar.update(1)
+    return train_loss / num_train
 
-            if val_metrics.f1 > best_val.f1:
-                best_val = val_metrics
-                best_train = train_metrics
-                best_model = copy.deepcopy(self.model)
-                best_epoch = epoch
 
-            train_losses.append(train_metrics.loss)
-            val_losses.append(val_metrics.loss)
+# ---------------------------------------------------------------------------
+def get_metrics(model: Any, dataloader: DataLoader,
+                device: torch.device) -> Metrics:
+    """
+    Compute model performance metrics
 
-            print(f'Epoch {epoch + 1}:\n'
-                  f'Train Loss: {train_loss:.5f}\n'
-                  f'Val Loss: {val_metrics.loss:.5f}\n'
-                  f'Train Precision: {train_metrics.precision:.3f}\n'
-                  f'Train Recall: {train_metrics.recall:.3f}\n'
-                  f'Train F1: {train_metrics.f1:.3f}\n'
-                  f'Val Precision: {val_metrics.precision:.3f}\n'
-                  f'Val Recall: {val_metrics.recall:.3f}\n'
-                  f'Val F1: {val_metrics.f1:.3f}')
+    Parameters:
+    `model`: Classification model
+    `dataloader`: DataLoader containing tokenized text entries and
+    corresponding labels
+    `device`: Torch device
 
-        print('Finished model training!')
-        print('=' * 30)
-        print(f'Best Train Precision: {best_train.precision:.3f}\n'
-              f'Best Train Recall: {best_train.recall:.3f}\n'
-              f'Best Train F1: {best_train.f1:.3f}\n'
-              f'Best Val Precision: {best_val.precision:.3f}\n'
-              f'Best Val Recall: {best_val.recall:.3f}\n'
-              f'Best Val F1: {best_val.f1:.3f}\n')
-        self.best_model = best_model
-        self.best_epoch = best_epoch
-        self.best_f1_score = best_val.f1
+    Returns:
+    A `Metrics` NamedTuple
+    """
+    precision = load_metric("precision")
+    recall = load_metric("recall")
+    f1 = load_metric("f1")
+    total_loss = 0.
+    num_seen_datapoints = 0
+    for batch in dataloader:
+        batch = {k: v.to(device) for k, v in batch.items()}
+        with torch.no_grad():
+            outputs = model(**batch)
+        num_seen_datapoints += len(batch['input_ids'])
+        logits = outputs.logits
+        loss = outputs.loss
+        predictions = torch.argmax(logits, dim=-1)
+        precision.add_batch(predictions=predictions,
+                            references=batch["labels"])
+        recall.add_batch(predictions=predictions, references=batch["labels"])
+        f1.add_batch(predictions=predictions, references=batch["labels"])
+        total_loss += loss.item()
+    total_loss /= num_seen_datapoints
 
-        return best_model, best_epoch, train_losses, val_losses
+    return Metrics(precision.compute()['precision'],
+                   recall.compute()['recall'],
+                   f1.compute()['f1'], total_loss)
 
-    # -----------------------------------------------------------------------
-    def save_best_model(self, checkpt_filename):
-        """
-        Saves a model checkpoint, epoch and F1 score to file
 
-        :param model: model to save
-        :param epoch: num_epoch corresponding to trained model
-        :param f1_score: F1 score obtained by the model on validation data
-        :param checkpt_filename: filename under which the model checkpoint
-        will be saved
-        """
-        torch.save(
-            {
-                'model_state_dict': self.best_model.state_dict(),
-                'epoch': self.best_epoch,
-                'f1_val': self.best_f1_score,
-            }, checkpt_filename)
+# ---------------------------------------------------------------------------
+def save_model(model: Any, epoch: int, f1: float, filename: str) -> None:
+    """
+    Save model checkpoint, epoch, and F1 score to file
 
-    # -----------------------------------------------------------------------
-    def plot_losses(self, losses, labels, img_filename):
-        """
-        Plots training and val losses
+    Parameters:
+    `model`: Model to save
+    `epoch`: Epochs used to train model
+    `f1`: F1 score obtained by model
+    `filename`: Name of file for saving model
+    """
 
-        :param num_epochs: total number of epochs the model was trained on;
-        corresponds to length of the losses array
-        :param losses: array corresponding to [train_losses, val_losses]
-        :param labels: labels used for plotting;
-        usually ['Train Loss', 'Val Loss']
+    torch.save(
+        {
+            'model_state_dict': model.state_dict(),
+            'epoch': epoch,
+            'f1_val': f1
+        }, filename)
 
-        :return: Generated plot
-        """
-        x = list(range(self.num_epochs))
-        df = pd.DataFrame({'Epoch': x})
-        for loss_arr, label in zip(losses, labels):
-            df[label] = loss_arr
-        fig = px.line(df, x="Epoch", y=labels, title='Train/Val Losses')
-        fig.show()
-        fig.write_image(img_filename)
-        return fig
+
+# ---------------------------------------------------------------------------
+def save_loss_plot(train_losses: List[float], val_losses: List[float],
+                   num_epochs: int, filename: str) -> None:
+    """
+    Plot training and validation losses, and save to file
+
+    Parameters:
+    `train_losses`: Training losses
+    `val_losses`: Validation losses
+    `filename`: Name of file for saving plot
+    `labels`: Series labels for the two losses
+    """
+    df = pd.DataFrame({
+        'Epoch': list(range(num_epochs)),
+        'Train': train_losses,
+        'Validation': val_losses
+    })
+
+    fig = px.line(df,
+                  x="Training Epoch",
+                  y=['Train', 'Valication'],
+                  title='Train and Validation Losses')
+
+    fig.write_image(filename)
+
+
+# ---------------------------------------------------------------------------
+# class Trainer():
+#     """
+#     Handles training of the model
+#     """
+
+#     # pylint: disable=too-many-instance-attributes
+
+#     def __init__(self, settings: Settings):
+#         """
+#         :param model: PyTorch model
+#         :param optimizer: optimizer used
+#         :param train_dataloader: DataLoader containing data used for training
+#         :param val_dataloader: DataLoader containing data used for validation
+#         :param lr_scheduler: learning rate scheduler; None if no lr_scheduler
+#         :param num_epochs: number of epochs to train the model for
+#         :param num_training_steps: total number of training steps
+#         :param device: device used for training; 'cuda' if GPU is available
+#         """
+#         self.model = settings.model
+#         self.optimizer = settings.optimizer
+#         self.train_dataloader = settings.train_dataloader
+#         self.val_dataloader = settings.val_dataloader
+#         self.lr_scheduler = settings.lr_scheduler
+#         self.num_epochs = settings.num_epochs
+#         self.num_training_steps = settings.num_training_steps
+#         self.device = settings.device
+#         self.best_model = settings.model
+#         self.best_epoch = 0.
+#         self.best_f1_score = 0.
+
+#     # -----------------------------------------------------------------------
+#     def get_metrics(self, dataloader) -> Metrics:
+#         """
+#         Computes and returns metrics (P, R, F1 score) of a model on
+#         data present in a dataloader
+
+#         :param model: model used to compute the metrics
+#         :param dataloader: DataLoader containing tokenized text entries and
+#         corresponding labels
+
+#         :return: precision, recall, F1 score
+#         """
+#         precision = load_metric("precision")
+#         recall = load_metric("recall")
+#         f1 = load_metric("f1")
+#         total_loss = 0.
+#         num_seen_datapoints = 0
+#         for batch in dataloader:
+#             batch = {k: v.to(self.device) for k, v in batch.items()}
+#             with torch.no_grad():
+#                 outputs = self.model(**batch)
+#             num_seen_datapoints += len(batch['input_ids'])
+#             logits = outputs.logits
+#             loss = outputs.loss
+#             predictions = torch.argmax(logits, dim=-1)
+#             precision.add_batch(predictions=predictions,
+#                                 references=batch["labels"])
+#             recall.add_batch(predictions=predictions,
+#                              references=batch["labels"])
+#             f1.add_batch(predictions=predictions, references=batch["labels"])
+#             total_loss += loss.item()
+#         total_loss /= num_seen_datapoints
+
+#         return Metrics(precision.compute()['precision'],
+#                        recall.compute()['recall'],
+#                        f1.compute()['f1'], total_loss)
+
+#     # -----------------------------------------------------------------------
+#     def train_epoch(self, progress_bar):
+#         """
+#         Handles training of the model over one epoch
+
+#         :param model: PyTorch model
+#         :param optimizer: optimizer used
+#         :param lr_scheduler: learning rate scheduler; None if no lr_scheduler
+#         :param train_dataloader: DataLoader containing data used for training
+#         :param device: device used for training; 'cuda' if GPU is available
+#         :param progress_bar: tqdm instance for tracking progress
+#         """
+#         train_loss = 0
+#         num_train = 0
+#         for batch in self.train_dataloader:
+#             batch = {k: v.to(self.device) for k, v in batch.items()}
+#             num_train += len(batch['input_ids'])
+#             outputs = self.model(**batch)
+#             loss = outputs.loss
+#             loss.backward()
+#             train_loss += loss.item()
+#             self.optimizer.step()
+#             if self.lr_scheduler:
+#                 self.lr_scheduler.step()
+#             self.optimizer.zero_grad()
+#             progress_bar.update(1)
+#         return train_loss / num_train
+
+#     # -----------------------------------------------------------------------
+#     def train(self):
+#         """
+#         Handles training of the model over all epochs
+
+#         :param model: PyTorch model
+#         :param train_dataloader: DataLoader containing data used for training
+#         :param val_dataloader: DataLoader containing data used for validation
+#         :param optimizer: optimizer used
+#         :param lr_scheduler: learning rate scheduler; None if no lr_scheduler
+#         :param num_epochs: number of epochs to train the model for
+#         :param num_training_steps:
+#         :param checkpt_name: name under which the checkpoint will be saved
+#         :param device: device used for training; 'cuda' if GPU is available
+
+#         :return best_model: model checkpt that has the highest F1 score on
+#         the validation data
+#         :return best_epoch: epoch corresponding to best_model
+#         :return train_losses: list of training loss values over all epochs;
+#         helpful for plotting
+#         :return val_losses: list of validation loss values over all epochs;
+#         helpful for plotting
+
+#         """
+#         progress_bar = tqdm(range(self.num_training_steps))
+#         self.model.train()
+#         best_model = self.model
+#         train_losses = []
+#         val_losses = []
+#         best_val = Metrics(0, 0, 0, 0)
+#         best_train = Metrics(0, 0, 0, 0)
+#         best_epoch = 0
+
+#         for epoch in range(self.num_epochs):
+#             # training
+#             train_loss = self.train_epoch(progress_bar)
+#             # evaluation
+#             self.model.eval()
+#             train_metrics = self.get_metrics(self.train_dataloader)
+#             val_metrics = self.get_metrics(self.val_dataloader)
+
+#             if val_metrics.f1 > best_val.f1:
+#                 best_val = val_metrics
+#                 best_train = train_metrics
+#                 best_model = copy.deepcopy(self.model)
+#                 best_epoch = epoch
+
+#             train_losses.append(train_metrics.loss)
+#             val_losses.append(val_metrics.loss)
+
+#             print(f'Epoch {epoch + 1}:\n'
+#                   f'Train Loss: {train_loss:.5f}\n'
+#                   f'Val Loss: {val_metrics.loss:.5f}\n'
+#                   f'Train Precision: {train_metrics.precision:.3f}\n'
+#                   f'Train Recall: {train_metrics.recall:.3f}\n'
+#                   f'Train F1: {train_metrics.f1:.3f}\n'
+#                   f'Val Precision: {val_metrics.precision:.3f}\n'
+#                   f'Val Recall: {val_metrics.recall:.3f}\n'
+#                   f'Val F1: {val_metrics.f1:.3f}')
+
+#         print('Finished model training!')
+#         print('=' * 30)
+#         print(f'Best Train Precision: {best_train.precision:.3f}\n'
+#               f'Best Train Recall: {best_train.recall:.3f}\n'
+#               f'Best Train F1: {best_train.f1:.3f}\n'
+#               f'Best Val Precision: {best_val.precision:.3f}\n'
+#               f'Best Val Recall: {best_val.recall:.3f}\n'
+#               f'Best Val F1: {best_val.f1:.3f}\n')
+#         self.best_model = best_model
+#         self.best_epoch = best_epoch
+#         self.best_f1_score = best_val.f1
+
+#         return best_model, best_epoch, train_losses, val_losses
+
+#     # -----------------------------------------------------------------------
+#     def save_best_model(self, checkpt_filename):
+#         """
+#         Saves a model checkpoint, epoch and F1 score to file
+
+#         :param model: model to save
+#         :param epoch: num_epoch corresponding to trained model
+#         :param f1_score: F1 score obtained by the model on validation data
+#         :param checkpt_filename: filename under which the model checkpoint
+#         will be saved
+#         """
+#         torch.save(
+#             {
+#                 'model_state_dict': self.best_model.state_dict(),
+#                 'epoch': self.best_epoch,
+#                 'f1_val': self.best_f1_score,
+#             }, checkpt_filename)
+
+#     # -----------------------------------------------------------------------
+#     def plot_losses(self, losses, labels, img_filename):
+#         """
+#         Plots training and val losses
+
+#         :param num_epochs: total number of epochs the model was trained on;
+#         corresponds to length of the losses array
+#         :param losses: array corresponding to [train_losses, val_losses]
+#         :param labels: labels used for plotting;
+#         usually ['Train Loss', 'Val Loss']
+
+#         :return: Generated plot
+#         """
+#         x = list(range(self.num_epochs))
+#         df = pd.DataFrame({'Epoch': x})
+#         for loss_arr, label in zip(losses, labels):
+#             df[label] = loss_arr
+#         fig = px.line(df, x="Epoch", y=labels, title='Train/Val Losses')
+#         fig.show()
+#         fig.write_image(img_filename)
+#         return fig
 
 
 # ---------------------------------------------------------------------------
@@ -486,21 +660,16 @@ def main() -> None:
     settings = initialize_model(model_name, args, train_dataloader,
                                 val_dataloader)
 
-    # Model Training
     print('Starting model training...')
     print('=' * 30)
 
-    trainer = Trainer(settings)
-    _, _, train_losses, val_losses = trainer.train()
+    model, epoch, f1, train_losses, val_losses = train(settings)
 
     checkpt_filename, img_filename = make_filenames(out_dir, args.model_name)
-    # Save best checkpoint
-    trainer.save_best_model(checkpt_filename)
-    print('Saved best checkpt to', checkpt_filename)
+    save_model(model, epoch, f1, checkpt_filename)
+    print('Saved best checkpoint to', checkpt_filename)
 
-    # Plot losses
-    trainer.plot_losses([train_losses, val_losses], ['Train Loss', 'Val Loss'],
-                        img_filename)
+    save_loss_plot(train_losses, val_losses, epoch, img_filename)
     print('=' * 30)
 
 
