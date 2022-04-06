@@ -24,6 +24,25 @@ from utils import MODEL_TO_HUGGINGFACE_VERSION, CustomHelpFormatter
 
 
 # ---------------------------------------------------------------------------
+class Args(NamedTuple):
+    """ Command-line arguments """
+    train_file: TextIO
+    val_file: TextIO
+    out_dir: str
+    predictive_field: str
+    labels_field: str
+    descriptive_labels: List[str]
+    model_name: str
+    max_len: int
+    learning_rate: float
+    weight_decay: float
+    num_training: int
+    num_epochs: int
+    batch_size: int
+    lr_scheduler: bool
+
+
+# ---------------------------------------------------------------------------
 class Settings(NamedTuple):
     """ Trainer settings """
 
@@ -222,22 +241,76 @@ def save_loss_plot(train_losses: List[float], val_losses: List[float],
 
 
 # ---------------------------------------------------------------------------
-class Args(NamedTuple):
-    """ Command-line arguments """
-    train_file: TextIO
-    val_file: TextIO
-    out_dir: str
-    predictive_field: str
-    labels_field: str
-    descriptive_labels: List[str]
-    model_name: str
-    max_len: int
-    learning_rate: float
-    weight_decay: float
-    num_training: int
-    num_epochs: int
-    batch_size: int
-    lr_scheduler: bool
+def get_dataloaders(args: Args,
+                    model_name: str) -> Tuple[DataLoader, DataLoader]:
+    """ Generate the dataloaders """
+
+    print('Generating dataloaders ...')
+    print('=' * 30)
+
+    data_fields = DataFields(
+        args.predictive_field,
+        args.descriptive_labels,
+        args.labels_field,
+    )
+
+    dataloader_params = RunParams(model_name, args.batch_size, args.max_len,
+                                  args.num_training)
+
+    train_dataloader = get_dataloader(args.train_file, data_fields,
+                                      dataloader_params)
+    val_dataloader = get_dataloader(args.val_file, data_fields,
+                                    dataloader_params)
+
+    print('Finished generating dataloaders!')
+    print('=' * 30)
+
+    return train_dataloader, val_dataloader
+
+
+# ---------------------------------------------------------------------------
+def initialize_model(model_name: str, args: Args, train_dataloader: DataLoader,
+                     val_dataloader: DataLoader) -> Settings:
+    """ Initialize the model and get settings  """
+
+    print('Initializing', model_name, 'model ...')
+    print('=' * 30)
+    model = AutoModelForSequenceClassification.from_pretrained(model_name,
+                                                               num_labels=2)
+    optimizer = AdamW(model.parameters(),
+                      lr=args.learning_rate,
+                      weight_decay=args.weight_decay)
+    num_training_steps = args.num_epochs * len(train_dataloader)
+    if args.lr_scheduler:
+        lr_scheduler = get_scheduler("linear",
+                                     optimizer=optimizer,
+                                     num_warmup_steps=0,
+                                     num_training_steps=num_training_steps)
+    else:
+        lr_scheduler = None
+    device = torch.device(
+        "cuda") if torch.cuda.is_available() else torch.device("cpu")
+    model.to(device)
+
+    return Settings(model, optimizer, train_dataloader, val_dataloader,
+                    lr_scheduler, args.num_epochs, num_training_steps, device)
+
+
+# ---------------------------------------------------------------------------
+def make_filenames(out_dir: str, model_name: str) -> Tuple[str, str]:
+    """ Make output filenames """
+
+    partial_name = os.path.join(out_dir, model_name + '_')
+
+    return partial_name + 'checkpt.pt', partial_name + 'losses.png'
+
+
+# ---------------------------------------------------------------------------
+def test_make_filenames() -> None:
+    """ Test make_filenames """
+
+    assert make_filenames('out', 'scibert') == ('out/scibert_checkpt.pt',
+                                                'out/scibert_losses.png')
 
 
 # ---------------------------------------------------------------------------
@@ -357,79 +430,6 @@ def get_args():
                 args.descriptive_labels, args.model_name, args.max_len,
                 args.learning_rate, args.weight_decay, args.num_training,
                 args.num_epochs, args.batch_size, args.lr_scheduler)
-
-
-# ---------------------------------------------------------------------------
-def get_dataloaders(args: Args,
-                    model_name: str) -> Tuple[DataLoader, DataLoader]:
-    """ Generate the dataloaders """
-
-    print('Generating dataloaders ...')
-    print('=' * 30)
-
-    data_fields = DataFields(
-        args.predictive_field,
-        args.descriptive_labels,
-        args.labels_field,
-    )
-
-    dataloader_params = RunParams(model_name, args.batch_size, args.max_len,
-                                  args.num_training)
-
-    train_dataloader = get_dataloader(args.train_file, data_fields,
-                                      dataloader_params)
-    val_dataloader = get_dataloader(args.val_file, data_fields,
-                                    dataloader_params)
-
-    print('Finished generating dataloaders!')
-    print('=' * 30)
-
-    return train_dataloader, val_dataloader
-
-
-# ---------------------------------------------------------------------------
-def initialize_model(model_name: str, args: Args, train_dataloader: DataLoader,
-                     val_dataloader: DataLoader) -> Settings:
-    """ Initialize the model and get settings  """
-
-    print('Initializing', model_name, 'model ...')
-    print('=' * 30)
-    model = AutoModelForSequenceClassification.from_pretrained(model_name,
-                                                               num_labels=2)
-    optimizer = AdamW(model.parameters(),
-                      lr=args.learning_rate,
-                      weight_decay=args.weight_decay)
-    num_training_steps = args.num_epochs * len(train_dataloader)
-    if args.lr_scheduler:
-        lr_scheduler = get_scheduler("linear",
-                                     optimizer=optimizer,
-                                     num_warmup_steps=0,
-                                     num_training_steps=num_training_steps)
-    else:
-        lr_scheduler = None
-    device = torch.device(
-        "cuda") if torch.cuda.is_available() else torch.device("cpu")
-    model.to(device)
-
-    return Settings(model, optimizer, train_dataloader, val_dataloader,
-                    lr_scheduler, args.num_epochs, num_training_steps, device)
-
-
-# ---------------------------------------------------------------------------
-def make_filenames(out_dir: str, model_name: str) -> Tuple[str, str]:
-    """ Make output filenames """
-
-    partial_name = os.path.join(out_dir, model_name + '_')
-
-    return partial_name + 'checkpt.pt', partial_name + 'losses.png'
-
-
-# ---------------------------------------------------------------------------
-def test_make_filenames() -> None:
-    """ Test make_filenames """
-
-    assert make_filenames('out', 'scibert') == ('out/scibert_checkpt.pt',
-                                                'out/scibert_losses.png')
 
 
 # ---------------------------------------------------------------------------
