@@ -105,11 +105,11 @@ def test_preprocess_data() -> None:
 
     out_df = pd.DataFrame([[
         'A Descriptive Title', 'A detailed abstract.',
-        'A Descriptive Title - A detailed abstract.'
+        'A Descriptive Title. A detailed abstract.'
     ],
                            [
                                'Another title', 'Another abstract.',
-                               'Another title - Another abstract.'
+                               'Another title. Another abstract.'
                            ]],
                           columns=['title', 'abstract', 'title_abstract'])
 
@@ -129,7 +129,7 @@ def strip_xml(text: str) -> str:
     """
     # If header tag between two adjacent strings, replace with a space
     pattern = re.compile(
-        r'''(?<=[\w.]) # Header tag must be preceded by word
+        r'''(?<=[\w.?!]) # Header tag must be preceded by word
             (</?h[\d]>) # Header tag has letter h and number
             (?=[\w]) # Header tag must be followed by word''', re.X)
     text = re.sub(pattern, ' ', text)
@@ -156,6 +156,7 @@ def test_strip_xml() -> None:
                      ) == 'http://proteomics.ucsd.edu/Software.html Contact'
     assert strip_xml(
         '<h4>Summary</h4>Neuropeptides') == 'Summary Neuropeptides'
+    assert strip_xml('<h4>Wow!</h4>Go on') == 'Wow! Go on'
 
 
 # ---------------------------------------------------------------------------
@@ -170,7 +171,7 @@ def concat_title_abstract(df: pd.DataFrame) -> pd.DataFrame:
     A `pd.DataFrame` with new column "title_abstract"
     """
 
-    df['title_abstract'] = df['title'] + ' - ' + df['abstract']
+    df['title_abstract'] = df['title'].map(add_period) + ' ' + df['abstract']
 
     return df
 
@@ -184,11 +185,32 @@ def test_concat_title_abstract() -> None:
 
     out_df = pd.DataFrame([[
         'A Descriptive Title', 'A detailed abstract.',
-        'A Descriptive Title - A detailed abstract.'
+        'A Descriptive Title. A detailed abstract.'
     ]],
                           columns=['title', 'abstract', 'title_abstract'])
 
     assert_frame_equal(concat_title_abstract(in_df), out_df)
+
+
+# ---------------------------------------------------------------------------
+def add_period(text: str) -> str:
+    """
+    Add period to end of sentence if not present
+    """
+    if text[-1] not in '.?!':
+        text = text + '.'
+
+    return text
+
+
+# ---------------------------------------------------------------------------
+def test_add_period() -> None:
+    """ Test add_poeriod() """
+
+    assert add_period('A statement.') == 'A statement.'
+    assert add_period('A question?') == 'A question?'
+    assert add_period('An exclamation!') == 'An exclamation!'
+    assert add_period('An incomplete') == 'An incomplete.'
 
 
 # ---------------------------------------------------------------------------
