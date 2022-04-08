@@ -369,7 +369,7 @@ def save_model(model: Any, epoch: int, f1: float, filename: str) -> None:
 
 # ---------------------------------------------------------------------------
 def save_loss_plot(train_losses: List[float], val_losses: List[float],
-                   num_epochs: int, filename: str) -> None:
+                   filename: str) -> None:
     """
     Plot training and validation losses, and save to file
 
@@ -377,10 +377,9 @@ def save_loss_plot(train_losses: List[float], val_losses: List[float],
     `train_losses`: Training losses
     `val_losses`: Validation losses
     `filename`: Name of file for saving plot
-    `labels`: Series labels for the two losses
     """
     df = pd.DataFrame({
-        'Epoch': list(range(num_epochs + 1)),
+        'Epoch': list(range(1,len(val_losses) + 1)),
         'Train': train_losses,
         'Validation': val_losses
     })
@@ -494,7 +493,7 @@ def main() -> None:
 
     checkpt_filename, img_filename = make_filenames(out_dir, args.model_name)
     save_model(model, epoch, f1, checkpt_filename)
-    save_loss_plot(train_losses, val_losses, epoch, img_filename)
+    save_loss_plot(train_losses, val_losses, img_filename)
 
     print('Done. Saved best checkpoint to', checkpt_filename)
 
