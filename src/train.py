@@ -379,7 +379,8 @@ def save_loss_plot(train_losses: List[float], val_losses: List[float],
     `filename`: Name of file for saving plot
     """
     df = pd.DataFrame({
-        'Epoch': list(range(1,len(val_losses) + 1)),
+        'Epoch': list(range(1,
+                            len(val_losses) + 1)),
         'Train': train_losses,
         'Validation': val_losses
     })
