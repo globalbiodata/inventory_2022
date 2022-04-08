@@ -85,7 +85,7 @@ def preprocess_data(file: TextIO) -> pd.DataFrame:
 
     if not all(map(lambda c: c in df.columns, ['title', 'abstract'])):
         logging.error(f'Data file {file.name} must contain columns '
-                 'labeled "title" and "abstract".')
+                      'labeled "title" and "abstract".')
 
     for col in ['title', 'abstract']:
         df[col] = df[col].apply(strip_xml)
@@ -127,8 +127,17 @@ def strip_xml(text: str) -> str:
     Returns:
     String without XML tags
     """
+    # If header tag between two adjacent strings, replace with a space
+    pattern = re.compile(
+        r'''(?<=[\w.]) # Header tag must be preceded by word
+            (</?h[\d]>) # Header tag has letter h and number
+            (?=[\w]) # Header tag must be followed by word''', re.X)
+    text = re.sub(pattern, ' ', text)
 
-    return re.sub(r'<[\w/]+>', '', text)
+    # Remove all other XML tags
+    text = re.sub(r'<[\w/]+>', '', text)
+
+    return text
 
 
 # ---------------------------------------------------------------------------
@@ -139,6 +148,14 @@ def test_strip_xml() -> None:
     assert strip_xml('H<sub>2</sub>O<sub>2</sub>') == 'H2O2'
     assert strip_xml(
         'the <i>Bacillus pumilus</i> group.') == 'the Bacillus pumilus group.'
+
+    # If there are not spaces around header tags, add them
+    assert strip_xml(
+        'MS/MS spectra.<h4>Availability') == 'MS/MS spectra. Availability'
+    assert strip_xml('http://proteomics.ucsd.edu/Software.html<h4>Contact'
+                     ) == 'http://proteomics.ucsd.edu/Software.html Contact'
+    assert strip_xml(
+        '<h4>Summary</h4>Neuropeptides') == 'Summary Neuropeptides'
 
 
 # ---------------------------------------------------------------------------
@@ -192,11 +209,11 @@ def generate_dataloader(df: pd.DataFrame, filename: str, fields: DataFields,
 
     if fields.predictive not in df.columns:
         logging.error(f'Predictive field column "{fields.predictive}" '
-                 f'not in file {filename}.')
+                      f'not in file {filename}.')
 
     if fields.labels and fields.labels not in df.columns:
         logging.error(f'Labels field column "{fields.labels}" '
-                 f'not in file {filename}.')
+                      f'not in file {filename}.')
 
     text, labels = get_text_labels(df, fields)
 
