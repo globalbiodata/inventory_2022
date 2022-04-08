@@ -195,7 +195,13 @@ def test_concat_title_abstract() -> None:
 # ---------------------------------------------------------------------------
 def add_period(text: str) -> str:
     """
-    Add period to end of sentence if not present
+    Add period to end of sentence if punctuation not present
+
+    Parameter:
+    `text`: String that may be missing final puncturation
+
+    Returns:
+    `text` With final punctuation
     """
     if text[-1] not in '.?!':
         text = text + '.'
