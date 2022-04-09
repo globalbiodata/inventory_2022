@@ -69,3 +69,24 @@ def test_bad_descriptors() -> None:
     """ Incorrect number of descriptive labels """
 
     tu.bad_descriptors(PRG)
+
+
+# ---------------------------------------------------------------------------
+def test_bad_numeric_args() -> None:
+    """ Incorrect type for numeric arguments """
+
+    bad_float = tu.random_string()
+
+    for flag in ['-r', '-decay']:
+        retval, out = getstatusoutput(f'{PRG} {flag} {bad_float}')
+        assert retval != 0
+        assert out.lower().startswith('usage')
+        assert re.search(f"invalid float value: '{bad_float}'", out)
+
+    bad_int = tu.random_float()
+
+    for flag in ['-max', '-nt', '-ne', '-batch']:
+        retval, out = getstatusoutput(f'{PRG} {flag} {bad_int}')
+        assert retval != 0
+        assert out.lower().startswith('usage')
+        assert re.search(f"invalid int value: '{bad_int}'", out)

@@ -16,6 +16,13 @@ def random_string() -> str:
 
 
 # ---------------------------------------------------------------------------
+def random_float() -> float:
+    """ Generate a random floating point number """
+
+    return random.choice(range(1, 100, 1)) / 100
+
+
+# ---------------------------------------------------------------------------
 def run_bad_option(prg: str, flag: str) -> None:
     """ Dies on bad option """
 
