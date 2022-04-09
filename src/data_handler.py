@@ -203,10 +203,8 @@ def add_period(text: str) -> str:
     Returns:
     `text` With final punctuation
     """
-    if text[-1] not in '.?!':
-        text = text + '.'
 
-    return text
+    return text if text[-1] in '.?!' else text + '.'
 
 
 # ---------------------------------------------------------------------------
