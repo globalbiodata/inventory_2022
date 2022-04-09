@@ -4,9 +4,9 @@ Authors: Ana-Maria Istrate and Kenneth Schackart
 """
 
 import io
-import logging
 import random
 import re
+import sys
 from functools import partial
 from typing import List, NamedTuple, Optional, TextIO, Tuple
 
@@ -84,8 +84,8 @@ def preprocess_data(file: TextIO) -> pd.DataFrame:
     df = pd.read_csv(file)
 
     if not all(map(lambda c: c in df.columns, ['title', 'abstract'])):
-        logging.error(f'Data file {file.name} must contain columns '
-                      'labeled "title" and "abstract".')
+        sys.exit(f'Data file {file.name} must contain columns '
+                 'labeled "title" and "abstract".')
 
     for col in ['title', 'abstract']:
         df[col] = df[col].apply(strip_xml)
@@ -234,12 +234,12 @@ def generate_dataloader(df: pd.DataFrame, filename: str, fields: DataFields,
     """
 
     if fields.predictive not in df.columns:
-        logging.error(f'Predictive field column "{fields.predictive}" '
-                      f'not in file {filename}.')
+        sys.exit(f'Predictive field column "{fields.predictive}" '
+                 f'not in file {filename}.')
 
     if fields.labels and fields.labels not in df.columns:
-        logging.error(f'Labels field column "{fields.labels}" '
-                      f'not in file {filename}.')
+        sys.exit(f'Labels field column "{fields.labels}" '
+                 f'not in file {filename}.')
 
     text, labels = get_text_labels(df, fields)
 
@@ -254,7 +254,7 @@ def generate_dataloader(df: pd.DataFrame, filename: str, fields: DataFields,
         dataset = dataset.select(
             random.sample(range(dataset.num_rows), k=params.num_train))
 
-    return DataLoader(dataset, batch_size=params.batch_size)
+    return DataLoader(dataset, batch_size=params.batch_size)  # type:ignore
 
 
 # ---------------------------------------------------------------------------
