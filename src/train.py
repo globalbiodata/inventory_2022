@@ -6,9 +6,9 @@ Authors: Ana-Maria Istrate and Kenneth Schackart
 
 import argparse
 import copy
-import logging
 import os
-from typing import Any, List, NamedTuple, Optional, TextIO, Tuple
+import sys
+from typing import Any, cast, List, NamedTuple, TextIO, Tuple
 
 import pandas as pd
 import plotly.express as px
@@ -26,7 +26,6 @@ from utils import MODEL_TO_HUGGINGFACE_VERSION, CustomHelpFormatter
 # ---------------------------------------------------------------------------
 class Args(NamedTuple):
     """ Command-line arguments """
-    quiet: bool
     train_file: TextIO
     val_file: TextIO
     out_dir: str
@@ -57,7 +56,6 @@ class Settings(NamedTuple):
     `num_training_steps`: Maximum number of training steps
     (`num_epochs` * `num_training`)
     `device`: Torch device
-    `quiet`: Run with minimal verbosity
     """
 
     model: Any
@@ -68,7 +66,6 @@ class Settings(NamedTuple):
     num_epochs: int
     num_training_steps: int
     device: torch.device
-    quiet: bool
 
 
 # ---------------------------------------------------------------------------
@@ -95,11 +92,6 @@ def get_args():
     parser = argparse.ArgumentParser(
         description='Train BERT model for article classification',
         formatter_class=CustomHelpFormatter)
-
-    parser.add_argument('-q',
-                        '--quiet',
-                        help='Run with minimal verbosity',
-                        action='store_true')
 
     inputs = parser.add_argument_group('Inputs and Outputs')
     data_info = parser.add_argument_group('Information on Data')
@@ -205,7 +197,7 @@ def get_args():
 
     args = parser.parse_args()
 
-    return Args(args.quiet, args.train_file, args.val_file, args.out_dir,
+    return Args(args.train_file, args.val_file, args.out_dir,
                 args.predictive_field, args.labels_field,
                 args.descriptive_labels, args.model_name, args.max_len,
                 args.learning_rate, args.weight_decay, args.num_training,
@@ -223,8 +215,7 @@ def train(settings: Settings) -> Tuple:
 
     model = settings.model
     model.train()
-    progress_bar = tqdm(range(
-        settings.num_training_steps)) if not settings.quiet else None
+    progress_bar = tqdm(range(settings.num_training_steps))
     best_model = model
     train_losses = []
     val_losses = []
@@ -256,30 +247,30 @@ def train(settings: Settings) -> Tuple:
         train_losses.append(train_metrics.loss)
         val_losses.append(val_metrics.loss)
 
-        logging.info(f'Epoch {epoch + 1}:\n'
-                     f'Train Loss: {train_loss:.5f}\n'
-                     f'Val Loss: {val_metrics.loss:.5f}\n'
-                     f'Train Precision: {train_metrics.precision:.3f}\n'
-                     f'Train Recall: {train_metrics.recall:.3f}\n'
-                     f'Train F1: {train_metrics.f1:.3f}\n'
-                     f'Val Precision: {val_metrics.precision:.3f}\n'
-                     f'Val Recall: {val_metrics.recall:.3f}\n'
-                     f'Val F1: {val_metrics.f1:.3f}')
+        print(f'Epoch {epoch + 1}:\n'
+              f'Train Loss: {train_loss:.5f}\n'
+              f'Val Loss: {val_metrics.loss:.5f}\n'
+              f'Train Precision: {train_metrics.precision:.3f}\n'
+              f'Train Recall: {train_metrics.recall:.3f}\n'
+              f'Train F1: {train_metrics.f1:.3f}\n'
+              f'Val Precision: {val_metrics.precision:.3f}\n'
+              f'Val Recall: {val_metrics.recall:.3f}\n'
+              f'Val F1: {val_metrics.f1:.3f}')
 
-    logging.info('Finished model training!')
-    logging.info('=' * 30)
-    logging.info(f'Best Train Precision: {best_train.precision:.3f}\n'
-                 f'Best Train Recall: {best_train.recall:.3f}\n'
-                 f'Best Train F1: {best_train.f1:.3f}\n'
-                 f'Best Val Precision: {best_val.precision:.3f}\n'
-                 f'Best Val Recall: {best_val.recall:.3f}\n'
-                 f'Best Val F1: {best_val.f1:.3f}\n')
+    print('Finished model training!')
+    print('=' * 30)
+    print(f'Best Train Precision: {best_train.precision:.3f}\n'
+          f'Best Train Recall: {best_train.recall:.3f}\n'
+          f'Best Train F1: {best_train.f1:.3f}\n'
+          f'Best Val Precision: {best_val.precision:.3f}\n'
+          f'Best Val Recall: {best_val.recall:.3f}\n'
+          f'Best Val F1: {best_val.f1:.3f}\n')
 
     return best_model, best_epoch, best_val.f1, train_losses, val_losses
 
 
 # ---------------------------------------------------------------------------
-def train_epoch(settings: Settings, progress_bar: Optional[tqdm]) -> float:
+def train_epoch(settings: Settings, progress_bar: tqdm) -> float:
     """
     Perform one epoch of model training
 
@@ -302,8 +293,7 @@ def train_epoch(settings: Settings, progress_bar: Optional[tqdm]) -> float:
         if settings.lr_scheduler:
             settings.lr_scheduler.step()
         settings.optimizer.zero_grad()
-        if progress_bar:
-            progress_bar.update(1)
+        progress_bar.update(1)
     return train_loss / num_train
 
 
@@ -322,9 +312,9 @@ def get_metrics(model: Any, dataloader: DataLoader,
     Returns:
     A `Metrics` NamedTuple
     """
-    precision = load_metric('precision')
-    recall = load_metric('recall')
-    f1 = load_metric('f1')
+    calc_precision = load_metric('precision')
+    calc_recall = load_metric('recall')
+    calc_f1 = load_metric('f1')
     total_loss = 0.
     num_seen_datapoints = 0
     for batch in dataloader:
@@ -332,19 +322,27 @@ def get_metrics(model: Any, dataloader: DataLoader,
         with torch.no_grad():
             outputs = model(**batch)
         num_seen_datapoints += len(batch['input_ids'])
-        logits = outputs.logits
-        loss = outputs.loss
-        predictions = torch.argmax(logits, dim=-1)
-        precision.add_batch(predictions=predictions,
-                            references=batch['labels'])
-        recall.add_batch(predictions=predictions, references=batch['labels'])
-        f1.add_batch(predictions=predictions, references=batch['labels'])
-        total_loss += loss.item()
+        predictions = torch.argmax(outputs.logits, dim=-1)
+        calc_precision.add_batch(predictions=predictions,
+                                 references=batch['labels'])
+        calc_recall.add_batch(predictions=predictions,
+                              references=batch['labels'])
+        calc_f1.add_batch(predictions=predictions, references=batch['labels'])
+        total_loss += outputs.loss.item()
     total_loss /= num_seen_datapoints
 
-    return Metrics(precision.compute()['precision'],
-                   recall.compute()['recall'],
-                   f1.compute()['f1'], total_loss)
+    if not all(
+        [calc_precision.compute(),
+         calc_recall.compute(),
+         calc_f1.compute()]):
+        sys.exit('Unable to calculate metrics.')
+
+    precision = cast(dict, calc_precision.compute())
+    recall = cast(dict, calc_recall.compute())
+    f1 = cast(dict, calc_f1.compute())
+
+    return Metrics(precision['precision'], recall['recall'], f1['f1'],
+                   total_loss)
 
 
 # ---------------------------------------------------------------------------
@@ -398,8 +396,8 @@ def get_dataloaders(args: Args,
                     model_name: str) -> Tuple[DataLoader, DataLoader]:
     """ Generate the dataloaders """
 
-    logging.info('Generating dataloaders ...')
-    logging.info('=' * 30)
+    print('Generating dataloaders ...')
+    print('=' * 30)
 
     data_fields = DataFields(
         args.predictive_field,
@@ -415,8 +413,8 @@ def get_dataloaders(args: Args,
     val_dataloader = get_dataloader(args.val_file, data_fields,
                                     dataloader_params)
 
-    logging.info('Finished generating dataloaders!')
-    logging.info('=' * 30)
+    print('Finished generating dataloaders!')
+    print('=' * 30)
 
     return train_dataloader, val_dataloader
 
@@ -426,8 +424,8 @@ def initialize_model(model_name: str, args: Args, train_dataloader: DataLoader,
                      val_dataloader: DataLoader) -> Settings:
     """ Initialize the model and get settings  """
 
-    logging.info(f'Initializing {model_name} model ...')
-    logging.info('=' * 30)
+    print(f'Initializing {model_name} model ...')
+    print('=' * 30)
     model = AutoModelForSequenceClassification.from_pretrained(model_name,
                                                                num_labels=2)
     optimizer = AdamW(model.parameters(),
@@ -446,8 +444,7 @@ def initialize_model(model_name: str, args: Args, train_dataloader: DataLoader,
     model.to(device)
 
     return Settings(model, optimizer, train_dataloader, val_dataloader,
-                    lr_scheduler, args.num_epochs, num_training_steps, device,
-                    args.quiet)
+                    lr_scheduler, args.num_epochs, num_training_steps, device)
 
 
 # ---------------------------------------------------------------------------
@@ -474,9 +471,6 @@ def main() -> None:
     args = get_args()
     out_dir = args.out_dir
 
-    logging.basicConfig(level=logging.CRITICAL if args.quiet else logging.INFO,
-                        format='%(message)s')
-
     if not os.path.isdir(out_dir):
         os.makedirs(out_dir)
 
@@ -487,8 +481,8 @@ def main() -> None:
     settings = initialize_model(model_name, args, train_dataloader,
                                 val_dataloader)
 
-    logging.info('Starting model training...')
-    logging.info('=' * 30)
+    print('Starting model training...')
+    print('=' * 30)
 
     model, epoch, f1, train_losses, val_losses = train(settings)
 
