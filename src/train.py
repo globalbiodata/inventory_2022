@@ -322,9 +322,9 @@ def get_metrics(model: Any, dataloader: DataLoader,
     Returns:
     A `Metrics` NamedTuple
     """
-    precision = load_metric("precision")
-    recall = load_metric("recall")
-    f1 = load_metric("f1")
+    precision = load_metric('precision')
+    recall = load_metric('recall')
+    f1 = load_metric('f1')
     total_loss = 0.
     num_seen_datapoints = 0
     for batch in dataloader:
@@ -336,9 +336,9 @@ def get_metrics(model: Any, dataloader: DataLoader,
         loss = outputs.loss
         predictions = torch.argmax(logits, dim=-1)
         precision.add_batch(predictions=predictions,
-                            references=batch["labels"])
-        recall.add_batch(predictions=predictions, references=batch["labels"])
-        f1.add_batch(predictions=predictions, references=batch["labels"])
+                            references=batch['labels'])
+        recall.add_batch(predictions=predictions, references=batch['labels'])
+        f1.add_batch(predictions=predictions, references=batch['labels'])
         total_loss += loss.item()
     total_loss /= num_seen_datapoints
 
@@ -435,14 +435,14 @@ def initialize_model(model_name: str, args: Args, train_dataloader: DataLoader,
                       weight_decay=args.weight_decay)
     num_training_steps = args.num_epochs * len(train_dataloader)
     if args.lr_scheduler:
-        lr_scheduler = get_scheduler("linear",
+        lr_scheduler = get_scheduler('linear',
                                      optimizer=optimizer,
                                      num_warmup_steps=0,
                                      num_training_steps=num_training_steps)
     else:
         lr_scheduler = None
     device = torch.device(
-        "cuda") if torch.cuda.is_available() else torch.device("cpu")
+        'cuda') if torch.cuda.is_available() else torch.device('cpu')
     model.to(device)
 
     return Settings(model, optimizer, train_dataloader, val_dataloader,
