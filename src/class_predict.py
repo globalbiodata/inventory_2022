@@ -14,7 +14,7 @@ from datasets import ClassLabel
 from torch.utils.data.dataloader import DataLoader
 from transformers import AutoModelForSequenceClassification as classifier
 
-from data_handler import get_dataloader, DataFields, RunParams
+from class_data_handler import get_dataloader, DataFields, RunParams
 from utils import MODEL_TO_HUGGINGFACE_VERSION, CustomHelpFormatter
 
 

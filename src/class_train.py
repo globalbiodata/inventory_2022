@@ -19,7 +19,7 @@ from tqdm.auto import tqdm
 from transformers import (AdamW, AutoModelForSequenceClassification,
                           get_scheduler)
 
-from data_handler import get_dataloader, DataFields, RunParams
+from class_data_handler import get_dataloader, DataFields, RunParams
 from utils import MODEL_TO_HUGGINGFACE_VERSION, CustomHelpFormatter
 
 
