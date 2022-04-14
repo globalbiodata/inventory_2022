@@ -7,7 +7,7 @@ from subprocess import getstatusoutput
 
 import test_utils as tu
 
-PRG = 'src/class/predict.py'
+PRG = 'src/class_predict.py'
 INPUT1 = 'tests/inputs/example_data.csv'
 
 
