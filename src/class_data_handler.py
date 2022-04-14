@@ -5,7 +5,6 @@ Authors: Ana-Maria Istrate and Kenneth Schackart
 
 import io
 import random
-import re
 import sys
 from functools import partial
 from typing import List, NamedTuple, Optional, TextIO, Tuple
@@ -15,6 +14,8 @@ from datasets import ClassLabel, Dataset
 from pandas.testing import assert_frame_equal
 from torch.utils.data import DataLoader
 from transformers import AutoTokenizer, PreTrainedTokenizer
+
+from utils import strip_xml
 
 
 # ---------------------------------------------------------------------------
@@ -114,49 +115,6 @@ def test_preprocess_data() -> None:
                           columns=['title', 'abstract', 'title_abstract'])
 
     assert_frame_equal(preprocess_data(in_fh), out_df)
-
-
-# ---------------------------------------------------------------------------
-def strip_xml(text: str) -> str:
-    """
-    Strip XML tags from a string
-
-    Parameters:
-    `text`: String possibly containing XML tags
-
-    Returns:
-    String without XML tags
-    """
-    # If header tag between two adjacent strings, replace with a space
-    pattern = re.compile(
-        r'''(?<=[\w.?!]) # Header tag must be preceded by word
-            (</?h[\d]>) # Header tag has letter h and number
-            (?=[\w]) # Header tag must be followed by word''', re.X)
-    text = re.sub(pattern, ' ', text)
-
-    # Remove all other XML tags
-    text = re.sub(r'<[\w/]+>', '', text)
-
-    return text
-
-
-# ---------------------------------------------------------------------------
-def test_strip_xml() -> None:
-    """ Test strip_xml() """
-
-    assert strip_xml('<h4>Supplementary info</h4>') == 'Supplementary info'
-    assert strip_xml('H<sub>2</sub>O<sub>2</sub>') == 'H2O2'
-    assert strip_xml(
-        'the <i>Bacillus pumilus</i> group.') == 'the Bacillus pumilus group.'
-
-    # If there are not spaces around header tags, add them
-    assert strip_xml(
-        'MS/MS spectra.<h4>Availability') == 'MS/MS spectra. Availability'
-    assert strip_xml('http://proteomics.ucsd.edu/Software.html<h4>Contact'
-                     ) == 'http://proteomics.ucsd.edu/Software.html Contact'
-    assert strip_xml(
-        '<h4>Summary</h4>Neuropeptides') == 'Summary Neuropeptides'
-    assert strip_xml('<h4>Wow!</h4>Go on') == 'Wow! Go on'
 
 
 # ---------------------------------------------------------------------------
