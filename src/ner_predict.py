@@ -20,7 +20,7 @@ class NERPredictor():
     def __init__(self, model_huggingface_version, checkpoint_filepath):
         """
     :param model_huggingface_version: HuggingFace model version to load the pretrained model weights from
-    :param checkpoint_filepath: saved checkpt to load the model from 
+    :param checkpoint_filepath: saved checkpt to load the model from
     """
         self.device = torch.device(
             "cuda") if torch.cuda.is_available() else torch.device("cpu")
@@ -38,7 +38,7 @@ class NERPredictor():
     def predict(self, text):
         """
     Generates predictions for a sentence using the trained model
-    
+
     :returns: predicted labels
     """
         with torch.no_grad():
