@@ -4,13 +4,13 @@ Purpose: Perform named entity recognition
 Authors: Ana-Maria Istrate and Kenneth Schackart
 """
 
-from transformers import AutoTokenizer
 import argparse
-import torch
-from transformers import AutoModelForTokenClassification
+
 import pandas as pd
-import nltk
-from utils import *
+import torch
+from transformers import AutoModelForTokenClassification, AutoTokenizer
+
+from utils import ID2NER_TAG, MODEL_TO_HUGGINGFACE_VERSION, NER_TAG2ID
 
 
 class NERPredictor():

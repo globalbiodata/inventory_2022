@@ -3,10 +3,11 @@ Purpose: Preprocess and tokenize data, create DataLoader
 Authors: Ana-Maria Istrate and Kenneth Schackart
 """
 
-from datasets import Dataset, load_dataset
-from transformers import DataCollatorForTokenClassification
+from datasets import load_dataset
 from torch.utils.data import DataLoader
-from utils import *
+from transformers import AutoTokenizer, DataCollatorForTokenClassification
+
+from utils import NER_TAG2ID
 
 
 class NERDataHandler:

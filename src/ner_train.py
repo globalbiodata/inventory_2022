@@ -4,19 +4,20 @@ Purpose: Train NER model from pretrained BERT
 Authors: Ana-Maria Istrate and Kenneth Schackart
 """
 
-from datasets import load_metric
-import numpy as np
-from transformers import AutoModelForTokenClassification, get_scheduler
-from torch.optim import AdamW
-from torch.utils.data import DataLoader
-from tqdm.auto import tqdm
-import torch
 import argparse
 import copy
-import plotly.express as px
-from utils import *
-from ner_data_handler import *
 import os
+
+import pandas as pd
+import plotly.express as px
+import torch
+from datasets import load_metric
+from torch.optim import AdamW
+from tqdm.auto import tqdm
+from transformers import AutoModelForTokenClassification, get_scheduler
+
+from ner_data_handler import NERDataHandler
+from utils import ARGS_MAP, ID2NER_TAG, NER_TAG2ID, set_random_seed
 
 
 class Trainer():
