@@ -1,7 +1,7 @@
 .PHONY: test, dryrun
 
 test:
-	python3 -m pytest -v --flake8 --pylint --pylint-rcfile=.pylintrc --mypy \
+	python3 -m pytest -v --flake8 --pylint --pylint-rcfile=config/.pylintrc --mypy \
 	tests/ \
 	src/train.py \
 	src/predict.py \
