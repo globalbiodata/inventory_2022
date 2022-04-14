@@ -1,3 +1,9 @@
+#!/usr/bin/env python3
+"""
+Purpose: Train NER model from pretrained BERT
+Authors: Ana-Maria Istrate and Kenneth Schackart
+"""
+
 from datasets import load_metric
 import numpy as np
 from transformers import AutoModelForTokenClassification, get_scheduler

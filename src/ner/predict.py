@@ -1,3 +1,9 @@
+#!/usr/bin/env python3
+"""
+Purpose: Perform named entity recognition
+Authors: Ana-Maria Istrate and Kenneth Schackart
+"""
+
 from transformers import AutoTokenizer
 import argparse
 import torch

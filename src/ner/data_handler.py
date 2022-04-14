@@ -1,3 +1,8 @@
+"""
+Purpose: Preprocess and tokenize data, create DataLoader
+Authors: Ana-Maria Istrate and Kenneth Schackart
+"""
+
 from datasets import Dataset, load_dataset
 from transformers import DataCollatorForTokenClassification
 from torch.utils.data import DataLoader
