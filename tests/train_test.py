@@ -8,7 +8,7 @@ import test_utils as tu
 
 # import shutil
 
-PRG = 'src/train.py'
+PRG = 'src/class/train.py'
 
 
 # ---------------------------------------------------------------------------
