@@ -189,7 +189,6 @@ def get_args():
                                 type=int,
                                 default=32,
                                 help='Batch Size')
-
     runtime_params.add_argument('-lr',
                                 '--lr-scheduler',
                                 action='store_true',
