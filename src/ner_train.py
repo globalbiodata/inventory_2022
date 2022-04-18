@@ -17,9 +17,105 @@ from tqdm.auto import tqdm
 from transformers import AutoModelForTokenClassification, get_scheduler
 
 from ner_data_handler import NERDataHandler
-from utils import ARGS_MAP, ID2NER_TAG, NER_TAG2ID, set_random_seed
+from utils import (ARGS_MAP, ID2NER_TAG, NER_TAG2ID, set_random_seed,
+                   CustomHelpFormatter)
 
 
+# ---------------------------------------------------------------------------
+def get_args():
+    """ Parse command-line arguments """
+
+    parser = argparse.ArgumentParser(
+        description='Train BERT model for named entity recognition',
+        formatter_class=CustomHelpFormatter)
+
+    inputs = parser.add_argument_group('Inputs and Outputs')
+    data_info = parser.add_argument_group('Information on Data')
+    model_params = parser.add_argument_group('Model Parameters')
+    runtime_params = parser.add_argument_group('Runtime Parameters')
+
+    inputs.add_argument('-t',
+                        '--train_file',
+                        metavar='FILE',
+                        type=str,
+                        default='data/ner_train.pkl',
+                        help='Training data file (.pkl)')
+    inputs.add_argument('-v',
+                        '--val_file',
+                        metavar='FILE',
+                        type=str,
+                        default='data/ner_val.pkl',
+                        help='Validation data file (.pkl)')
+    inputs.add_argument('-s',
+                        '--test_file',
+                        metavar='FILE',
+                        type=str,
+                        default='data/ner_test.pkl',
+                        help='Test data file (.pkl)')
+    inputs.add_argument('-o',
+                        '--output-dir',
+                        metavar='DIR',
+                        type=str,
+                        default='out/',
+                        help='Directory to output checkpt and loss plot')
+
+    model_params.add_argument(
+        '-m',
+        '--model_name',
+        metavar='MODEL',
+        type=str,
+        default='biomed_roberta',
+        help='Name of model',
+        choices=[
+            'bert', 'biobert', 'scibert', 'pubmedbert', 'pubmedbert_pmc',
+            'bluebert', 'bluebert_mimic3', 'sapbert', 'sapbert_mean_token',
+            'bioelectra', 'bioelectra_pmc', 'electramed', 'biomed_roberta',
+            'biomed_roberta_chemprot', 'biomed_roberta_rct_500'
+        ])
+    model_params.add_argument('-rate',
+                              '--learning-rate',
+                              metavar='NUM',
+                              type=float,
+                              default=3e-5,
+                              help='Learning Rate')
+    model_params.add_argument('-decay',
+                              '--weight_decay',
+                              metavar='NUM',
+                              type=float,
+                              default=0.01,
+                              help='Weight Decay for Learning Rate')
+    model_params.add_argument('-def',
+                              '--use-default-values',
+                              type=bool,
+                              default=True,
+                              help='Use default values in ner_utils.py')
+
+    runtime_params.add_argument('-ne',
+                                '--num_epochs',
+                                metavar='INT',
+                                type=int,
+                                default=3,
+                                help='Number of Epochs')
+    runtime_params.add_argument('-batch',
+                                '--batch-size',
+                                metavar='INT',
+                                type=int,
+                                default=16,
+                                help='Batch Size')
+    runtime_params.add_argument('-lr',
+                                '--lr_scheduler',
+                                action='store_true',
+                                help='Use a Learning Rate Scheduler')
+    runtime_params.add_argument('--sanity-check',
+                                action='store_true',
+                                help="Run sanity-check")
+
+    args = parser.parse_args()
+
+    return args
+
+
+# ---------------------------------------------------------------------------
 class Trainer():
     """
   Handles training of the model
@@ -193,72 +289,8 @@ class Trainer():
 
 
 if __name__ == '__main__':
-    # Parsing arguments
-    parser = argparse.ArgumentParser()
 
-    parser.add_argument('--num_epochs',
-                        type=int,
-                        default=3,
-                        help='Number of Epochs')
-    parser.add_argument('--batch-size',
-                        type=int,
-                        default=16,
-                        help='Batch Size')
-    parser.add_argument('--learning-rate',
-                        type=float,
-                        default=3e-5,
-                        help='Learning Rate')
-    parser.add_argument('--weight_decay',
-                        type=float,
-                        default=0.01,
-                        help='Weight Decay for Learning Rate')
-    parser.add_argument(
-        '--lr_scheduler',
-        action='store_true',
-        help=
-        'True if using a Learning Rate Scheduler. More info here: https://huggingface.co/docs/transformers/main_classes/optimizer_schedules'
-    )
-    parser.add_argument(
-        '--use-default-values',
-        type=bool,
-        default=True,
-        help='True if to use default values available in ner_utils.py')
-    parser.add_argument(
-        '--model_name',
-        type=str,
-        default='biomed_roberta',
-        help=
-        "Name of model to try. Can be one of: ['bert', 'biobert', 'scibert', 'pubmedbert', 'pubmedbert_pmc', 'bluebert', 'bluebert_mimic3', 'sapbert', 'sapbert_mean_token', 'bioelectra', 'bioelectra_pmc', 'electramed', 'biomed_roberta', 'biomed_roberta_chemprot', 'biomed_roberta_rct_500']"
-    )
-    parser.add_argument(
-        '--output-dir',
-        type=str,
-        default='checkpts',
-        help='Default directory to output checkpt and plot losses')
-    parser.add_argument(
-        '--train_file',
-        type=str,
-        default='data/ner_train.pkl',
-        help=
-        'Location of training file. Note that it has to be in a .pkl format')
-    parser.add_argument(
-        '--val_file',
-        type=str,
-        default='data/ner_val.pkl',
-        help='Location of val file. Note that it has to be in a .pkl format')
-    parser.add_argument(
-        '--test_file',
-        type=str,
-        default='data/ner_test.pkl',
-        help='Location of test file. Note that it has to be in a .pkl format')
-    parser.add_argument(
-        '--sanity-check',
-        action='store_true',
-        help=
-        "True for sanity-check. Runs training on a smaller subset of the entire training data."
-    )
-
-    args, _ = parser.parse_known_args()
+    args = get_args()
 
     if args.use_default_values:
         model_name = args.model_name
