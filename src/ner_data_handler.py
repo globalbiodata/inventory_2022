@@ -12,8 +12,8 @@ from utils import NER_TAG2ID
 
 class NERDataHandler:
     """
-  Handles generating training, validation and testing dataloaders used for training and evaluation
-  """
+    Handles generating training, validation and testing dataloaders used for training and evaluation
+    """
     def __init__(self,
                  model_huggingface_version,
                  batch_size,
@@ -22,11 +22,11 @@ class NERDataHandler:
                  test_file=None,
                  sanity_check=False):
         """
-    :param train_file: path to train file
-    :param val_file: path to val file
-    :param test_file: path to test file
-    :param model_huggingface_version: Hugginface model version used to instantiate the tokenizer
-    """
+        :param train_file: path to train file
+        :param val_file: path to val file
+        :param test_file: path to test file
+        :param model_huggingface_version: Hugginface model version used to instantiate the tokenizer
+        """
 
         self.tokenizer = AutoTokenizer.from_pretrained(
             model_huggingface_version)
@@ -57,18 +57,18 @@ class NERDataHandler:
 
     def get_dataloaders(self):
         """
-    Returns train, val and test dataloaders
-    """
+        Returns train, val and test dataloaders
+        """
         return self.train_dataloader, self.val_dataloader, self.test_dataloader
 
     def align_labels_with_tokens(self, labels, word_ids, cls_token=-100):
         """
-    Aligns word labels to token labels for NER
-    :param labels: word labels
-    :param word ids: word IDs of tokens
-    :param cls_token: token to assign to CLS tokens
-    :return: labels for tokens
-    """
+        Aligns word labels to token labels for NER
+        :param labels: word labels
+        :param word ids: word IDs of tokens
+        :param cls_token: token to assign to CLS tokens
+        :return: labels for tokens
+        """
         new_labels = []
         last_word_id = None
         last_tag = None
@@ -89,10 +89,10 @@ class NERDataHandler:
 
     def tokenize_and_align_labels(self, examples):
         """
-    Tokenizes and aligns labels for a given sequence of examples
-    :param examples: sequence to tokenize/assign labels to
-    :return: tokenized inputs
-    """
+        Tokenizes and aligns labels for a given sequence of examples
+        :param examples: sequence to tokenize/assign labels to
+        :return: tokenized inputs
+        """
         tokenized_inputs = self.tokenizer(examples["words"],
                                           truncation=True,
                                           is_split_into_words=True)
