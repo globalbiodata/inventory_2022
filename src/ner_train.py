@@ -118,20 +118,20 @@ def get_args():
 # ---------------------------------------------------------------------------
 class Trainer():
     """
-  Handles training of the model
-  """
+     Handles training of the model
+    """
     def __init__(self, model, optimizer, train_dataloader, val_dataloader,
                  lr_scheduler, num_epochs, num_training_steps, device):
         """
-    :param model: PyTorch model
-    :param optimizer: optimizer used
-    :param train_dataloader: DataLoader containing data used for training
-    :param val_dataloader: DataLoader containing data used for validation
-    :param lr_scheduler: learning rate scheduler; could be equal to None if no lr_scheduler is used
-    :param num_epochs: number of epochs to train the model for
-    :param num_training_steps: total number of training steps
-    :param device: device used for training; equal to 'cuda' if GPU is available
-    """
+        :param model: PyTorch model
+        :param optimizer: optimizer used
+        :param train_dataloader: DataLoader containing data used for training
+        :param val_dataloader: DataLoader containing data used for validation
+        :param lr_scheduler: learning rate scheduler; could be equal to None if no lr_scheduler is used
+        :param num_epochs: number of epochs to train the model for
+        :param num_training_steps: total number of training steps
+        :param device: device used for training; equal to 'cuda' if GPU is available
+        """
         self.model = model
         self.optimizer = optimizer
         self.train_dataloader = train_dataloader
@@ -143,10 +143,10 @@ class Trainer():
 
     def evaluate(self, dataloader):
         """
-    Computes and returns metrics (P, R, F1 score, loss) of a model on data present in a dataloader
-    :param dataloader: DataLoader containing tokenized text entries and corresponding labels
-    :return: precision, recall, F1 score, loss
-    """
+        Computes and returns metrics (P, R, F1 score, loss) of a model on data present in a dataloader
+        :param dataloader: DataLoader containing tokenized text entries and corresponding labels
+        :return: precision, recall, F1 score, loss
+        """
         metric = load_metric("seqeval")
         total_loss = 0
         num_seen_datapoints = 0
@@ -172,9 +172,9 @@ class Trainer():
 
     def train_epoch(self, progress_bar):
         """
-    Handles training of the model over one epoch
-    :param progress_bar: tqdm instance for tracking progress
-    """
+        Handles training of the model over one epoch
+        :param progress_bar: tqdm instance for tracking progress
+        """
         train_loss = 0
         num_train = 0
         for batch in self.train_dataloader:
@@ -195,8 +195,8 @@ class Trainer():
 
     def train(self):
         """
-    Handles training of the model over all epochs
-    """
+        Handles training of the model over all epochs
+        """
         progress_bar = tqdm(range(num_training_steps))
         self.model.train()
 
@@ -235,8 +235,8 @@ class Trainer():
 
     def get_metrics(self, results):
         """
-    Return metrics (Precision, recall, f1, accuracy)
-    """
+        Return metrics (Precision, recall, f1, accuracy)
+        """
         return [
             results[f"overall_{key}"]
             for key in ["precision", "recall", "f1", "accuracy"]
@@ -244,11 +244,11 @@ class Trainer():
 
     def postprocess(self, predictions, labels):
         """
-    Postprocess true and predicted arrays (as indices) to the corresponding labels (eg 'B-RES', 'I-RES')
-    :param predictions: array corresponding to predicted labels (as indices)
-    :param labels: array corresponding to true labels (as indices)
-    :return: predicted and true labels (as tags)
-    """
+        Postprocess true and predicted arrays (as indices) to the corresponding labels (eg 'B-RES', 'I-RES')
+        :param predictions: array corresponding to predicted labels (as indices)
+        :param labels: array corresponding to true labels (as indices)
+        :return: predicted and true labels (as tags)
+        """
         predictions = predictions.detach().cpu().clone().numpy()
         labels = labels.detach().cpu().clone().numpy()
         true_labels = [[ID2NER_TAG[l] for l in label if l != -100]
@@ -260,9 +260,9 @@ class Trainer():
 
     def save_best_model(self, checkpt_filename):
         """
-    Saves a model checkpoint, epoch and F1 score to file
-    :param checkpt_filename: filename under which the model checkpoint will be saved
-    """
+        Saves a model checkpoint, epoch and F1 score to file
+        :param checkpt_filename: filename under which the model checkpoint will be saved
+        """
         torch.save(
             {
                 'model_state_dict': self.best_model.state_dict(),
@@ -272,12 +272,12 @@ class Trainer():
 
     def plot_losses(self, losses, labels, img_filename):
         """
-    Plots training and val losses
-    :param num_epochs: total number of epochs the model was trained on; corresponds to length of the losses array
-    :param losses: array corresponding to [train_losses, val_losses]
-    :param img_filename: filename under which to save the image
-    :return: Generated plot
-    """
+        Plots training and val losses
+        :param num_epochs: total number of epochs the model was trained on; corresponds to length of the losses array
+        :param losses: array corresponding to [train_losses, val_losses]
+        :param img_filename: filename under which to save the image
+        :return: Generated plot
+        """
         x = [i for i in range(self.num_epochs)]
         df = pd.DataFrame({'Epoch': x})
         for loss_arr, label in zip(losses, labels):
