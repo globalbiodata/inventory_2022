@@ -139,7 +139,9 @@ def check_input(df: pd.DataFrame) -> None:
     exp_cols = ['id', 'title', 'abstract', 'curation_score']
 
     if not all(col in df.columns for col in exp_cols):
-        sys.exit(f'Input data does not have the expected columns: {exp_cols}')
+        sys.exit(
+            f'ERROR: Input data does not have the expected columns: {exp_cols}'
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -181,8 +183,8 @@ def check_data(df: pd.DataFrame) -> None:
     unique_ids = df['id'].nunique()
 
     if not num_certain == unique_ids:
-        sys.exit(f'Number of certain scores ({num_certain}) not equal to'
-                 f'number of unique IDs ({unique_ids}).')
+        sys.exit(f'ERROR: Number of certain scores ({num_certain}) not equal'
+                 f' to number of unique IDs ({unique_ids}).')
 
 
 # ---------------------------------------------------------------------------
