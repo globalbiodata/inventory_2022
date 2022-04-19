@@ -6,11 +6,11 @@ Authors: Ana-Maria Istrate and Kenneth Schackart
 
 import argparse
 import os
-import pytest
 import sys
 from typing import List, NamedTuple, TextIO
 
 import pandas as pd
+import pytest
 from pandas.testing import assert_frame_equal
 from sklearn.model_selection import train_test_split
 
@@ -129,6 +129,20 @@ def get_args() -> Args:
 
 
 # ---------------------------------------------------------------------------
+def check_input(df: pd.DataFrame) -> None:
+    """
+    Check the input data columns
+
+    `df`: Input dataframe
+    """
+
+    exp_cols = ['id', 'title', 'abstract', 'curation_score']
+
+    if not all(col in df.columns for col in exp_cols):
+        sys.exit(f'Input data does not have the expected columns: {exp_cols}')
+
+
+# ---------------------------------------------------------------------------
 def filter_data(df: pd.DataFrame) -> pd.DataFrame:
     """
     Return only data with curation score of 0 or 1
@@ -175,7 +189,7 @@ def check_data(df: pd.DataFrame) -> None:
 def split_df(df: pd.DataFrame, rand_seed: bool, splits: List[float]) -> Splits:
     """
     Split manually curated data into train, validation and test sets
-    
+
     `df`: Manually curated classification data
     `seed`: Optionally use random seed
     """
@@ -222,7 +236,7 @@ def test_seeded_split(unsplit_data: pd.DataFrame) -> None:
 
 
 # ---------------------------------------------------------------------------
-def make_filename(dir: str, name: str) -> str:
+def make_filename(out_dir: str, name: str) -> str:
     """
     Make output filename
 
@@ -230,9 +244,17 @@ def make_filename(dir: str, name: str) -> str:
     `name`: File name
     """
 
-    outfile = os.path.join(dir, name)
+    outfile = os.path.join(out_dir, name)
 
     return outfile
+
+
+# ---------------------------------------------------------------------------
+def test_make_filename() -> None:
+    """ Test make_filename() """
+
+    assert make_filename('out', 'val.csv') == 'out/val.csv'
+    assert make_filename('out/val', 'class.csv') == 'out/val/class.csv'
 
 
 # ---------------------------------------------------------------------------
@@ -246,6 +268,8 @@ def main() -> None:
         os.makedirs(out_dir)
 
     df = pd.read_csv(args.infile)
+
+    check_input(df)
 
     df = filter_data(df)
 
