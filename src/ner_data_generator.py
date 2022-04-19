@@ -1,16 +1,104 @@
-import pandas as pd
-import numpy as np
-import re
-import string
-from sklearn.model_selection import train_test_split
-import nltk
+#!/usr/bin/env python3
+"""
+Purpose: Split curated NER data into training, validation, and testing sets
+Authors: Ana-Maria Istrate and Kenneth Schackart
+"""
+
 import argparse
-from utils import *
+import string
+from typing import List, NamedTuple, TextIO
+
+import nltk
+import numpy as np
+import pandas as pd
+from sklearn.model_selection import train_test_split
+
+from utils import strip_xml, CustomHelpFormatter
 
 nltk.download('punkt')
 RND_SEED = 241
 
 
+# ---------------------------------------------------------------------------
+class Args(NamedTuple):
+    """
+    Command-line arguments
+
+    `infile`: Input curated data filehandle
+    `outdir`: Output directory
+    `train`: Training data output file name
+    `val`: Validation data output file name
+    `spltis`: Train, val, test proportions
+    `test`: Test data output file name
+    `seed`: Random seed
+    """
+    infile: TextIO
+    outdir: str
+    train: str
+    val: str
+    test: str
+    splits: List[float]
+    seed: bool
+
+
+# ---------------------------------------------------------------------------
+def get_args() -> Args:
+    """ Parse command-line arguments """
+
+    parser = argparse.ArgumentParser(
+        description='Split curated classification data',
+        formatter_class=CustomHelpFormatter)
+
+    parser.add_argument('infile',
+                        metavar='FILE',
+                        type=argparse.FileType('rt', encoding='ISO-8859-1'),
+                        default='data/manual_ner_extraction.csv',
+                        help='Manually classified input file')
+    parser.add_argument('-o',
+                        '--outdir',
+                        metavar='',
+                        type=str,
+                        default='data/',
+                        help='Output directory')
+    parser.add_argument('-t',
+                        '--train',
+                        metavar='',
+                        type=str,
+                        default='train_ner.pkl',
+                        help='Training data output file name')
+    parser.add_argument('-v',
+                        '--val',
+                        metavar='',
+                        type=str,
+                        default='val_ner.pkl',
+                        help='Validation data output file name')
+    parser.add_argument('-s',
+                        '--test',
+                        metavar='',
+                        type=str,
+                        default='test_ner.pkl',
+                        help='Test data output file name')
+    parser.add_argument('--splits',
+                        metavar='',
+                        type=float,
+                        nargs=3,
+                        default=[0.7, 0.15, 0.15],
+                        help='Proportions for train, val, test splits')
+    parser.add_argument('-r',
+                        '--seed',
+                        action='store_true',
+                        help='Set random seed')
+
+    args = parser.parse_args()
+
+    if not sum(args.splits) == 1.0:
+        parser.error(f'--splits {args.splits} must sum to 1')
+
+    return Args(args.infile, args.outdir, args.train, args.val, args.test,
+                args.splits, args.seed)
+
+
+# ---------------------------------------------------------------------------
 def get_offsets(text_sentences, resource_name, resource_type):
     """
     Matches a given resource_name (eg 'MEGALEX') of a given resource_type (eg RES) to a given list of sentences
@@ -65,6 +153,7 @@ def get_offsets(text_sentences, resource_name, resource_type):
     return words, word_indices, tags, sent_indices
 
 
+# ---------------------------------------------------------------------------
 def reconcile_tags(tags_arr1, tags_arr2):
     """
     Reconciles different set of tags in arrays corresponding to the same sequence of words.
@@ -85,6 +174,7 @@ def reconcile_tags(tags_arr1, tags_arr2):
     return final_tags
 
 
+# ---------------------------------------------------------------------------
 def BIO_scheme_transform(df):
     """
     Matches B-RES and I-RES tags according to the BIO-scheme for the mentions found under the 'name' and 'acronym' fields. 
@@ -149,6 +239,7 @@ def BIO_scheme_transform(df):
     return df
 
 
+# ---------------------------------------------------------------------------
 def process_df(df, filename):
     """
     Saves a df as a pickle file under a given filename
@@ -162,17 +253,11 @@ def process_df(df, filename):
     df_grouped.to_pickle(filename)
 
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--input_file',
-                        type=str,
-                        default='data/extracted_elements_2022-02-24_hji.csv')
-    parser.add_argument(
-        '--output_dir',
-        type=str,
-        default='data/',
-        help='Output directory. Where train/test/val files will be found')
-    args, _ = parser.parse_known_args()
+# ---------------------------------------------------------------------------
+def main() -> None:
+    """ Main function """
+
+    args = get_args()
 
     print(f'args={args}')
 
@@ -206,3 +291,8 @@ if __name__ == '__main__':
     process_df(train_df, args.output_dir + 'ner_train.pkl')
     process_df(val_df, args.output_dir + 'ner_val.pkl')
     process_df(test_df, args.output_dir + 'ner_test.pkl')
+
+
+# ---------------------------------------------------------------------------
+if __name__ == '__main__':
+    main()
