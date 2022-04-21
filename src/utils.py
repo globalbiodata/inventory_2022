@@ -5,7 +5,11 @@ Authors: Ana-Maria Istrate and Kenneth Schackart
 
 import argparse
 import re
+from typing import List, NamedTuple
+
+import pandas as pd
 import torch
+from sklearn.model_selection import train_test_split
 
 # ---------------------------------------------------------------------------
 # Mapping from generic model name to the Huggingface Version
@@ -83,8 +87,8 @@ ID2NER_TAG = {v: k for k, v in NER_TAG2ID.items()}
 # ---------------------------------------------------------------------------
 def set_random_seed(seed):
     """
-  Sets random seed for deterministic outcome of ML-trained models
-  """
+    Sets random seed for deterministic outcome of ML-trained models
+    """
     torch.manual_seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
@@ -157,3 +161,67 @@ def test_strip_xml() -> None:
     assert strip_xml(
         '<h4>Summary</h4>Neuropeptides') == 'Summary Neuropeptides'
     assert strip_xml('<h4>Wow!</h4>Go on') == 'Wow! Go on'
+
+
+# ---------------------------------------------------------------------------
+class Splits(NamedTuple):
+    """
+    Training, validation, and test dataframes
+
+    `train`: Training data
+    `val`: Validation data
+    `test`: Test data
+    """
+    train: pd.DataFrame
+    val: pd.DataFrame
+    test: pd.DataFrame
+
+
+# ---------------------------------------------------------------------------
+def split_df(df: pd.DataFrame, rand_seed: bool, splits: List[float]) -> Splits:
+    """
+    Split manually curated data into train, validation and test sets
+
+    `df`: Manually curated classification data
+    `seed`: Optionally use random seed
+    """
+
+    seed = 241 if rand_seed else None
+
+    _, val_split, test_split = splits
+    val_test_split = val_split + test_split
+
+    train, val_test = train_test_split(df,
+                                       test_size=val_test_split,
+                                       random_state=seed)
+    val, test = train_test_split(val_test,
+                                 test_size=test_split / val_test_split,
+                                 random_state=seed)
+
+    return Splits(train, val, test)
+
+
+# ---------------------------------------------------------------------------
+def test_random_split(unsplit_data: pd.DataFrame) -> None:
+    """ Test that split_df() gives correct proportions """
+
+    in_df = unsplit_data
+
+    train, val, test = split_df(in_df, False, [0.5, 0.25, 0.25])
+
+    assert len(train.index) == 4
+    assert len(val.index) == 2
+    assert len(test.index) == 2
+
+
+# ---------------------------------------------------------------------------
+def test_seeded_split(unsplit_data: pd.DataFrame) -> None:
+    """ Test that split_df() behaves deterministically """
+
+    in_df = unsplit_data
+
+    train, val, test = split_df(in_df, True, [0.5, 0.25, 0.25])
+
+    assert list(train['id'].values) == [321, 789, 741, 654]
+    assert list(val['id'].values) == [987, 456]
+    assert list(test['id'].values) == [852, 123]
