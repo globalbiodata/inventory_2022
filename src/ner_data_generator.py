@@ -5,7 +5,9 @@ Authors: Ana-Maria Istrate and Kenneth Schackart
 """
 
 import argparse
+import os
 import string
+import sys
 from typing import List, NamedTuple, TextIO
 
 import nltk
@@ -13,10 +15,10 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
-from utils import strip_xml, CustomHelpFormatter
+from utils import CustomHelpFormatter, strip_xml
 
-nltk.download('punkt')
-RND_SEED = 241
+# nltk.download('punkt')
+# RND_SEED = 241
 
 
 # ---------------------------------------------------------------------------
@@ -96,6 +98,41 @@ def get_args() -> Args:
 
     return Args(args.infile, args.outdir, args.train, args.val, args.test,
                 args.splits, args.seed)
+
+
+# ---------------------------------------------------------------------------
+def check_input(df: pd.DataFrame) -> None:
+    """
+    Check the input data columns
+
+    `df`: Input dataframe
+    """
+
+    exp_cols = ['id', 'title', 'abstract', 'full_name', 'common_name']
+
+    if not all(col in df.columns for col in exp_cols):
+        sys.exit(
+            f'ERROR: Input data does not have the expected columns: {exp_cols}'
+        )
+
+
+# --------------------------------------------------------------------------
+def filter_data(df: pd.DataFrame) -> pd.DataFrame:
+    """ Get only relevant data """
+
+    return df[['id', 'title', 'abstract', 'full_name', 'common_name']]
+
+
+# --------------------------------------------------------------------------
+def clean_data(df: pd.DataFrame) -> pd.DataFrame:
+    """ Strip XML tags and deduplicate """
+
+    df['title'] = df['title'].apply(strip_xml)
+    df['abstract'] = df['abstract'].apply(strip_xml)
+
+    df = df.drop_duplicates()
+
+    return df
 
 
 # ---------------------------------------------------------------------------
@@ -258,20 +295,23 @@ def main() -> None:
     """ Main function """
 
     args = get_args()
+    out_dir = args.outdir
 
-    print(f'args={args}')
+    if not os.path.isdir(out_dir):
+        os.makedirs(out_dir)
 
-    df = pd.read_csv(args.input_file)
-    df = df[['id', 'title', 'abstract', 'name', 'acronym']]
-    df['abstract_parsed_xml'] = df['abstract'].apply(get_parsed_xml)
-    df['title_parsed_xml'] = df['title'].apply(get_parsed_xml)
-    df = df.drop_duplicates()
-    print('This is how the initial data looks like:')
-    print(df.head())
-    df = df[~df['name'].isna()]
+    df = pd.read_csv(args.infile)
+
+    check_input(df)
+
+    df = filter_data(df)
+
+    df = clean_data(df)
+
+    # df = df[~df['name'].isna()]
     ner_df = BIO_scheme_transform(df)
 
-    np.random.seed(RND_SEED)
+    # np.random.seed(RND_SEED)
     sent_ids = ner_df['pmid'].unique()
     sent_ids_train, sent_ids_val_test = train_test_split(sent_ids,
                                                          test_size=0.3,
