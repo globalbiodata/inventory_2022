@@ -183,7 +183,11 @@ def split_df(df: pd.DataFrame, rand_seed: bool, splits: List[float]) -> Splits:
     Split manually curated data into train, validation and test sets
 
     `df`: Manually curated classification data
-    `seed`: Optionally use random seed
+    `rand_seed`: Optionally use random seed
+    `splits`: Proportions of data for [train, validation, test]
+
+    Return:
+    train, validation, test dataframes
     """
 
     seed = 241 if rand_seed else None
