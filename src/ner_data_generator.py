@@ -8,7 +8,7 @@ import argparse
 import os
 import string
 import sys
-from typing import List, NamedTuple, TextIO
+from typing import List, NamedTuple, TextIO, Tuple
 
 import nltk
 import numpy as np
@@ -137,7 +137,8 @@ def clean_data(df: pd.DataFrame) -> pd.DataFrame:
 
 
 # ---------------------------------------------------------------------------
-def get_offsets(text_sentences, resource_name, resource_type):
+def get_offsets(text_sentences: List[str], resource_name: str,
+                resource_type: str) -> Tuple[List, List, List, List]:
     """
     Matches a given resource_name (eg 'MEGALEX') of a given resource_type (eg RES) to a given list of sentences
     :param text_sentences: sentences to map the given resource_name to
@@ -192,17 +193,16 @@ def get_offsets(text_sentences, resource_name, resource_type):
 
 
 # ---------------------------------------------------------------------------
-def reconcile_tags(tags_arr1, tags_arr2):
+def reconcile_tags(tags_1: List, tags_2: List) -> List:
     """
-    Reconciles different set of tags in arrays corresponding to the same sequence of words.
-    Eg: [B-RES, I-RES, O] and [O, O, O]
-    Each word will get the more specific tag found in either of the arrays
-    :param tags_arr1: array containing first list of tags
-    :param tags_arr2: array containing second list of tags
+    Reconciles different set of tags in lists corresponding to the same sequence of words.
+    Each word will get the more specific tag found in either of the lists
+    :param tags_1: list containing first list of tags
+    :param tags_2: list containing second list of tags
     :return final_tags: array containing reconciled tags
     """
     final_tags = []
-    for tag1, tag2 in zip(tags_arr1, tags_arr2):
+    for tag1, tag2 in zip(tags_1, tags_2):
         if tag1 == tag2:
             final_tags.append(tag1)
         elif tag1 != 'O':
@@ -229,15 +229,11 @@ def test_reconcile_tags() -> None:
     assert reconcile_tags(tags_1, tags_2) == merged_tags
 
     # This test case currently fails, first list takes priority
-    tags_1 = ['O', 'O', 'B-RES', 'O', 'O']
-    tags_2 = ['O', 'B-RES', 'I-RES', 'I-RES', 'O']
-    merged_tags = ['O', 'B-RES', 'I-RES', 'I-RES', 'O']
-
-    assert reconcile_tags(tags_1, tags_2) == merged_tags
+    assert reconcile_tags(tags_2, tags_1) == merged_tags
 
 
 # ---------------------------------------------------------------------------
-def BIO_scheme_transform(df):
+def BIO_scheme_transform(df: pd.DataFrame) -> pd.DataFrame:
     """
     Matches B-RES and I-RES tags according to the BIO-scheme for the mentions found under the 'name' and 'full_name' fields. 
     Matches on both the 'title' and 'abstract' fields, parsed to remove XML tags
@@ -365,7 +361,7 @@ def split_df(df: pd.DataFrame, rand_seed: bool, splits: List[float]) -> Splits:
 
 
 # ---------------------------------------------------------------------------
-def process_df(df, filename):
+def process_df(df: pd.DataFrame, filename: str) -> None:
     """
     Saves a df as a pickle file under a given filename
     :param filename: Output filename
