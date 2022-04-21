@@ -13,6 +13,7 @@ from typing import List, NamedTuple, TextIO
 import nltk
 import numpy as np
 import pandas as pd
+from pandas.testing import assert_frame_equal
 from sklearn.model_selection import train_test_split
 
 from utils import CustomHelpFormatter, Splits, strip_xml
@@ -274,6 +275,36 @@ def BIO_scheme_transform(df):
         'tag': all_tags
     })
     return df
+
+
+# ---------------------------------------------------------------------------
+def test_BIO_scheme_transform() -> None:
+    """ Test BIO_scheme_transform() """
+
+    in_df = pd.DataFrame(
+        [[
+            123, 'MEGALEX: A megastudy.', 'New database (MEGALEX) of.',
+            'MEGALEX', 'MEGALEX'
+        ],
+         [
+             456, 'The Auditory English Lexicon Project: A multi.',
+             '(AELP) is a.', 'Auditory English Lexicon Project', 'AELP'
+         ]],
+        columns=['id', 'title', 'abstract', 'full_name', 'common_name'])
+
+    out_df = pd.DataFrame(
+        [[123, 0, 'MEGALEX:', 0, 'B-RES'], [123, 0, 'A', 1, 'O'],
+         [123, 0, 'megastudy.', 2, 'O'], [123, 1, 'New', 0, 'O'],
+         [123, 1, 'database', 1, 'O'], [123, 1, '(MEGALEX)', 2, 'B-RES'],
+         [123, 1, 'of.', 3, 'O'], [456, 0, 'The', 0, 'O'],
+         [456, 0, 'Auditory', 1, 'B-RES'], [456, 0, 'English', 2, 'I-RES'],
+         [456, 0, 'Lexicon', 3, 'I-RES'], [456, 0, 'Project:', 4, 'I-RES'],
+         [456, 0, 'A', 5, 'O'], [456, 0, 'multi.', 6, 'O'],
+         [456, 1, '(AELP)', 0, 'B-RES'], [456, 1, 'is', 1, 'O'],
+         [456, 1, 'a.', 2, 'O']],
+        columns=['pmid', 'sent_idx', 'word', 'word_idx', 'tag'])
+
+    assert_frame_equal(BIO_scheme_transform(in_df), out_df)
 
 
 # ---------------------------------------------------------------------------
