@@ -13,9 +13,8 @@ from typing import List, NamedTuple, TextIO
 import nltk
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import train_test_split
 
-from utils import CustomHelpFormatter, strip_xml
+from utils import CustomHelpFormatter, split_df, strip_xml
 
 # nltk.download('punkt')
 # RND_SEED = 241
@@ -214,16 +213,16 @@ def reconcile_tags(tags_arr1, tags_arr2):
 # ---------------------------------------------------------------------------
 def BIO_scheme_transform(df):
     """
-    Matches B-RES and I-RES tags according to the BIO-scheme for the mentions found under the 'name' and 'acronym' fields. 
+    Matches B-RES and I-RES tags according to the BIO-scheme for the mentions found under the 'name' and 'full_name' fields. 
     Matches on both the 'title' and 'abstract' fields, parsed to remove XML tags
-    :param df: the given df. Must contain    the following fields: [id, title, abstract_parsed_xml, name, acronym]
-    :return df: df containing sentences where mentions under 'name' and 'acronym' fields are being matched
+    :param df: the given df. Must contain    the following fields: [id, title, abstract_parsed_xml, name, full_name]
+    :return df: df containing sentences where mentions under 'name' and 'full_name' fields are being matched
     """
     pmids = df['id'].values
     titles = df['title'].values
-    abstracts = df['abstract_parsed_xml'].values
-    names = df['name'].values
-    acronyms = df['acronym'].values
+    abstracts = df['abstract'].values
+    names = df['common_name'].values
+    full_names = df['full_name'].values
 
     all_words = []
     all_word_indices = []
@@ -235,16 +234,16 @@ def BIO_scheme_transform(df):
     last_words = []
     last_word_indices = []
     last_sent_indices = []
-    for pmid, title, abstract, resource_name, acronym in zip(
-            pmids, titles, abstracts, names, acronyms):
+    for pmid, title, abstract, resource_name, full_name in zip(
+            pmids, titles, abstracts, names, full_names):
         title_abstract_sentences = nltk.sent_tokenize(
             title) + nltk.sent_tokenize(abstract)
         words, word_indices, tags, sentences_indices = get_offsets(
             title_abstract_sentences, resource_name, 'RES')
-        _, _, acronyms_tags, acronyms_sentences_indices = get_offsets(
-            title_abstract_sentences, acronym, 'RES')
+        _, _, full_names_tags, full_names_sentences_indices = get_offsets(
+            title_abstract_sentences, full_name, 'RES')
 
-        final_tags = reconcile_tags(tags, acronyms_tags)
+        final_tags = reconcile_tags(tags, full_names_tags)
         if pmid == last_pmid:
             final_tags = reconcile_tags(final_tags, last_final_tags)
         # seeing a new pmid -> append last information unless last_pmid is -1
@@ -280,7 +279,7 @@ def BIO_scheme_transform(df):
 def process_df(df, filename):
     """
     Saves a df as a pickle file under a given filename
-    :param filename: file under which to save the pickled df
+    :param filename: Output filename
     """
     df_grouped = df.groupby(['pmid', 'sent_idx']).agg(list).reset_index()
     df_grouped = df_grouped.rename(columns={
@@ -312,25 +311,17 @@ def main() -> None:
     ner_df = BIO_scheme_transform(df)
 
     # np.random.seed(RND_SEED)
-    sent_ids = ner_df['pmid'].unique()
-    sent_ids_train, sent_ids_val_test = train_test_split(sent_ids,
-                                                         test_size=0.3,
-                                                         random_state=RND_SEED)
-    sent_ids_val, sent_ids_test = train_test_split(sent_ids_val_test,
-                                                   test_size=0.5,
-                                                   random_state=RND_SEED)
+    # sent_ids = ner_df['pmid'].unique()
+    train_df, val_df, test_df = split_df(ner_df, args.seed, args.splits)
 
-    train_df = ner_df[ner_df['pmid'].isin(sent_ids_train)]
-    val_df = ner_df[ner_df['pmid'].isin(sent_ids_val)]
-    test_df = ner_df[ner_df['pmid'].isin(sent_ids_test)]
+    train_out, val_out, test_out = map(lambda f: os.path.join(out_dir, f),
+                                       [args.train, args.val, args.test])
 
-    assert (len(set(sent_ids_train).intersection(set(sent_ids_val))) == 0)
-    assert (len(set(sent_ids_train).intersection(set(sent_ids_test))) == 0)
-    assert (len(set(sent_ids_val).intersection(set(sent_ids_test))) == 0)
+    process_df(train_df, train_out)
+    process_df(val_df, val_out)
+    process_df(test_df, test_out)
 
-    process_df(train_df, args.output_dir + 'ner_train.pkl')
-    process_df(val_df, args.output_dir + 'ner_val.pkl')
-    process_df(test_df, args.output_dir + 'ner_test.pkl')
+    print(f'Done. Wrote 3 files to {out_dir}.')
 
 
 # ---------------------------------------------------------------------------
