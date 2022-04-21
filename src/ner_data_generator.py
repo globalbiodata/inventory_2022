@@ -270,9 +270,9 @@ def BIO_scheme_transform(df):
     df = pd.DataFrame({
         'pmid': all_pmids,
         'sent_idx': all_sent_indices,
-        'word': all_words,
         'word_idx': all_word_indices,
-        'tag': all_tags
+        'tag': all_tags,
+        'word': all_words,
     })
     return df
 
@@ -293,16 +293,16 @@ def test_BIO_scheme_transform() -> None:
         columns=['id', 'title', 'abstract', 'full_name', 'common_name'])
 
     out_df = pd.DataFrame(
-        [[123, 0, 'MEGALEX:', 0, 'B-RES'], [123, 0, 'A', 1, 'O'],
-         [123, 0, 'megastudy.', 2, 'O'], [123, 1, 'New', 0, 'O'],
-         [123, 1, 'database', 1, 'O'], [123, 1, '(MEGALEX)', 2, 'B-RES'],
-         [123, 1, 'of.', 3, 'O'], [456, 0, 'The', 0, 'O'],
-         [456, 0, 'Auditory', 1, 'B-RES'], [456, 0, 'English', 2, 'I-RES'],
-         [456, 0, 'Lexicon', 3, 'I-RES'], [456, 0, 'Project:', 4, 'I-RES'],
-         [456, 0, 'A', 5, 'O'], [456, 0, 'multi.', 6, 'O'],
-         [456, 1, '(AELP)', 0, 'B-RES'], [456, 1, 'is', 1, 'O'],
-         [456, 1, 'a.', 2, 'O']],
-        columns=['pmid', 'sent_idx', 'word', 'word_idx', 'tag'])
+        [[123, 0, 0, 'B-RES', 'MEGALEX:'], [123, 0, 1, 'O', 'A'],
+         [123, 0, 2, 'O', 'megastudy.'], [123, 1, 0, 'O', 'New'],
+         [123, 1, 1, 'O', 'database'], [123, 1, 2, 'B-RES', '(MEGALEX)'],
+         [123, 1, 3, 'O', 'of.'], [456, 0, 0, 'O', 'The'],
+         [456, 0, 1, 'B-RES', 'Auditory'], [456, 0, 2, 'I-RES', 'English'],
+         [456, 0, 3, 'I-RES', 'Lexicon'], [456, 0, 4, 'I-RES', 'Project:'],
+         [456, 0, 5, 'O', 'A'], [456, 0, 6, 'O', 'multi.'],
+         [456, 1, 0, 'B-RES', '(AELP)'], [456, 1, 1, 'O', 'is'],
+         [456, 1, 2, 'O', 'a.']],
+        columns=['pmid', 'sent_idx', 'word_idx', 'tag', 'word'])
 
     assert_frame_equal(BIO_scheme_transform(in_df), out_df)
 
