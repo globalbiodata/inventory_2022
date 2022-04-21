@@ -12,8 +12,9 @@ from typing import List, NamedTuple, TextIO
 import pandas as pd
 import pytest
 from pandas.testing import assert_frame_equal
+from sklearn.model_selection import train_test_split
 
-from utils import CustomHelpFormatter, split_df
+from utils import CustomHelpFormatter, Splits
 
 
 # ---------------------------------------------------------------------------
@@ -173,25 +174,57 @@ def check_data(df: pd.DataFrame) -> None:
 
 
 # ---------------------------------------------------------------------------
-def make_filename(out_dir: str, name: str) -> str:
+def split_df(df: pd.DataFrame, rand_seed: bool, splits: List[float]) -> Splits:
     """
-    Make output filename
+    Split manually curated data into train, validation and test sets
 
-    `dir`: Output directory
-    `name`: File name
+    `df`: Manually curated classification data
+    `rand_seed`: Optionally use random seed
+    `splits`: Proportions of data for [train, validation, test]
+
+    Return:
+    train, validation, test dataframes
     """
 
-    outfile = os.path.join(out_dir, name)
+    seed = 241 if rand_seed else None
 
-    return outfile
+    _, val_split, test_split = splits
+    val_test_split = val_split + test_split
+
+    train, val_test = train_test_split(df,
+                                       test_size=val_test_split,
+                                       random_state=seed)
+    val, test = train_test_split(val_test,
+                                 test_size=test_split / val_test_split,
+                                 random_state=seed)
+
+    return Splits(train, val, test)
 
 
 # ---------------------------------------------------------------------------
-def test_make_filename() -> None:
-    """ Test make_filename() """
+def test_random_split(unsplit_data: pd.DataFrame) -> None:
+    """ Test that split_df() gives correct proportions """
 
-    assert make_filename('out', 'val.csv') == 'out/val.csv'
-    assert make_filename('out/val', 'class.csv') == 'out/val/class.csv'
+    in_df = unsplit_data
+
+    train, val, test = split_df(in_df, False, [0.5, 0.25, 0.25])
+
+    assert len(train.index) == 4
+    assert len(val.index) == 2
+    assert len(test.index) == 2
+
+
+# ---------------------------------------------------------------------------
+def test_seeded_split(unsplit_data: pd.DataFrame) -> None:
+    """ Test that split_df() behaves deterministically """
+
+    in_df = unsplit_data
+
+    train, val, test = split_df(in_df, True, [0.5, 0.25, 0.25])
+
+    assert list(train['id'].values) == [321, 789, 741, 654]
+    assert list(val['id'].values) == [987, 456]
+    assert list(test['id'].values) == [852, 123]
 
 
 # ---------------------------------------------------------------------------
@@ -214,7 +247,7 @@ def main() -> None:
 
     train_df, val_df, test_df = split_df(df, args.seed, args.splits)
 
-    train_out, val_out, test_out = map(lambda f: make_filename(out_dir, f),
+    train_out, val_out, test_out = map(lambda f: os.path.join(out_dir, f),
                                        [args.train, args.val, args.test])
 
     train_df.to_csv(train_out, index=False)
