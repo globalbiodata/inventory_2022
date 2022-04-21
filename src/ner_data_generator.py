@@ -13,8 +13,9 @@ from typing import List, NamedTuple, TextIO
 import nltk
 import numpy as np
 import pandas as pd
+from sklearn.model_selection import train_test_split
 
-from utils import CustomHelpFormatter, split_df, strip_xml
+from utils import CustomHelpFormatter, Splits, strip_xml
 
 # nltk.download('punkt')
 # RND_SEED = 241
@@ -276,6 +277,39 @@ def BIO_scheme_transform(df):
 
 
 # ---------------------------------------------------------------------------
+def split_df(df: pd.DataFrame, rand_seed: bool, splits: List[float]) -> Splits:
+    """
+    Split manually curated data into train, validation and test sets
+
+    `df`: Manually curated classification data
+    `rand_seed`: Optionally use random seed
+    `splits`: Proportions of data for [train, validation, test]
+
+    Return:
+    train, validation, test dataframes
+    """
+
+    seed = 241 if rand_seed else None
+
+    _, val_split, test_split = splits
+    val_test_split = val_split + test_split
+
+    ids = df['pmid'].unique()
+    train_ids, val_test_ids = train_test_split(ids,
+                                               test_size=val_test_split,
+                                               random_state=seed)
+    val_ids, test_ids = train_test_split(val_test_ids,
+                                         test_size=test_split / val_test_split,
+                                         random_state=seed)
+
+    train = df[df['pmid'].isin(train_ids)]
+    val = df[df['pmid'].isin(val_ids)]
+    test = df[df['pmid'].isin(test_ids)]
+
+    return Splits(train, val, test)
+
+
+# ---------------------------------------------------------------------------
 def process_df(df, filename):
     """
     Saves a df as a pickle file under a given filename
@@ -312,10 +346,15 @@ def main() -> None:
 
     # np.random.seed(RND_SEED)
     # sent_ids = ner_df['pmid'].unique()
+
     train_df, val_df, test_df = split_df(ner_df, args.seed, args.splits)
 
     train_out, val_out, test_out = map(lambda f: os.path.join(out_dir, f),
                                        [args.train, args.val, args.test])
+
+    assert (len(set(train_df['pmid']).intersection(set(val_df['pmid']))) == 0)
+    assert (len(set(train_df['pmid']).intersection(set(test_df['pmid']))) == 0)
+    assert (len(set(val_df['pmid']).intersection(set(test_df['pmid']))) == 0)
 
     process_df(train_df, train_out)
     process_df(val_df, val_out)
