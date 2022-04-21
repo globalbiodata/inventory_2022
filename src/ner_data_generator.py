@@ -213,6 +213,30 @@ def reconcile_tags(tags_arr1, tags_arr2):
 
 
 # ---------------------------------------------------------------------------
+def test_reconcile_tags() -> None:
+    """ Test reconcile_tags """
+
+    tags_1 = ['O', 'B-RES', 'I-RES', 'I-RES', 'O']
+    tags_2 = ['O', 'O', 'O', 'O', 'O']
+    merged_tags = ['O', 'B-RES', 'I-RES', 'I-RES', 'O']
+
+    assert reconcile_tags(tags_1, tags_2) == merged_tags
+
+    tags_1 = ['O', 'B-RES', 'I-RES', 'I-RES', 'O']
+    tags_2 = ['O', 'O', 'B-RES', 'O', 'O']
+    merged_tags = ['O', 'B-RES', 'I-RES', 'I-RES', 'O']
+
+    assert reconcile_tags(tags_1, tags_2) == merged_tags
+
+    # This test case currently fails, first list takes priority
+    tags_1 = ['O', 'O', 'B-RES', 'O', 'O']
+    tags_2 = ['O', 'B-RES', 'I-RES', 'I-RES', 'O']
+    merged_tags = ['O', 'B-RES', 'I-RES', 'I-RES', 'O']
+
+    assert reconcile_tags(tags_1, tags_2) == merged_tags
+
+
+# ---------------------------------------------------------------------------
 def BIO_scheme_transform(df):
     """
     Matches B-RES and I-RES tags according to the BIO-scheme for the mentions found under the 'name' and 'full_name' fields. 
