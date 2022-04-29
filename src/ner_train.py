@@ -67,10 +67,11 @@ def get_args():
         default='biomed_roberta',
         help='Name of model',
         choices=[
-            'bert', 'biobert', 'scibert', 'pubmedbert', 'pubmedbert_pmc',
-            'bluebert', 'bluebert_mimic3', 'sapbert', 'sapbert_mean_token',
-            'bioelectra', 'bioelectra_pmc', 'electramed', 'biomed_roberta',
-            'biomed_roberta_chemprot', 'biomed_roberta_rct_500'
+            'bert', 'biobert', 'bioelectra', 'bioelectra_pmc',
+            'biomed_roberta', 'biomed_roberta_chemprot',
+            'biomed_roberta_rct_500', 'bluebert', 'bluebert_mimic3',
+            'electramed', 'pubmedbert', 'pubmedbert_pmc', 'sapbert',
+            'sapbert_mean_token', 'scibert'
         ])
     model_params.add_argument('-rate',
                               '--learning-rate',
