@@ -248,26 +248,47 @@ def test_restructure_df() -> None:
 
 
 # ---------------------------------------------------------------------------
-def get_article_tags(df: pd.DataFrame) -> pd.DataFrame:
+def assign_tags(words: pd.Series, full_name: str,
+                common_name: str) -> pd.Series:
+
+    full_name_split = full_name.split(' ')
+    common_name_split = common_name.split(' ')
+
+    full_name_len = len(full_name_split)
+    common_name_len = len(common_name_split)
+
+    seq_len = len(words)
+
+    tags = pd.Series(['O'] * seq_len)
+    for i in range(len(words)):
+        if i + common_name_len <= seq_len:
+            if all(words[i:i + common_name_len] == common_name_split):
+                tags[i] = 'B-COM'
+                tags[i + 1:i + common_name_len] = 'I-COM'
+        if i + full_name_len <= seq_len:
+            if all(words[i:i + full_name_len] == full_name_split):
+                tags[i] = 'B-FUL'
+                tags[i + 1:i + full_name_len] = 'I-FUL'
+
+    return tags
+
+
+# ---------------------------------------------------------------------------
+def tag_article_tokens(df: pd.DataFrame) -> pd.DataFrame:
     """"
     Map full_name and common_name to article title and abstract
     Add tags for each
     """
 
+    full_name = df['full_name'].iloc[0]
+    common_name = df['common_name'].iloc[0]
     out_df = restructure_df(df)
 
     words = out_df['word'].str.strip(string.punctuation)
     split_full_name = out_df.pop('full_name').str.split(' ')
     split_common_name = out_df.pop('common_name').str.split(' ')
 
-    b_ful = split_full_name.str[0].eq(words)
-    i_ful = [b in a for a, b in zip(split_full_name, words)]
-    b_com = split_common_name.str[0].eq(words)
-    i_com = [b in a for a, b in zip(split_common_name, words)]
-
-    out_df['tag'] = np.select([b_com, i_com, b_ful, i_ful],
-                              ['B-COM', 'I-COM', 'B-FUL', 'I-FUL'],
-                              default='O')
+    out_df['tag'] = assign_tags(words, full_name, common_name)
 
     out_df = out_df[['pmid', 'sent_idx', 'word_idx', 'tag', 'word']]
 
@@ -275,7 +296,7 @@ def get_article_tags(df: pd.DataFrame) -> pd.DataFrame:
 
 
 # ---------------------------------------------------------------------------
-def test_get_article_tags() -> None:
+def test_tag_article_tokens() -> None:
 
     in_df = pd.DataFrame(
         [[
@@ -292,7 +313,7 @@ def test_get_article_tags() -> None:
          [456, 1, 1, 'O', 'is'], [456, 1, 2, 'O', 'a.']],
         columns=['pmid', 'sent_idx', 'word_idx', 'tag', 'word'])
 
-    assert_frame_equal(get_article_tags(in_df), out_df)
+    assert_frame_equal(tag_article_tokens(in_df), out_df)
 
     # Partial matches to named entities should not be tagged
     in_df = pd.DataFrame(
@@ -310,7 +331,7 @@ def test_get_article_tags() -> None:
          [456, 0, 8, 'O', 'database.']],
         columns=['pmid', 'sent_idx', 'word_idx', 'tag', 'word'])
 
-    assert_frame_equal(get_article_tags(in_df), out_df)
+    assert_frame_equal(tag_article_tokens(in_df), out_df)
 
 
 # ---------------------------------------------------------------------------
@@ -322,7 +343,7 @@ def BIO_scheme_transform(df: pd.DataFrame) -> pd.DataFrame:
 
     out_df = pd.DataFrame()
     for _, article_df in df.groupby('id'):
-        tagged_df = get_article_tags(article_df)
+        tagged_df = tag_article_tokens(article_df)
         out_df = pd.concat([out_df, tagged_df])
 
     out_df = out_df.reset_index(drop=True)
