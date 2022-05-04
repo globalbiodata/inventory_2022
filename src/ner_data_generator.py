@@ -152,6 +152,44 @@ def clean_data(df: pd.DataFrame) -> pd.DataFrame:
 
 
 # ---------------------------------------------------------------------------
+def resolve_nested_tags(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Remove long_name if common_name is contained within it
+    """
+
+    df['full_name'] = df['full_name'].where(
+        ~df.apply(lambda s: s.common_name in s.full_name, axis=1), other='')
+
+    return df
+
+
+# ---------------------------------------------------------------------------
+def test_resolve_nested_tags() -> None:
+    """ Test resolve_nested_tags() """
+
+    in_df = pd.DataFrame([
+        [123, 'The Ensembl project is a thing.', 'Ensembl project', 'Ensembl'],
+        [
+            456, 'The Auditory English Lexicon Project (AELP).',
+            'Auditory English Lexicon Project', 'AELP'
+        ]
+    ],
+                         columns=[
+                             'id', 'title_abstract', 'full_name', 'common_name'
+                         ])
+
+    out_df = pd.DataFrame(
+        [[123, 'The Ensembl project is a thing.', '', 'Ensembl'],
+         [
+             456, 'The Auditory English Lexicon Project (AELP).',
+             'Auditory English Lexicon Project', 'AELP'
+         ]],
+        columns=['id', 'title_abstract', 'full_name', 'common_name'])
+
+    assert_frame_equal(resolve_nested_tags(in_df), out_df)
+
+
+# ---------------------------------------------------------------------------
 def restructure_df(df: pd.DataFrame) -> pd.DataFrame:
     """
     Create a row for each word in article title and abstract
@@ -159,7 +197,7 @@ def restructure_df(df: pd.DataFrame) -> pd.DataFrame:
     """
 
     out_df = df.set_index(['id', 'full_name', 'common_name'], append=True)
-    out_df = out_df.title_abstract.str.split(r'(?<=\.) ', expand=True)
+    out_df = out_df.title_abstract.map(nltk.sent_tokenize).apply(pd.Series)
     out_df = out_df.stack()
     out_df = out_df.reset_index(level=4, drop=True)
     out_df = out_df.reset_index(name='sentence')
@@ -280,6 +318,8 @@ def BIO_scheme_transform(df: pd.DataFrame) -> pd.DataFrame:
 
     df = concat_title_abstract(df)
 
+    df = resolve_nested_tags(df)
+
     out_df = pd.DataFrame()
     for _, article_df in df.groupby('id'):
         tagged_df = get_article_tags(article_df)
@@ -318,6 +358,23 @@ def test_BIO_scheme_transform() -> None:
         columns=['pmid', 'sent_idx', 'word_idx', 'tag', 'word'])
 
     assert_frame_equal(BIO_scheme_transform(in_df), out_df, check_dtype=False)
+
+    # Tokens cannot have multiple tags, so if common_name is in full_name
+    # Do not tag full_name
+    in_df = pd.DataFrame(
+        [[
+            456, 'The Ensembl project.', 'Is a thing.', 'Ensembl project',
+            'Ensembl'
+        ]],
+        columns=['id', 'title', 'abstract', 'full_name', 'common_name'])
+
+    out_df = pd.DataFrame(
+        [[456, 0, 0, 'O', 'The'], [456, 0, 1, 'B-COM', 'Ensembl'],
+         [456, 0, 2, 'O', 'project.'], [456, 1, 0, 'O', 'Is'],
+         [456, 1, 1, 'O', 'a'], [456, 1, 2, 'O', 'thing.']],
+        columns=['pmid', 'sent_idx', 'word_idx', 'tag', 'word'])
+
+    assert_frame_equal(BIO_scheme_transform(in_df), out_df)
 
 
 # ---------------------------------------------------------------------------
