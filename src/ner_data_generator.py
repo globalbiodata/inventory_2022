@@ -13,10 +13,11 @@ from typing import List, NamedTuple, TextIO, Tuple
 import nltk
 import numpy as np
 import pandas as pd
+import re
 from pandas.testing import assert_frame_equal
 from sklearn.model_selection import train_test_split
 
-from utils import CustomHelpFormatter, Splits, strip_xml
+from utils import concat_title_abstract, CustomHelpFormatter, Splits, strip_xml
 
 # nltk.download('punkt')
 # RND_SEED = 241
@@ -42,6 +43,20 @@ class Args(NamedTuple):
     test: str
     splits: List[float]
     seed: bool
+
+
+# ---------------------------------------------------------------------------
+class LabeledSentence(NamedTuple):
+    """
+    Sentence labeled with BIO scheme
+
+    `words`: List of words in sentence
+    `indices`: Word indices
+    `tags`: BIO tag per word
+    """
+    words: List[str]
+    indices: List[int]
+    tags: List[str]
 
 
 # ---------------------------------------------------------------------------
@@ -137,164 +152,124 @@ def clean_data(df: pd.DataFrame) -> pd.DataFrame:
 
 
 # ---------------------------------------------------------------------------
-def get_offsets(text_sentences: List[str], resource_name: str,
-                resource_type: str) -> Tuple[List, List, List, List]:
+def restructure_df(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Matches a given resource_name (eg 'MEGALEX') of a given resource_type (eg RES) to a given list of sentences
-    :param text_sentences: sentences to map the given resource_name to
-    :param resource_name: resource_name to map
-    :param resource_type: type of resource to map
-    :return: list of words, word_indices, tags and sent_indices corresponding to the mapped sequence
+    Create a row for each word in article title and abstract
+    Add sentence and word index columns
     """
-    word_indices = []
-    tags = []
-    words = []
-    sent_indices = []
 
-    for sent_idx, text in enumerate(text_sentences):
-        text_tokens = text.split()
-        text_tokens_stripped = np.array(
-            [x.strip(string.punctuation).lower() for x in text_tokens])
-        text_token_idx2tag = {}
-        if resource_name == resource_name:
+    out_df = df.set_index(['id', 'full_name', 'common_name'], append=True)
+    out_df = out_df.title_abstract.str.split(r'(?<=\.) ', expand=True)
+    out_df = out_df.stack()
+    out_df = out_df.reset_index(level=4, drop=True)
+    out_df = out_df.reset_index(name='sentence')
+    out_df = out_df.set_index(['id', 'full_name', 'common_name'], append=True)
+    out_df = out_df.sentence.str.split(expand=True)
+    out_df = out_df.stack()
+    out_df = out_df.reset_index(name='word')
+    out_df = out_df.rename(columns={
+        'level_0': 'sent_idx',
+        'level_4': 'word_idx',
+        'id': 'pmid'
+    })
 
-            resource_name_tokens = [x.lower() for x in resource_name.split()]
-            resource_name_first_token = resource_name_tokens[0]
+    out_df = out_df[[
+        'pmid', 'sent_idx', 'word_idx', 'word', 'common_name', 'full_name'
+    ]]
 
-            match_indices = np.where(
-                text_tokens_stripped == resource_name_first_token)[0]
-            for match_idx in match_indices:
-                found_match = True
-                text_token_idx2tag[match_idx] = 'B-' + resource_type
-                for i, resource_name_token in enumerate(
-                        resource_name_tokens[1:]):
-                    resource_name_token_in_range = (
-                        (i + match_idx + 1) < (len(text_tokens_stripped)))
-                    if (not resource_name_token_in_range) or (
-                            resource_name_token_in_range and
-                        (text_tokens_stripped[i + match_idx + 1] !=
-                         resource_name_token)):
-                        found_match = False
-                    else:
-                        text_token_idx2tag[match_idx + i +
-                                           1] = 'I-' + resource_type
-                if not found_match:
-                    for i, resource_name_token in enumerate(
-                            resource_name_tokens):
-                        text_token_idx2tag[match_idx + i] = 'O'
-
-        for token_idx, token in enumerate(text_tokens):
-            words.append(token)
-            word_indices.append(token_idx)
-            tags.append(text_token_idx2tag[token_idx] if token_idx in
-                        text_token_idx2tag else 'O')
-            sent_indices.append(sent_idx)
-    return words, word_indices, tags, sent_indices
+    return out_df
 
 
 # ---------------------------------------------------------------------------
-def reconcile_tags(tags_1: List, tags_2: List) -> List:
-    """
-    Reconciles different set of tags in lists corresponding to the same sequence of words.
-    Each word will get the more specific tag found in either of the lists
-    :param tags_1: list containing first list of tags
-    :param tags_2: list containing second list of tags
-    :return final_tags: array containing reconciled tags
-    """
-    final_tags = []
-    for tag1, tag2 in zip(tags_1, tags_2):
-        if tag1 == tag2:
-            final_tags.append(tag1)
-        elif tag1 != 'O':
-            final_tags.append(tag1)
-        else:
-            final_tags.append(tag2)
-    return final_tags
+def test_restructure_df() -> None:
+    """ Test restructure_df() """
+
+    in_df = pd.DataFrame(
+        [[
+            456, 'The Auditory English Lexicon Project: A multi. (AELP) is a.',
+            'Auditory English Lexicon Project', 'AELP'
+        ]],
+        columns=['id', 'title_abstract', 'full_name', 'common_name'])
+
+    out_df = pd.DataFrame(
+        [[456, 0, 0, 'The', 'AELP', 'Auditory English Lexicon Project'],
+         [456, 0, 1, 'Auditory', 'AELP', 'Auditory English Lexicon Project'],
+         [456, 0, 2, 'English', 'AELP', 'Auditory English Lexicon Project'],
+         [456, 0, 3, 'Lexicon', 'AELP', 'Auditory English Lexicon Project'],
+         [456, 0, 4, 'Project:', 'AELP', 'Auditory English Lexicon Project'],
+         [456, 0, 5, 'A', 'AELP', 'Auditory English Lexicon Project'],
+         [456, 0, 6, 'multi.', 'AELP', 'Auditory English Lexicon Project'],
+         [456, 1, 0, '(AELP)', 'AELP', 'Auditory English Lexicon Project'],
+         [456, 1, 1, 'is', 'AELP', 'Auditory English Lexicon Project'],
+         [456, 1, 2, 'a.', 'AELP', 'Auditory English Lexicon Project']],
+        columns=[
+            'pmid', 'sent_idx', 'word_idx', 'word', 'common_name', 'full_name'
+        ])
+
+    assert_frame_equal(restructure_df(in_df), out_df)
 
 
 # ---------------------------------------------------------------------------
-def test_reconcile_tags() -> None:
-    """ Test reconcile_tags """
+def get_article_tags(df: pd.DataFrame) -> pd.DataFrame:
+    """"
+    Map full_name and common_name to article title and abstract
+    Add tags for each
+    """
 
-    tags_1 = ['O', 'B-RES', 'I-RES', 'I-RES', 'O']
-    tags_2 = ['O', 'O', 'O', 'O', 'O']
-    merged_tags = ['O', 'B-RES', 'I-RES', 'I-RES', 'O']
+    out_df = restructure_df(df)
 
-    assert reconcile_tags(tags_1, tags_2) == merged_tags
+    words = out_df['word'].str.strip(string.punctuation)
+    split_full_name = out_df.pop('full_name').str.split(' ')
+    split_common_name = out_df.pop('common_name').str.split(' ')
 
-    tags_1 = ['O', 'B-RES', 'I-RES', 'I-RES', 'O']
-    tags_2 = ['O', 'O', 'B-RES', 'O', 'O']
-    merged_tags = ['O', 'B-RES', 'I-RES', 'I-RES', 'O']
+    b_ful = split_full_name.str[0].eq(words)
+    i_ful = [b in a for a, b in zip(split_full_name, words)]
+    b_com = split_common_name.str[0].eq(words)
+    i_com = [b in a for a, b in zip(split_common_name, words)]
 
-    assert reconcile_tags(tags_1, tags_2) == merged_tags
+    out_df['tag'] = np.select([b_com, i_com, b_ful, i_ful],
+                              ['B-COM', 'I-COM', 'B-FUL', 'I-FUL'],
+                              default='O')
 
-    # This test case currently fails, first list takes priority
-    assert reconcile_tags(tags_2, tags_1) == merged_tags
+    out_df = out_df[['pmid', 'sent_idx', 'word_idx', 'tag', 'word']]
+
+    return out_df
+
+
+# ---------------------------------------------------------------------------
+def test_get_article_tags() -> None:
+
+    in_df = pd.DataFrame(
+        [[
+            456, 'The Auditory English Lexicon Project: A multi. (AELP) is a.',
+            'Auditory English Lexicon Project', 'AELP'
+        ]],
+        columns=['id', 'title_abstract', 'full_name', 'common_name'])
+
+    out_df = pd.DataFrame(
+        [[456, 0, 0, 'O', 'The'], [456, 0, 1, 'B-FUL', 'Auditory'],
+         [456, 0, 2, 'I-FUL', 'English'], [456, 0, 3, 'I-FUL', 'Lexicon'],
+         [456, 0, 4, 'I-FUL', 'Project:'], [456, 0, 5, 'O', 'A'],
+         [456, 0, 6, 'O', 'multi.'], [456, 1, 0, 'B-COM', '(AELP)'],
+         [456, 1, 1, 'O', 'is'], [456, 1, 2, 'O', 'a.']],
+        columns=['pmid', 'sent_idx', 'word_idx', 'tag', 'word'])
+
+    assert_frame_equal(get_article_tags(in_df), out_df)
 
 
 # ---------------------------------------------------------------------------
 def BIO_scheme_transform(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Matches B-RES and I-RES tags according to the BIO-scheme for the mentions found under the 'name' and 'full_name' fields. 
-    Matches on both the 'title' and 'abstract' fields, parsed to remove XML tags
-    :param df: the given df. Must contain    the following fields: [id, title, abstract_parsed_xml, name, full_name]
-    :return df: df containing sentences where mentions under 'name' and 'full_name' fields are being matched
-    """
-    pmids = df['id'].values
-    titles = df['title'].values
-    abstracts = df['abstract'].values
-    names = df['common_name'].values
-    full_names = df['full_name'].values
 
-    all_words = []
-    all_word_indices = []
-    all_tags = []
-    all_pmids = []
-    all_sent_indices = []
-    last_pmid = -1
-    last_final_tags = []
-    last_words = []
-    last_word_indices = []
-    last_sent_indices = []
-    for pmid, title, abstract, resource_name, full_name in zip(
-            pmids, titles, abstracts, names, full_names):
-        title_abstract_sentences = nltk.sent_tokenize(
-            title) + nltk.sent_tokenize(abstract)
-        words, word_indices, tags, sentences_indices = get_offsets(
-            title_abstract_sentences, resource_name, 'RES')
-        _, _, full_names_tags, full_names_sentences_indices = get_offsets(
-            title_abstract_sentences, full_name, 'RES')
+    df = concat_title_abstract(df)
 
-        final_tags = reconcile_tags(tags, full_names_tags)
-        if pmid == last_pmid:
-            final_tags = reconcile_tags(final_tags, last_final_tags)
-        # seeing a new pmid -> append last information unless last_pmid is -1
-        elif last_pmid != -1:
-            all_words.extend(last_words)
-            all_word_indices.extend(last_word_indices)
-            all_tags.extend(last_final_tags)
-            all_pmids.extend([last_pmid] * len(last_words))
-            all_sent_indices.extend(last_sent_indices)
+    out_df = pd.DataFrame()
+    for _, article_df in df.groupby('id'):
+        tagged_df = get_article_tags(article_df)
+        out_df = pd.concat([out_df, tagged_df])
 
-        last_pmid = pmid
-        last_final_tags = final_tags
-        last_words = words
-        last_word_indices = word_indices
-        last_sent_indices = sentences_indices
+    out_df = out_df.reset_index(drop=True)
 
-    all_words.extend(last_words)
-    all_word_indices.extend(last_word_indices)
-    all_tags.extend(last_final_tags)
-    all_pmids.extend([last_pmid] * len(last_words))
-    all_sent_indices.extend(last_sent_indices)
-    df = pd.DataFrame({
-        'pmid': all_pmids,
-        'sent_idx': all_sent_indices,
-        'word_idx': all_word_indices,
-        'tag': all_tags,
-        'word': all_words,
-    })
-    return df
+    return out_df
 
 
 # ---------------------------------------------------------------------------
@@ -313,18 +288,18 @@ def test_BIO_scheme_transform() -> None:
         columns=['id', 'title', 'abstract', 'full_name', 'common_name'])
 
     out_df = pd.DataFrame(
-        [[123, 0, 0, 'B-RES', 'MEGALEX:'], [123, 0, 1, 'O', 'A'],
+        [[123, 0, 0, 'B-COM', 'MEGALEX:'], [123, 0, 1, 'O', 'A'],
          [123, 0, 2, 'O', 'megastudy.'], [123, 1, 0, 'O', 'New'],
-         [123, 1, 1, 'O', 'database'], [123, 1, 2, 'B-RES', '(MEGALEX)'],
+         [123, 1, 1, 'O', 'database'], [123, 1, 2, 'B-COM', '(MEGALEX)'],
          [123, 1, 3, 'O', 'of.'], [456, 0, 0, 'O', 'The'],
-         [456, 0, 1, 'B-RES', 'Auditory'], [456, 0, 2, 'I-RES', 'English'],
-         [456, 0, 3, 'I-RES', 'Lexicon'], [456, 0, 4, 'I-RES', 'Project:'],
+         [456, 0, 1, 'B-FUL', 'Auditory'], [456, 0, 2, 'I-FUL', 'English'],
+         [456, 0, 3, 'I-FUL', 'Lexicon'], [456, 0, 4, 'I-FUL', 'Project:'],
          [456, 0, 5, 'O', 'A'], [456, 0, 6, 'O', 'multi.'],
-         [456, 1, 0, 'B-RES', '(AELP)'], [456, 1, 1, 'O', 'is'],
+         [456, 1, 0, 'B-COM', '(AELP)'], [456, 1, 1, 'O', 'is'],
          [456, 1, 2, 'O', 'a.']],
         columns=['pmid', 'sent_idx', 'word_idx', 'tag', 'word'])
 
-    assert_frame_equal(BIO_scheme_transform(in_df), out_df)
+    assert_frame_equal(BIO_scheme_transform(in_df), out_df, check_dtype=False)
 
 
 # ---------------------------------------------------------------------------
