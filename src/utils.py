@@ -9,6 +9,7 @@ from typing import List, NamedTuple
 
 import pandas as pd
 import torch
+from pandas.testing import assert_frame_equal
 
 # ---------------------------------------------------------------------------
 # Mapping from generic model name to the Huggingface Version
@@ -160,6 +161,64 @@ def test_strip_xml() -> None:
     assert strip_xml(
         '<h4>Summary</h4>Neuropeptides') == 'Summary Neuropeptides'
     assert strip_xml('<h4>Wow!</h4>Go on') == 'Wow! Go on'
+
+
+# ---------------------------------------------------------------------------
+def concat_title_abstract(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Concatenate abstract and title columns
+
+    Parameters:
+    `df`: Dataframe with columns "title" and "abstract"
+
+    Returns:
+    A `pd.DataFrame` with new column "title_abstract"
+    """
+
+    df['title_abstract'] = df['title'].map(add_period) + ' ' + df['abstract']
+
+    return df
+
+
+# ---------------------------------------------------------------------------
+def test_concat_title_abstract() -> None:
+    """ Test concat_title_abstract() """
+
+    in_df = pd.DataFrame([['A Descriptive Title', 'A detailed abstract.']],
+                         columns=['title', 'abstract'])
+
+    out_df = pd.DataFrame([[
+        'A Descriptive Title', 'A detailed abstract.',
+        'A Descriptive Title. A detailed abstract.'
+    ]],
+                          columns=['title', 'abstract', 'title_abstract'])
+
+    assert_frame_equal(concat_title_abstract(in_df), out_df)
+
+
+# ---------------------------------------------------------------------------
+def add_period(text: str) -> str:
+    """
+    Add period to end of sentence if punctuation not present
+
+    Parameter:
+    `text`: String that may be missing final puncturation
+
+    Returns:
+    `text` With final punctuation
+    """
+
+    return text if text[-1] in '.?!' else text + '.'
+
+
+# ---------------------------------------------------------------------------
+def test_add_period() -> None:
+    """ Test add_poeriod() """
+
+    assert add_period('A statement.') == 'A statement.'
+    assert add_period('A question?') == 'A question?'
+    assert add_period('An exclamation!') == 'An exclamation!'
+    assert add_period('An incomplete') == 'An incomplete.'
 
 
 # ---------------------------------------------------------------------------

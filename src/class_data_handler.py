@@ -15,7 +15,7 @@ from pandas.testing import assert_frame_equal
 from torch.utils.data import DataLoader
 from transformers import AutoTokenizer, PreTrainedTokenizer
 
-from utils import strip_xml
+from utils import concat_title_abstract, strip_xml
 
 
 # ---------------------------------------------------------------------------
@@ -115,64 +115,6 @@ def test_preprocess_data() -> None:
                           columns=['title', 'abstract', 'title_abstract'])
 
     assert_frame_equal(preprocess_data(in_fh), out_df)
-
-
-# ---------------------------------------------------------------------------
-def concat_title_abstract(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Concatenate abstract and title columns
-
-    Parameters:
-    `df`: Dataframe with columns "title" and "abstract"
-
-    Returns:
-    A `pd.DataFrame` with new column "title_abstract"
-    """
-
-    df['title_abstract'] = df['title'].map(add_period) + ' ' + df['abstract']
-
-    return df
-
-
-# ---------------------------------------------------------------------------
-def test_concat_title_abstract() -> None:
-    """ Test concat_title_abstract() """
-
-    in_df = pd.DataFrame([['A Descriptive Title', 'A detailed abstract.']],
-                         columns=['title', 'abstract'])
-
-    out_df = pd.DataFrame([[
-        'A Descriptive Title', 'A detailed abstract.',
-        'A Descriptive Title. A detailed abstract.'
-    ]],
-                          columns=['title', 'abstract', 'title_abstract'])
-
-    assert_frame_equal(concat_title_abstract(in_df), out_df)
-
-
-# ---------------------------------------------------------------------------
-def add_period(text: str) -> str:
-    """
-    Add period to end of sentence if punctuation not present
-
-    Parameter:
-    `text`: String that may be missing final puncturation
-
-    Returns:
-    `text` With final punctuation
-    """
-
-    return text if text[-1] in '.?!' else text + '.'
-
-
-# ---------------------------------------------------------------------------
-def test_add_period() -> None:
-    """ Test add_poeriod() """
-
-    assert add_period('A statement.') == 'A statement.'
-    assert add_period('A question?') == 'A question?'
-    assert add_period('An exclamation!') == 'An exclamation!'
-    assert add_period('An incomplete') == 'An incomplete.'
 
 
 # ---------------------------------------------------------------------------
