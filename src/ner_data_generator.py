@@ -256,6 +256,24 @@ def test_get_article_tags() -> None:
 
     assert_frame_equal(get_article_tags(in_df), out_df)
 
+    # Partial matches to named entities should not be tagged
+    in_df = pd.DataFrame(
+        [[
+            456, 'The database of peptide ligand (DPL) is a database.',
+            'database of peptide ligand', 'DPL'
+        ]],
+        columns=['id', 'title_abstract', 'full_name', 'common_name'])
+
+    out_df = pd.DataFrame(
+        [[456, 0, 0, 'O', 'The'], [456, 0, 1, 'B-FUL', 'database'],
+         [456, 0, 2, 'I-FUL', 'of'], [456, 0, 3, 'I-FUL', 'peptide'],
+         [456, 0, 4, 'I-FUL', 'ligand'], [456, 0, 5, 'B-COM', '(DPL)'],
+         [456, 0, 6, 'O', 'is'], [456, 0, 7, 'O', 'a'],
+         [456, 0, 8, 'O', 'database.']],
+        columns=['pmid', 'sent_idx', 'word_idx', 'tag', 'word'])
+
+    assert_frame_equal(get_article_tags(in_df), out_df)
+
 
 # ---------------------------------------------------------------------------
 def BIO_scheme_transform(df: pd.DataFrame) -> pd.DataFrame:
