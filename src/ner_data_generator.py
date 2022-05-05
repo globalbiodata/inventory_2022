@@ -177,6 +177,26 @@ def clean_data(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+# --------------------------------------------------------------------------
+def test_clean_data() -> None:
+    """ Test clean_data() """
+
+    in_df = pd.DataFrame(
+        [['123', 'A <i>title</i>', 'An <i>abstract</i>.', 'full_name', NaN],
+         ['456', 'A dup title', 'A dup abstract.', 'full_name', 'common_name'],
+         ['456', 'A dup title', 'A dup abstract.', 'full_name', 'common_name']
+         ],
+        columns=['id', 'title', 'abstract', 'full_name', 'common_name'])
+
+    out_df = pd.DataFrame(
+        [['123', 'A title', 'An abstract.', 'full_name', ''],
+         ['456', 'A dup title', 'A dup abstract.', 'full_name', 'common_name']
+         ],
+        columns=['id', 'title', 'abstract', 'full_name', 'common_name'])
+
+    assert_frame_equal(clean_data(in_df), out_df)
+
+
 # ---------------------------------------------------------------------------
 def restructure_df(df: pd.DataFrame) -> pd.DataFrame:
     """
