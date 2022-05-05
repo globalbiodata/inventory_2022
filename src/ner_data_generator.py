@@ -144,48 +144,11 @@ def clean_data(df: pd.DataFrame) -> pd.DataFrame:
 
     df['title'] = df['title'].apply(strip_xml)
     df['abstract'] = df['abstract'].apply(strip_xml)
+    df = df.fillna('')
 
     df = df.drop_duplicates()
 
     return df
-
-
-# ---------------------------------------------------------------------------
-def resolve_nested_tags(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Remove long_name if common_name is contained within it
-    """
-
-    df['full_name'] = df['full_name'].where(
-        ~df.apply(lambda s: s.common_name in s.full_name, axis=1), other='')
-
-    return df
-
-
-# ---------------------------------------------------------------------------
-def test_resolve_nested_tags() -> None:
-    """ Test resolve_nested_tags() """
-
-    in_df = pd.DataFrame([
-        [123, 'The Ensembl project is a thing.', 'Ensembl project', 'Ensembl'],
-        [
-            456, 'The Auditory English Lexicon Project (AELP).',
-            'Auditory English Lexicon Project', 'AELP'
-        ]
-    ],
-                         columns=[
-                             'id', 'title_abstract', 'full_name', 'common_name'
-                         ])
-
-    out_df = pd.DataFrame(
-        [[123, 'The Ensembl project is a thing.', '', 'Ensembl'],
-         [
-             456, 'The Auditory English Lexicon Project (AELP).',
-             'Auditory English Lexicon Project', 'AELP'
-         ]],
-        columns=['id', 'title_abstract', 'full_name', 'common_name'])
-
-    assert_frame_equal(resolve_nested_tags(in_df), out_df)
 
 
 # ---------------------------------------------------------------------------
@@ -259,6 +222,7 @@ def assign_tags(words: pd.Series, full_name: str,
     to tokens in sequence
     """
 
+    full_name = '' if common_name in full_name else full_name
     full_name_split = full_name.split(' ')
     common_name_split = common_name.split(' ')
 
@@ -376,7 +340,7 @@ def BIO_scheme_transform(df: pd.DataFrame) -> pd.DataFrame:
 
     df = concat_title_abstract(df)
 
-    df = resolve_nested_tags(df)
+    # df = resolve_nested_tags(df)
 
     out_df = pd.DataFrame()
     for _, article_df in df.groupby('id'):
@@ -494,7 +458,7 @@ def main() -> None:
     if not os.path.isdir(out_dir):
         os.makedirs(out_dir)
 
-    df = pd.read_csv(args.infile)
+    df = pd.read_csv(args.infile, )
 
     check_input(df)
 
@@ -512,10 +476,6 @@ def main() -> None:
 
     train_out, val_out, test_out = map(lambda f: os.path.join(out_dir, f),
                                        [args.train, args.val, args.test])
-
-    assert (len(set(train_df['pmid']).intersection(set(val_df['pmid']))) == 0)
-    assert (len(set(train_df['pmid']).intersection(set(test_df['pmid']))) == 0)
-    assert (len(set(val_df['pmid']).intersection(set(test_df['pmid']))) == 0)
 
     process_df(train_df, train_out)
     process_df(val_df, val_out)
