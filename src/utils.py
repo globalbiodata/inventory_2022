@@ -5,7 +5,7 @@ Authors: Ana-Maria Istrate and Kenneth Schackart
 
 import argparse
 import re
-from typing import List, NamedTuple
+from typing import NamedTuple
 
 import pandas as pd
 import torch
@@ -78,7 +78,7 @@ ARGS_MAP = {
 
 # ---------------------------------------------------------------------------
 # Mapping from NER tag to ID
-NER_TAG2ID = {'O': 0, 'B-RES': 1, 'I-RES': 2}
+NER_TAG2ID = {'O': 0, 'B-COM': 1, 'I-COM': 2, 'B-FUL': 3, 'I-FUL': 4}
 
 # Mapping from ID to NER tag
 ID2NER_TAG = {v: k for k, v in NER_TAG2ID.items()}
