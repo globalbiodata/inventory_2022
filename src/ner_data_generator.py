@@ -425,11 +425,8 @@ def split_df(df: pd.DataFrame, rand_seed: bool, splits: List[float]) -> Splits:
                                          test_size=test_split / val_test_split,
                                          random_state=seed)
 
-    train = df[df['pmid'].isin(train_ids)]
-    val = df[df['pmid'].isin(val_ids)]
-    test = df[df['pmid'].isin(test_ids)]
-
-    return Splits(train, val, test)
+    return Splits(df[df['pmid'].isin(train_ids)], df[df['pmid'].isin(val_ids)],
+                  df[df['pmid'].isin(test_ids)])
 
 
 # ---------------------------------------------------------------------------
