@@ -487,19 +487,69 @@ def split_df(df: pd.DataFrame, rand_seed: bool, splits: List[float]) -> Splits:
 
 
 # ---------------------------------------------------------------------------
-def process_df(df: pd.DataFrame, filename: str) -> None:
+def group_tagged_df(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Save dataframe as pickle
+    Group dataframe by pmid and sentence index
 
-    `df`: Dataframe to be pickled
-    `filename`: Output filename
+    `df`: Dataframe to be grouped
     """
     df_grouped = df.groupby(['pmid', 'sent_idx']).agg(list).reset_index()
     df_grouped = df_grouped.rename(columns={
         'word': 'words',
         'tag': 'ner_tags'
     })
-    df_grouped.to_pickle(filename)
+
+    return df_grouped
+
+
+# ---------------------------------------------------------------------------
+def test_group_tagged_df() -> None:
+    """ Test group_tagged_df() """
+
+    in_df = pd.DataFrame(
+        [[123, 0, 0, 'B-COM', 'MEGALEX:'], [123, 0, 1, 'O', 'A'],
+         [123, 0, 2, 'O', 'megastudy.'], [123, 1, 0, 'O', 'New'],
+         [123, 1, 1, 'O', 'database'], [123, 1, 2, 'B-COM', '(MEGALEX)'],
+         [123, 1, 3, 'O', 'of.'], [456, 0, 0, 'O', 'The'],
+         [456, 0, 1, 'B-FUL', 'Auditory'], [456, 0, 2, 'I-FUL', 'English'],
+         [456, 0, 3, 'I-FUL', 'Lexicon'], [456, 0, 4, 'I-FUL', 'Project:'],
+         [456, 0, 5, 'O', 'A'], [456, 0, 6, 'O', 'multi.'],
+         [456, 1, 0, 'B-COM', '(AELP)'], [456, 1, 1, 'O', 'is'],
+         [456, 1, 2, 'O', 'a.']],
+        columns=['pmid', 'sent_idx', 'word_idx', 'ner_tags', 'words'])
+
+    out_df = pd.DataFrame(
+        [[
+            123, 0, [0, 1, 2], ['B-COM', 'O', 'O'],
+            ['MEGALEX:', 'A', 'megastudy.']
+        ],
+         [
+             123, 1, [0, 1, 2, 3], ['O', 'O', 'B-COM', 'O'],
+             ['New', 'database', '(MEGALEX)', 'of.']
+         ],
+         [
+             456, 0, [0, 1, 2, 3, 4, 5, 6],
+             ['O', 'B-FUL', 'I-FUL', 'I-FUL', 'I-FUL', 'O', 'O'],
+             [
+                 'The', 'Auditory', 'English', 'Lexicon', 'Project:', 'A',
+                 'multi.'
+             ]
+         ], [456, 1, [0, 1, 2], ['B-COM', 'O', 'O'], ['(AELP)', 'is', 'a.']]],
+        columns=['pmid', 'sent_idx', 'word_idx', 'ner_tags', 'words'])
+
+    assert_frame_equal(group_tagged_df(in_df), out_df, check_dtype=False)
+
+
+# ---------------------------------------------------------------------------
+def save_df(df: pd.DataFrame, filename: str) -> None:
+    """
+    Save dataframe to pickle
+
+    `df`: Dataframe to be pickled
+    `filename`: Output filename
+    """
+
+    df.to_pickle(filename)
 
 
 # ---------------------------------------------------------------------------
@@ -527,9 +577,9 @@ def main() -> None:
     train_out, val_out, test_out = map(lambda f: os.path.join(out_dir, f),
                                        [args.train, args.val, args.test])
 
-    process_df(train_df, train_out)
-    process_df(val_df, val_out)
-    process_df(test_df, test_out)
+    save_df(group_tagged_df(train_df), train_out)
+    save_df(group_tagged_df(val_df), val_out)
+    save_df(group_tagged_df(test_df), test_out)
 
     print(f'Done. Wrote 3 files to {out_dir}.')
 
