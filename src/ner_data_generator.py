@@ -8,17 +8,15 @@ import argparse
 import os
 import string
 import sys
-from typing import List, NamedTuple, TextIO, Tuple
+from typing import List, NamedTuple, TextIO
 
 import nltk
-import numpy as np
 import pandas as pd
-import re
 from pandas._testing.asserters import assert_series_equal
 from pandas.testing import assert_frame_equal
 from sklearn.model_selection import train_test_split
 
-from utils import concat_title_abstract, CustomHelpFormatter, Splits, strip_xml
+from utils import CustomHelpFormatter, Splits, concat_title_abstract, strip_xml
 
 # nltk.download('punkt')
 # RND_SEED = 241
@@ -195,6 +193,12 @@ def restructure_df(df: pd.DataFrame) -> pd.DataFrame:
     """
     Create a row for each word in article title and abstract
     Add sentence and word index columns
+
+    `df`: Dataframe for single article with id, title_abstract, common_name
+        and full_name columns
+
+    Return:
+    Dataframe with one row per token and with word and sentence indices
     """
 
     out_df = df.drop(['common_name', 'full_name'], axis='columns')
@@ -243,6 +247,17 @@ def test_restructure_df() -> None:
 # ---------------------------------------------------------------------------
 def assign_tags(words: pd.Series, full_name: str,
                 common_name: str) -> pd.Series:
+    """
+    Assign BIO tags to tokens in sequence
+
+    `words`: Series of tokens stripped of punctuation
+    `full_name`: Resource long name
+    `common_name`: Resource common name
+
+    Return:
+    Series of tags (`O`, `B-COM`, `I-COM`, `B-FUL`, or `I-FUL`) corresponding
+    to tokens in sequence
+    """
 
     full_name_split = full_name.split(' ')
     common_name_split = common_name.split(' ')
@@ -283,8 +298,15 @@ def test_assign_tags() -> None:
 
 # ---------------------------------------------------------------------------
 def tag_article_tokens(df: pd.DataFrame) -> pd.DataFrame:
-    """"
-    Tag full_name and common_name in article title and abstract
+    """
+    Apply BIO tagging to single article dataframe
+
+    `df`: Dataframe for single article with id, title_abstract, common_name
+        and full_name columns
+
+    Return:
+    Dataframe with one row per token and with word and sentence indices and
+    BIO tags
     """
 
     full_name = df['full_name'].iloc[0]
@@ -342,7 +364,15 @@ def test_tag_article_tokens() -> None:
 
 # ---------------------------------------------------------------------------
 def BIO_scheme_transform(df: pd.DataFrame) -> pd.DataFrame:
-    """ Add BIO tags to article titles and abstracts """
+    """
+    Perform BIO tagging for all articles in dataset
+
+    `df`: Dataframe with one row per article including extracted resource
+    common name and full name
+
+    Return: Dataframe with one row per token per article including indices
+    and BIO tags
+    """
 
     df = concat_title_abstract(df)
 
@@ -441,8 +471,10 @@ def split_df(df: pd.DataFrame, rand_seed: bool, splits: List[float]) -> Splits:
 # ---------------------------------------------------------------------------
 def process_df(df: pd.DataFrame, filename: str) -> None:
     """
-    Saves a df as a pickle file under a given filename
-    :param filename: Output filename
+    Save dataframe as pickle
+
+    `df`: Dataframe to be pickled
+    `filename`: Output filename
     """
     df_grouped = df.groupby(['pmid', 'sent_idx']).agg(list).reset_index()
     df_grouped = df_grouped.rename(columns={
