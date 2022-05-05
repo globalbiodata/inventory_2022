@@ -134,8 +134,15 @@ def check_input(df: pd.DataFrame) -> None:
 
 # --------------------------------------------------------------------------
 def filter_data(df: pd.DataFrame) -> pd.DataFrame:
-    """ Get only relevant data """
+    """
+    Filter input data for completeness and relevant columns
+    
+    `df`: Input data dataframe
 
+    Return: Filtered dataframe
+    """
+
+    # Filter out rows that are missing both full_name and common_name
     df = df.dropna(subset=['full_name', 'common_name'], how='all')
 
     df = df.reset_index(drop=True)
@@ -166,7 +173,13 @@ def test_filter_data() -> None:
 
 # --------------------------------------------------------------------------
 def clean_data(df: pd.DataFrame) -> pd.DataFrame:
-    """ Strip XML tags and deduplicate """
+    """
+    Strip XML tags, replace NAs, deduplicate
+
+    `df`: Input data dataframe
+
+    Return: Cleaned dataframe    
+    """
 
     df['title'] = df['title'].apply(strip_xml)
     df['abstract'] = df['abstract'].apply(strip_xml)
