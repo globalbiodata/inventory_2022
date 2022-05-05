@@ -14,6 +14,7 @@ import nltk
 import numpy as np
 import pandas as pd
 import re
+from pandas._testing.asserters import assert_series_equal
 from pandas.testing import assert_frame_equal
 from sklearn.model_selection import train_test_split
 
@@ -196,24 +197,24 @@ def restructure_df(df: pd.DataFrame) -> pd.DataFrame:
     Add sentence and word index columns
     """
 
-    out_df = df.set_index(['id', 'full_name', 'common_name'], append=True)
+    out_df = df.drop(['common_name', 'full_name'], axis='columns')
+
+    out_df = df.set_index(['id'], append=True)
     out_df = out_df.title_abstract.map(nltk.sent_tokenize).apply(pd.Series)
     out_df = out_df.stack()
-    out_df = out_df.reset_index(level=4, drop=True)
+    out_df = out_df.reset_index(level=2, drop=True)
     out_df = out_df.reset_index(name='sentence')
-    out_df = out_df.set_index(['id', 'full_name', 'common_name'], append=True)
+    out_df = out_df.set_index(['id'], append=True)
     out_df = out_df.sentence.str.split(expand=True)
     out_df = out_df.stack()
     out_df = out_df.reset_index(name='word')
     out_df = out_df.rename(columns={
         'level_0': 'sent_idx',
-        'level_4': 'word_idx',
+        'level_2': 'word_idx',
         'id': 'pmid'
     })
 
-    out_df = out_df[[
-        'pmid', 'sent_idx', 'word_idx', 'word', 'common_name', 'full_name'
-    ]]
+    out_df = out_df[['pmid', 'sent_idx', 'word_idx', 'word']]
 
     return out_df
 
@@ -230,19 +231,11 @@ def test_restructure_df() -> None:
         columns=['id', 'title_abstract', 'full_name', 'common_name'])
 
     out_df = pd.DataFrame(
-        [[456, 0, 0, 'The', 'AELP', 'Auditory English Lexicon Project'],
-         [456, 0, 1, 'Auditory', 'AELP', 'Auditory English Lexicon Project'],
-         [456, 0, 2, 'English', 'AELP', 'Auditory English Lexicon Project'],
-         [456, 0, 3, 'Lexicon', 'AELP', 'Auditory English Lexicon Project'],
-         [456, 0, 4, 'Project:', 'AELP', 'Auditory English Lexicon Project'],
-         [456, 0, 5, 'A', 'AELP', 'Auditory English Lexicon Project'],
-         [456, 0, 6, 'multi.', 'AELP', 'Auditory English Lexicon Project'],
-         [456, 1, 0, '(AELP)', 'AELP', 'Auditory English Lexicon Project'],
-         [456, 1, 1, 'is', 'AELP', 'Auditory English Lexicon Project'],
-         [456, 1, 2, 'a.', 'AELP', 'Auditory English Lexicon Project']],
-        columns=[
-            'pmid', 'sent_idx', 'word_idx', 'word', 'common_name', 'full_name'
-        ])
+        [[456, 0, 0, 'The'], [456, 0, 1, 'Auditory'], [456, 0, 2, 'English'],
+         [456, 0, 3, 'Lexicon'], [456, 0, 4, 'Project:'], [456, 0, 5, 'A'],
+         [456, 0, 6, 'multi.'], [456, 1, 0, '(AELP)'], [456, 1, 1, 'is'],
+         [456, 1, 2, 'a.']],
+        columns=['pmid', 'sent_idx', 'word_idx', 'word'])
 
     assert_frame_equal(restructure_df(in_df), out_df)
 
@@ -274,10 +267,24 @@ def assign_tags(words: pd.Series, full_name: str,
 
 
 # ---------------------------------------------------------------------------
+def test_assign_tags() -> None:
+    """ Test assign_tags() """
+
+    words = pd.Series(
+        'The database of peptide ligand DPL is a database'.split(' '))
+    full_name = 'database of peptide ligand'
+    common_name = 'DPL'
+
+    tags = pd.Series(
+        ['O', 'B-FUL', 'I-FUL', 'I-FUL', 'I-FUL', 'B-COM', 'O', 'O', 'O'])
+
+    assert_series_equal(assign_tags(words, full_name, common_name), tags)
+
+
+# ---------------------------------------------------------------------------
 def tag_article_tokens(df: pd.DataFrame) -> pd.DataFrame:
     """"
-    Map full_name and common_name to article title and abstract
-    Add tags for each
+    Tag full_name and common_name in article title and abstract
     """
 
     full_name = df['full_name'].iloc[0]
@@ -285,8 +292,6 @@ def tag_article_tokens(df: pd.DataFrame) -> pd.DataFrame:
     out_df = restructure_df(df)
 
     words = out_df['word'].str.strip(string.punctuation)
-    split_full_name = out_df.pop('full_name').str.split(' ')
-    split_common_name = out_df.pop('common_name').str.split(' ')
 
     out_df['tag'] = assign_tags(words, full_name, common_name)
 
@@ -297,6 +302,7 @@ def tag_article_tokens(df: pd.DataFrame) -> pd.DataFrame:
 
 # ---------------------------------------------------------------------------
 def test_tag_article_tokens() -> None:
+    """ Test tag_article_tokens() """
 
     in_df = pd.DataFrame(
         [[
@@ -336,6 +342,7 @@ def test_tag_article_tokens() -> None:
 
 # ---------------------------------------------------------------------------
 def BIO_scheme_transform(df: pd.DataFrame) -> pd.DataFrame:
+    """ Add BIO tags to article titles and abstracts """
 
     df = concat_title_abstract(df)
 
