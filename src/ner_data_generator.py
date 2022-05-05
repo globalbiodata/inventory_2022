@@ -136,7 +136,7 @@ def check_input(df: pd.DataFrame) -> None:
 def filter_data(df: pd.DataFrame) -> pd.DataFrame:
     """
     Filter input data for completeness and relevant columns
-    
+
     `df`: Input data dataframe
 
     Return: Filtered dataframe
@@ -178,7 +178,7 @@ def clean_data(df: pd.DataFrame) -> pd.DataFrame:
 
     `df`: Input data dataframe
 
-    Return: Cleaned dataframe    
+    Return: Cleaned dataframe
     """
 
     df['title'] = df['title'].apply(strip_xml)
