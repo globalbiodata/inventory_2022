@@ -91,6 +91,13 @@ def get_args():
                               default=True,
                               help='Use default values in ner_utils.py')
 
+    runtime_params.add_argument(
+        '-nt',
+        '--num-training',
+        metavar='INT',
+        type=int,
+        default=None,
+        help='Number of data points for training (default: all)')
     runtime_params.add_argument('-ne',
                                 '--num_epochs',
                                 metavar='INT',
@@ -107,9 +114,6 @@ def get_args():
                                 '--lr_scheduler',
                                 action='store_true',
                                 help='Use a Learning Rate Scheduler')
-    runtime_params.add_argument('--sanity-check',
-                                action='store_true',
-                                help="Run sanity-check")
 
     args = parser.parse_args()
 
@@ -312,7 +316,7 @@ if __name__ == '__main__':
     model_huggingface_version = ARGS_MAP[args.model_name][0]
     data_handler = NERDataHandler(model_huggingface_version, args.batch_size,
                                   args.train_file, args.val_file,
-                                  args.test_file, args.sanity_check)
+                                  args.test_file, args.num_training)
     train_dataloader, val_dataloader, test_dataloader = data_handler.get_dataloaders(
     )
 

@@ -3,7 +3,8 @@ Purpose: Preprocess and tokenize data, create DataLoader
 Authors: Ana-Maria Istrate and Kenneth Schackart
 """
 
-from typing import NamedTuple, TextIO
+import random
+from typing import NamedTuple, Optional, TextIO
 
 from datasets import load_dataset
 from torch.utils.data import DataLoader
@@ -20,11 +21,11 @@ class RunParams(NamedTuple):
 
     `model_name`: Huggingface model name
     `batch_size`: Tokenization batch size
-    `sanity_check`: Run on smaller subset of data
+    `num_train`: Number of training datapoints (optional)
     """
     model_name: str
     batch_size: int
-    sanity_check: bool = False
+    num_train: Optional[int] = None
 
 
 # ---------------------------------------------------------------------------
@@ -47,8 +48,9 @@ def get_dataloader(file: TextIO, run_params: RunParams) -> DataLoader:
 
     tokenized_dataset = tokenize_align_labels(dataset, tokenizer)
 
-    if run_params.sanity_check:
-        tokenized_datasets = tokenized_datasets.select(range(100))
+    if run_params.num_train:
+        tokenized_datasets = tokenized_datasets.select(
+            random.sample(range(dataset.num_rows), k=run_params.num_train))
 
     dataloader = DataLoader(tokenized_dataset,
                             shuffle=True,
@@ -112,7 +114,7 @@ class NERDataHandler:
                  train_file,
                  val_file=None,
                  test_file=None,
-                 sanity_check=False):
+                 num_train):
         """
         :param train_file: path to train file
         :param val_file: path to val file
