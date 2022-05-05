@@ -11,6 +11,7 @@ import sys
 from typing import List, NamedTuple, TextIO
 
 import nltk
+from numpy.core.numeric import NaN
 import pandas as pd
 from pandas._testing.asserters import assert_series_equal
 from pandas.testing import assert_frame_equal
@@ -135,7 +136,32 @@ def check_input(df: pd.DataFrame) -> None:
 def filter_data(df: pd.DataFrame) -> pd.DataFrame:
     """ Get only relevant data """
 
+    df = df.dropna(subset=['full_name', 'common_name'], how='all')
+
+    df = df.reset_index(drop=True)
+
     return df[['id', 'title', 'abstract', 'full_name', 'common_name']]
+
+
+# --------------------------------------------------------------------------
+def test_filter_data() -> None:
+    """ Test filter_data() """
+
+    in_df = pd.DataFrame(
+        [['123', 'A title', 'An abstract.', NaN, NaN, '', ''],
+         ['456', 'A title', 'An abstract.', 'full_name', NaN, '', ''],
+         ['789', 'A title', 'An abstract.', NaN, 'common_name', '', '']],
+        columns=[
+            'id', 'title', 'abstract', 'full_name', 'common_name', 'url',
+            'short_description'
+        ])
+
+    out_df = pd.DataFrame(
+        [['456', 'A title', 'An abstract.', 'full_name', NaN],
+         ['789', 'A title', 'An abstract.', NaN, 'common_name']],
+        columns=['id', 'title', 'abstract', 'full_name', 'common_name'])
+
+    assert_frame_equal(filter_data(in_df), out_df)
 
 
 # --------------------------------------------------------------------------
@@ -340,8 +366,6 @@ def BIO_scheme_transform(df: pd.DataFrame) -> pd.DataFrame:
 
     df = concat_title_abstract(df)
 
-    # df = resolve_nested_tags(df)
-
     out_df = pd.DataFrame()
     for _, article_df in df.groupby('id'):
         tagged_df = tag_article_tokens(article_df)
@@ -463,11 +487,7 @@ def main() -> None:
 
     df = clean_data(df)
 
-    # df = df[~df['name'].isna()]
     ner_df = BIO_scheme_transform(df)
-
-    # np.random.seed(RND_SEED)
-    # sent_ids = ner_df['pmid'].unique()
 
     train_df, val_df, test_df = split_df(ner_df, args.seed, args.splits)
 
