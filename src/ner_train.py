@@ -7,7 +7,7 @@ Authors: Ana-Maria Istrate and Kenneth Schackart
 import argparse
 import copy
 import os
-from typing import Tuple
+from typing import Tuple, NamedTuple, Optional
 
 import pandas as pd
 import plotly.express as px
@@ -24,7 +24,24 @@ from utils import (ARGS_MAP, ID2NER_TAG, NER_TAG2ID, CustomHelpFormatter,
 
 
 # ---------------------------------------------------------------------------
-def get_args():
+class Args(NamedTuple):
+    """ Command-line arguments """
+    train_file: str
+    val_file: str
+    out_dir: str
+    model_name: str
+    learning_rate: float
+    weight_decay: float
+    use_default_values: bool
+    num_training: int
+    num_epochs: int
+    batch_size: int
+    lr_scheduler: bool
+    model_checkpoint: Optional[str]
+
+
+# ---------------------------------------------------------------------------
+def get_args() -> Args:
     """ Parse command-line arguments """
 
     parser = argparse.ArgumentParser(
@@ -47,14 +64,8 @@ def get_args():
                         type=str,
                         default='data/ner_val.pkl',
                         help='Validation data file (.pkl)')
-    inputs.add_argument('-s',
-                        '--test_file',
-                        metavar='FILE',
-                        type=str,
-                        default='data/ner_test.pkl',
-                        help='Test data file (.pkl)')
     inputs.add_argument('-o',
-                        '--output-dir',
+                        '--out-dir',
                         metavar='DIR',
                         type=str,
                         default='out/',
@@ -118,11 +129,19 @@ def get_args():
 
     args = parser.parse_args()
 
+    args = Args(args.train_file, args.val_file, args.out_dir, args.model_name,
+                args.learning_rate, args.weight_decay, args.use_default_values,
+                args.num_training, args.num_epochs, args.batch_size,
+                args.lr_scheduler, None)
+
+    if args.use_default_values:
+        args = get_default_args(args)
+
     return args
 
 
 # ---------------------------------------------------------------------------
-def get_default_args(args):
+def get_default_args(args: Args) -> Args:
     """
     Get default options based on model
 
@@ -132,13 +151,15 @@ def get_default_args(args):
     """
 
     model_name = args.model_name
-    args.model_checkpoint = ARGS_MAP[model_name][0]
-    args.batch_size = ARGS_MAP[model_name][1]
-    args.learning_rate = ARGS_MAP[model_name][2]
-    args.weight_decay = ARGS_MAP[model_name][3]
-    args.use_scheduler = ARGS_MAP[model_name][4]
+    model_checkpoint = ARGS_MAP[model_name][0]
+    batch_size = ARGS_MAP[model_name][1]
+    learning_rate = ARGS_MAP[model_name][2]
+    weight_decay = ARGS_MAP[model_name][3]
+    use_scheduler = ARGS_MAP[model_name][4]
 
-    return args
+    return Args(args.train_file, args.val_file, args.out_dir, model_name,
+                learning_rate, weight_decay, True, args.num_training,
+                args.num_epochs, batch_size, use_scheduler, model_checkpoint)
 
 
 # ---------------------------------------------------------------------------
@@ -337,11 +358,8 @@ def main() -> None:
 
     args = get_args()
 
-    if args.use_default_values:
-        args = get_default_args(args)
-
-    if not os.path.exists(args.output_dir):
-        os.mkdir(args.output_dir)
+    if not os.path.exists(args.out_dir):
+        os.mkdir(args.out_dir)
 
     # Train, val, test dataloaders generation
     print('Generating train, val, test dataloaders ...')
@@ -385,13 +403,13 @@ def main() -> None:
     )
 
     # Save best checkpoint
-    checkpt_filename = args.output_dir + 'checkpt_ner_' + args.model_name + '_' + str(
+    checkpt_filename = args.out_dir + 'checkpt_ner_' + args.model_name + '_' + str(
         best_epoch + 1) + '_epochs'
     trainer.save_best_model(checkpt_filename)
     print('Saved best checkpt to', checkpt_filename)
 
     # Plot losses
-    img_filename = args.output_dir + args.model_name + '_' + str(
+    img_filename = args.out_dir + args.model_name + '_' + str(
         best_epoch + 1) + '_epochs.png'
     trainer.plot_losses([train_losses, val_losses], ['Train Loss', 'Val Loss'],
                         img_filename)
