@@ -16,9 +16,9 @@ from torch.optim import AdamW
 from tqdm.auto import tqdm
 from transformers import AutoModelForTokenClassification, get_scheduler
 
-from ner_data_handler import NERDataHandler
-from utils import (ARGS_MAP, ID2NER_TAG, NER_TAG2ID, set_random_seed,
-                   CustomHelpFormatter)
+from ner_data_handler import RunParams, get_dataloader
+from utils import (ARGS_MAP, ID2NER_TAG, NER_TAG2ID, CustomHelpFormatter,
+                   set_random_seed)
 
 
 # ---------------------------------------------------------------------------
@@ -314,11 +314,11 @@ if __name__ == '__main__':
     print('=' * 30)
 
     model_huggingface_version = ARGS_MAP[args.model_name][0]
-    data_handler = NERDataHandler(model_huggingface_version, args.batch_size,
-                                  args.train_file, args.val_file,
-                                  args.test_file, args.num_training)
-    train_dataloader, val_dataloader, test_dataloader = data_handler.get_dataloaders(
-    )
+    params = RunParams(model_huggingface_version, args.batch_size,
+                       args.num_training)
+    train_dataloader = get_dataloader(args.train_file, params)
+    val_dataloader = get_dataloader(args.val_file, params)
+    test_dataloader = get_dataloader(args.test_file, params)
 
     print('Finished generating dataloaders!')
     print('=' * 30)
