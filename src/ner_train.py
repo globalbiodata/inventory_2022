@@ -120,6 +120,26 @@ def get_args():
 
 
 # ---------------------------------------------------------------------------
+def get_default_args(args):
+    """
+    Get default options based on model
+
+    `args`: Command-line arguments
+
+    Return: Updated arguments
+    """
+
+    model_name = args.model_name
+    args.model_checkpoint = ARGS_MAP[model_name][0]
+    args.batch_size = ARGS_MAP[model_name][1]
+    args.learning_rate = ARGS_MAP[model_name][2]
+    args.weight_decay = ARGS_MAP[model_name][3]
+    args.use_scheduler = ARGS_MAP[model_name][4]
+
+    return args
+
+
+# ---------------------------------------------------------------------------
 class Trainer():
     """
      Handles training of the model
@@ -299,13 +319,7 @@ def main() -> None:
     args = get_args()
 
     if args.use_default_values:
-        model_name = args.model_name
-        args.model_checkpoint = ARGS_MAP[model_name][0]
-        args.batch_size = ARGS_MAP[model_name][1]
-        args.learning_rate = ARGS_MAP[model_name][2]
-        args.weight_decay = ARGS_MAP[model_name][3]
-        args.use_scheduler = ARGS_MAP[model_name][4]
-    print(f'args={args}')
+        args = get_default_args(args)
 
     if not os.path.exists(args.output_dir):
         os.mkdir(args.output_dir)
