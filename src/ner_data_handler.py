@@ -4,7 +4,9 @@ Authors: Ana-Maria Istrate and Kenneth Schackart
 """
 
 import random
+from datasets.dataset_dict import DatasetDict
 import pandas as pd
+from functools import partial
 from typing import List, NamedTuple, Optional, TextIO
 
 from datasets import load_dataset, Dataset
@@ -44,17 +46,21 @@ def get_dataloader(file: TextIO, run_params: RunParams) -> DataLoader:
     A `DataLoader` with preprocessed data
     """
 
-    dataset = load_dataset('pandas',
-                           data_files={run_params.dataset_name: file})
+    dataset = load_dataset('pandas', data_files={'set': file})
 
     tokenizer = AutoTokenizer.from_pretrained(run_params.model_name)
     collator = DataCollatorForTokenClassification(tokenizer=tokenizer)
 
-    tokenized_dataset = tokenize_align_labels(dataset, tokenizer)
+    tokenize_align_labels_with_tokenizer = partial(tokenize_align_labels,
+                                                   tokenizer=tokenizer)
+    tokenized_dataset = dataset.map(tokenize_align_labels_with_tokenizer,
+                                    batched=True,
+                                    remove_columns=dataset['set'].column_names)
 
     if run_params.num_train:
-        tokenized_datasets = tokenized_datasets.select(
-            random.sample(range(dataset.num_rows), k=run_params.num_train))
+        tokenized_dataset = tokenized_dataset['set'].select(
+            random.sample(range(dataset['set'].num_rows),
+                          k=run_params.num_train))
 
     dataloader = DataLoader(tokenized_dataset,
                             shuffle=True,
@@ -65,7 +71,8 @@ def get_dataloader(file: TextIO, run_params: RunParams) -> DataLoader:
 
 
 # ---------------------------------------------------------------------------
-def tokenize_align_labels(dataset: Dataset, tokenizer: PreTrainedTokenizer):
+def tokenize_align_labels(dataset: Dataset,
+                          tokenizer: PreTrainedTokenizer) -> DatasetDict:
 
     tokenized_inputs = tokenizer(dataset['words'],
                                  truncation=True,
@@ -74,9 +81,9 @@ def tokenize_align_labels(dataset: Dataset, tokenizer: PreTrainedTokenizer):
     new_labels = []
 
     # Should be able to use zip instead of enumerate
-    for i, labels in enumerate(dataset['ner_tags']):
+    for word_ids, labels in zip(tokenized_inputs.word_ids,
+                                dataset['ner_tags']):
         labels = [NER_TAG2ID[x] for x in labels]
-        word_ids = tokenized_inputs.word_ids(i)
         new_labels.append(align_labels_with_tokens(labels, word_ids))
 
     tokenized_inputs['labels'] = new_labels
@@ -84,30 +91,30 @@ def tokenize_align_labels(dataset: Dataset, tokenizer: PreTrainedTokenizer):
     return tokenized_inputs
 
 
-# ---------------------------------------------------------------------------
-def test_tokenize_align_labels() -> None:
-    """ Test tokenize_align_labels() """
+# # ---------------------------------------------------------------------------
+# def test_tokenize_align_labels() -> None:
+#     """ Test tokenize_align_labels() """
 
-    df = pd.DataFrame(
-        [[
-            123, 0, [0, 1, 2], ['B-COM', 'O', 'O'],
-            ['MEGALEX:', 'A', 'megastudy.']
-        ],
-         [
-             123, 1, [0, 1, 2, 3], ['O', 'O', 'B-COM', 'O'],
-             ['New', 'database', '(MEGALEX)', 'of.']
-         ],
-         [
-             456, 0, [0, 1, 2, 3, 4, 5],
-             ['O', 'B-FUL', 'I-FUL', 'I-FUL', 'I-FUL', 'O'],
-             ['The', 'Auditory', 'English', 'Lexicon', 'Project:', 'A.']
-         ], [456, 1, [0, 1, 2], ['B-COM', 'O', 'O'], ['(AELP)', 'is', 'a.']]],
-        columns=['pmid', 'sent_idx', 'word_idx', 'ner_tags', 'words'])
+#     df = pd.DataFrame(
+#         [[
+#             123, 0, [0, 1, 2], ['B-COM', 'O', 'O'],
+#             ['MEGALEX:', 'A', 'megastudy.']
+#         ],
+#          [
+#              123, 1, [0, 1, 2, 3], ['O', 'O', 'B-COM', 'O'],
+#              ['New', 'database', '(MEGALEX)', 'of.']
+#          ],
+#          [
+#              456, 0, [0, 1, 2, 3, 4, 5],
+#              ['O', 'B-FUL', 'I-FUL', 'I-FUL', 'I-FUL', 'O'],
+#              ['The', 'Auditory', 'English', 'Lexicon', 'Project:', 'A.']
+#          ], [456, 1, [0, 1, 2], ['B-COM', 'O', 'O'], ['(AELP)', 'is', 'a.']]],
+#         columns=['pmid', 'sent_idx', 'word_idx', 'ner_tags', 'words'])
 
-    dataset = Dataset.from_pandas(df)
+#     dataset = Dataset.from_pandas(df)
 
-    tokenizer = AutoTokenizer.from_pretrained(
-        'allenai/scibert_scivocab_uncased')
+#     tokenizer = AutoTokenizer.from_pretrained(
+#         'allenai/scibert_scivocab_uncased')
 
 
 # ---------------------------------------------------------------------------
