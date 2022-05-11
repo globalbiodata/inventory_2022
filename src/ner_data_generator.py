@@ -210,6 +210,55 @@ def test_clean_data() -> None:
     assert_frame_equal(clean_data(in_df), out_df)
 
 
+# --------------------------------------------------------------------------
+def combine_rows(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Combine rows of same id into single row
+
+    `df`: Dataframe with potentially multiple rows per id
+
+    Return: Dataframe with single row per id
+    """
+
+    out_df = pd.DataFrame(
+        columns=['id', 'title', 'abstract', 'full_name', 'common_name'])
+    for article_id, article in df.groupby('id'):
+        title = article.title.values[0]
+        abstract = article.abstract.values[0]
+        full_names = sorted(list(set(article.full_name.values)))
+        common_names = sorted(list(set(article.common_name.values)))
+
+        row = pd.DataFrame(
+            [[article_id, title, abstract, full_names, common_names]],
+            columns=['id', 'title', 'abstract', 'full_name', 'common_name'])
+        out_df = pd.concat([out_df, row])
+
+    out_df = out_df.reset_index(drop=True)
+
+    return out_df
+
+
+# --------------------------------------------------------------------------
+def test_combine_rows() -> None:
+    """ Test combine_rows() """
+
+    in_df = pd.DataFrame(
+        [['123', 'MEGALEX', 'An abstract', '', 'MEGALEX'],
+         ['456', 'CircR2Cancer', 'circR2Cancer', 'foo', 'CircR2Cancer'],
+         ['456', 'CircR2Cancer', 'circR2Cancer', 'foo', 'circR2Cancer']],
+        columns=['id', 'title', 'abstract', 'full_name', 'common_name'])
+
+    out_df = pd.DataFrame(
+        [['123', 'MEGALEX', 'An abstract', [''], ['MEGALEX']],
+         [
+             '456', 'CircR2Cancer', 'circR2Cancer', ['foo'],
+             ['CircR2Cancer', 'circR2Cancer']
+         ]],
+        columns=['id', 'title', 'abstract', 'full_name', 'common_name'])
+
+    assert_frame_equal(combine_rows(in_df), out_df)
+
+
 # ---------------------------------------------------------------------------
 def restructure_df(df: pd.DataFrame) -> pd.DataFrame:
     """
@@ -252,7 +301,7 @@ def test_restructure_df() -> None:
     in_df = pd.DataFrame(
         [[
             456, 'The Auditory English Lexicon Project: A multi. (AELP) is a.',
-            'Auditory English Lexicon Project', 'AELP'
+            ['Auditory English Lexicon Project'], ['AELP']
         ]],
         columns=['id', 'title_abstract', 'full_name', 'common_name'])
 
@@ -267,8 +316,8 @@ def test_restructure_df() -> None:
 
 
 # ---------------------------------------------------------------------------
-def assign_tags(words: pd.Series, full_name: str,
-                common_name: str) -> pd.Series:
+def assign_tags(words: pd.Series, full_names: List[str],
+                common_names: List[str]) -> pd.Series:
     """
     Assign BIO tags to tokens in sequence
 
@@ -281,25 +330,26 @@ def assign_tags(words: pd.Series, full_name: str,
     to tokens in sequence
     """
 
-    full_name = '' if common_name in full_name else full_name
-    full_name_split = full_name.split(' ')
-    common_name_split = common_name.split(' ')
-
-    full_name_len = len(full_name_split)
-    common_name_len = len(common_name_split)
-
     seq_len = len(words)
 
     tags = pd.Series(['O'] * seq_len)
-    for i in range(len(words)):
-        if i + common_name_len <= seq_len:
-            if all(words[i:i + common_name_len] == common_name_split):
-                tags[i] = 'B-COM'
-                tags[i + 1:i + common_name_len] = 'I-COM'
-        if i + full_name_len <= seq_len:
-            if all(words[i:i + full_name_len] == full_name_split):
-                tags[i] = 'B-FUL'
-                tags[i + 1:i + full_name_len] = 'I-FUL'
+    for i in range(seq_len):
+        for common_name in common_names:
+            common_name_split = common_name.split(' ')
+            common_name_len = len(common_name_split)
+            if i + common_name_len <= seq_len:
+                if all(words[i:i + common_name_len] == common_name_split):
+                    tags[i] = 'B-COM'
+                    tags[i + 1:i + common_name_len] = 'I-COM'
+        for full_name in full_names:
+            full_name = '' if any(name in full_name
+                                  for name in common_names) else full_name
+            full_name_split = full_name.split(' ')
+            full_name_len = len(full_name_split)
+            if i + full_name_len <= seq_len:
+                if all(words[i:i + full_name_len] == full_name_split):
+                    tags[i] = 'B-FUL'
+                    tags[i + 1:i + full_name_len] = 'I-FUL'
 
     return tags
 
@@ -308,15 +358,32 @@ def assign_tags(words: pd.Series, full_name: str,
 def test_assign_tags() -> None:
     """ Test assign_tags() """
 
+    # Partial matches to named entities should not be tagged
     words = pd.Series(
         'The database of peptide ligand DPL is a database'.split(' '))
-    full_name = 'database of peptide ligand'
-    common_name = 'DPL'
-
+    full_names = ['database of peptide ligand']
+    common_names = ['DPL']
     tags = pd.Series(
         ['O', 'B-FUL', 'I-FUL', 'I-FUL', 'I-FUL', 'B-COM', 'O', 'O', 'O'])
 
-    assert_series_equal(assign_tags(words, full_name, common_name), tags)
+    assert_series_equal(assign_tags(words, full_names, common_names), tags)
+
+    # Able to tag multiple entities per category
+    words = pd.Series('CircR2DNA is a database circR2DNA'.split(' '))
+    full_names = ['']
+    common_names = ['circR2DNA', 'CircR2DNA']
+    tags = pd.Series(['B-COM', 'O', 'O', 'O', 'B-COM'])
+
+    assert_series_equal(assign_tags(words, full_names, common_names), tags)
+
+    # Tokens cannot have multiple tags, so if common_name is in full_name
+    # Do not tag full_name
+    words = pd.Series('The Ensembl project is a thing'.split(' '))
+    full_names = ['Ensembl project']
+    common_names = ['Ensembl']
+    tags = pd.Series(['O', 'B-COM', 'O', 'O', 'O', 'O'])
+
+    assert_series_equal(assign_tags(words, full_names, common_names), tags)
 
 
 # ---------------------------------------------------------------------------
@@ -352,7 +419,7 @@ def test_tag_article_tokens() -> None:
     in_df = pd.DataFrame(
         [[
             456, 'The Auditory English Lexicon Project: A multi. (AELP) is a.',
-            'Auditory English Lexicon Project', 'AELP'
+            ['Auditory English Lexicon Project'], ['AELP']
         ]],
         columns=['id', 'title_abstract', 'full_name', 'common_name'])
 
@@ -362,24 +429,6 @@ def test_tag_article_tokens() -> None:
          [456, 0, 4, 'I-FUL', 'Project:'], [456, 0, 5, 'O', 'A'],
          [456, 0, 6, 'O', 'multi.'], [456, 1, 0, 'B-COM', '(AELP)'],
          [456, 1, 1, 'O', 'is'], [456, 1, 2, 'O', 'a.']],
-        columns=['pmid', 'sent_idx', 'word_idx', 'tag', 'word'])
-
-    assert_frame_equal(tag_article_tokens(in_df), out_df)
-
-    # Partial matches to named entities should not be tagged
-    in_df = pd.DataFrame(
-        [[
-            456, 'The database of peptide ligand (DPL) is a database.',
-            'database of peptide ligand', 'DPL'
-        ]],
-        columns=['id', 'title_abstract', 'full_name', 'common_name'])
-
-    out_df = pd.DataFrame(
-        [[456, 0, 0, 'O', 'The'], [456, 0, 1, 'B-FUL', 'database'],
-         [456, 0, 2, 'I-FUL', 'of'], [456, 0, 3, 'I-FUL', 'peptide'],
-         [456, 0, 4, 'I-FUL', 'ligand'], [456, 0, 5, 'B-COM', '(DPL)'],
-         [456, 0, 6, 'O', 'is'], [456, 0, 7, 'O', 'a'],
-         [456, 0, 8, 'O', 'database.']],
         columns=['pmid', 'sent_idx', 'word_idx', 'tag', 'word'])
 
     assert_frame_equal(tag_article_tokens(in_df), out_df)
@@ -416,11 +465,11 @@ def test_BIO_scheme_transform() -> None:
     in_df = pd.DataFrame(
         [[
             123, 'MEGALEX: A megastudy.', 'New database (MEGALEX) of.',
-            'MEGALEX', 'MEGALEX'
+            ['MEGALEX'], ['MEGALEX']
         ],
          [
              456, 'The Auditory English Lexicon Project: A multi.',
-             '(AELP) is a.', 'Auditory English Lexicon Project', 'AELP'
+             '(AELP) is a.', ['Auditory English Lexicon Project'], ['AELP']
          ]],
         columns=['id', 'title', 'abstract', 'full_name', 'common_name'])
 
@@ -437,23 +486,6 @@ def test_BIO_scheme_transform() -> None:
         columns=['pmid', 'sent_idx', 'word_idx', 'tag', 'word'])
 
     assert_frame_equal(BIO_scheme_transform(in_df), out_df, check_dtype=False)
-
-    # Tokens cannot have multiple tags, so if common_name is in full_name
-    # Do not tag full_name
-    in_df = pd.DataFrame(
-        [[
-            456, 'The Ensembl project.', 'Is a thing.', 'Ensembl project',
-            'Ensembl'
-        ]],
-        columns=['id', 'title', 'abstract', 'full_name', 'common_name'])
-
-    out_df = pd.DataFrame(
-        [[456, 0, 0, 'O', 'The'], [456, 0, 1, 'B-COM', 'Ensembl'],
-         [456, 0, 2, 'O', 'project.'], [456, 1, 0, 'O', 'Is'],
-         [456, 1, 1, 'O', 'a'], [456, 1, 2, 'O', 'thing.']],
-        columns=['pmid', 'sent_idx', 'word_idx', 'tag', 'word'])
-
-    assert_frame_equal(BIO_scheme_transform(in_df), out_df)
 
 
 # ---------------------------------------------------------------------------
@@ -566,9 +598,7 @@ def main() -> None:
 
     check_input(df)
 
-    df = filter_data(df)
-
-    df = clean_data(df)
+    df = combine_rows(clean_data(filter_data(df)))
 
     ner_df = BIO_scheme_transform(df)
 
