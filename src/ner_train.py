@@ -7,12 +7,14 @@ Authors: Ana-Maria Istrate and Kenneth Schackart
 import argparse
 import copy
 import os
+from typing import Tuple
 
 import pandas as pd
 import plotly.express as px
 import torch
 from datasets import load_metric
 from torch.optim import AdamW
+from torch.utils.data.dataloader import DataLoader
 from tqdm.auto import tqdm
 from transformers import AutoModelForTokenClassification, get_scheduler
 
@@ -137,6 +139,23 @@ def get_default_args(args):
     args.use_scheduler = ARGS_MAP[model_name][4]
 
     return args
+
+
+# ---------------------------------------------------------------------------
+def get_dataloaders(args, model_name: str) -> Tuple[DataLoader, DataLoader]:
+    """
+    Generate training and validation dataloaders
+
+    `args`: Command-line arguments
+
+    Return: training dataloader, validation dataloader
+    """
+
+    params = RunParams(model_name, args.batch_size, args.num_training)
+    train_dataloader = get_dataloader(args.train_file, params)
+    val_dataloader = get_dataloader(args.val_file, params)
+
+    return train_dataloader, val_dataloader
 
 
 # ---------------------------------------------------------------------------
@@ -329,11 +348,8 @@ def main() -> None:
     print('=' * 30)
 
     model_huggingface_version = ARGS_MAP[args.model_name][0]
-    params = RunParams(model_huggingface_version, args.batch_size,
-                       args.num_training)
-    train_dataloader = get_dataloader(args.train_file, params)
-    val_dataloader = get_dataloader(args.val_file, params)
-    test_dataloader = get_dataloader(args.test_file, params)
+    train_dataloader, val_dataloader = get_dataloaders(
+        args, model_huggingface_version)
 
     print('Finished generating dataloaders!')
     print('=' * 30)
