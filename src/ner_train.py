@@ -30,7 +30,6 @@ def get_args():
         formatter_class=CustomHelpFormatter)
 
     inputs = parser.add_argument_group('Inputs and Outputs')
-    data_info = parser.add_argument_group('Information on Data')
     model_params = parser.add_argument_group('Model Parameters')
     runtime_params = parser.add_argument_group('Runtime Parameters')
 
@@ -293,7 +292,9 @@ class Trainer():
         return fig
 
 
-if __name__ == '__main__':
+# ---------------------------------------------------------------------------
+def main() -> None:
+    """ Main function """
 
     args = get_args()
 
@@ -365,3 +366,8 @@ if __name__ == '__main__':
     trainer.plot_losses([train_losses, val_losses], ['Train Loss', 'Val Loss'],
                         img_filename)
     print('=' * 30)
+
+
+# ---------------------------------------------------------------------------
+if __name__ == '__main__':
+    main()
