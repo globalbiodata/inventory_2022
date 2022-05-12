@@ -261,3 +261,20 @@ class Settings(NamedTuple):
     num_epochs: int
     num_training_steps: int
     device: torch.device
+
+
+# ---------------------------------------------------------------------------
+class Metrics(NamedTuple):
+    """
+    Performance metrics
+
+    `precision`: Model precision
+    `recall`: Model recall
+    `f1`: Model F1 score
+    `loss`: Model loss
+    """
+
+    precision: float
+    recall: float
+    f1: float
+    loss: float

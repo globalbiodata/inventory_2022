@@ -20,7 +20,7 @@ from transformers import AutoModelForTokenClassification, get_scheduler
 
 from ner_data_handler import RunParams, get_dataloader
 from utils import (ARGS_MAP, ID2NER_TAG, NER_TAG2ID, CustomHelpFormatter,
-                   Settings, set_random_seed)
+                   Metrics, Settings, set_random_seed)
 
 
 # ---------------------------------------------------------------------------
@@ -226,6 +226,16 @@ def initialize_model(model_name: str, args: Args, train_dataloader: DataLoader,
 
 
 # ---------------------------------------------------------------------------
+def train(settings: Settings) -> Tuple:
+    """
+    Train the classifier
+
+    Parameters:
+    `settings`: Model settings (NamedTuple)
+    """
+
+
+# ---------------------------------------------------------------------------
 class Trainer():
     """
      Handles training of the model
@@ -417,6 +427,7 @@ def main() -> None:
     # Model Training
     print('Starting model training...')
     print('=' * 30)
+    model, epoch, f1, train_losses, val_losses = train(settings)
     trainer = Trainer(model, optimizer, train_dataloader, val_dataloader,
                       lr_scheduler, args.num_epochs, num_training_steps,
                       device)

@@ -20,7 +20,8 @@ from transformers import (AdamW, AutoModelForSequenceClassification,
                           get_scheduler)
 
 from class_data_handler import DataFields, RunParams, get_dataloader
-from utils import MODEL_TO_HUGGINGFACE_VERSION, CustomHelpFormatter, Settings
+from utils import (MODEL_TO_HUGGINGFACE_VERSION, CustomHelpFormatter, Metrics,
+                   Settings)
 
 
 # ---------------------------------------------------------------------------
@@ -40,23 +41,6 @@ class Args(NamedTuple):
     num_epochs: int
     batch_size: int
     lr_scheduler: bool
-
-
-# ---------------------------------------------------------------------------
-class Metrics(NamedTuple):
-    """
-    Performance metrics
-
-    `precision`: Model precision
-    `recall`: Model recall
-    `f1`: Model F1 score
-    `loss`: Model loss
-    """
-
-    precision: float
-    recall: float
-    f1: float
-    loss: float
 
 
 # ---------------------------------------------------------------------------
