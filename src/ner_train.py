@@ -7,7 +7,7 @@ Authors: Ana-Maria Istrate and Kenneth Schackart
 import argparse
 import copy
 import os
-from typing import Tuple, NamedTuple, Optional
+from typing import NamedTuple, Optional, Tuple
 
 import pandas as pd
 import plotly.express as px
@@ -20,7 +20,7 @@ from transformers import AutoModelForTokenClassification, get_scheduler
 
 from ner_data_handler import RunParams, get_dataloader
 from utils import (ARGS_MAP, ID2NER_TAG, NER_TAG2ID, CustomHelpFormatter,
-                   set_random_seed)
+                   Settings, set_random_seed)
 
 
 # ---------------------------------------------------------------------------

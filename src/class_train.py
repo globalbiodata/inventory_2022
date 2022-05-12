@@ -8,7 +8,7 @@ import argparse
 import copy
 import os
 import sys
-from typing import Any, cast, List, NamedTuple, TextIO, Tuple
+from typing import Any, List, NamedTuple, TextIO, Tuple, cast
 
 import pandas as pd
 import plotly.express as px
@@ -19,8 +19,8 @@ from tqdm.auto import tqdm
 from transformers import (AdamW, AutoModelForSequenceClassification,
                           get_scheduler)
 
-from class_data_handler import get_dataloader, DataFields, RunParams
-from utils import MODEL_TO_HUGGINGFACE_VERSION, CustomHelpFormatter
+from class_data_handler import DataFields, RunParams, get_dataloader
+from utils import MODEL_TO_HUGGINGFACE_VERSION, CustomHelpFormatter, Settings
 
 
 # ---------------------------------------------------------------------------
@@ -40,32 +40,6 @@ class Args(NamedTuple):
     num_epochs: int
     batch_size: int
     lr_scheduler: bool
-
-
-# ---------------------------------------------------------------------------
-class Settings(NamedTuple):
-    """
-    Settings used for model training
-
-    `model`: Pretrained model
-    `optimizer`: Training optimizer
-    `train_dataloader`: `DataLoader` of training data
-    `val_dataloader`: `DataLoader` of validation data
-    `lr_scheduler`: Learning rate schedule (optional)
-    `num_epochs`: Maximum number of training epochs
-    `num_training_steps`: Maximum number of training steps
-    (`num_epochs` * `num_training`)
-    `device`: Torch device
-    """
-
-    model: Any
-    optimizer: AdamW
-    train_dataloader: DataLoader
-    val_dataloader: DataLoader
-    lr_scheduler: Any
-    num_epochs: int
-    num_training_steps: int
-    device: torch.device
 
 
 # ---------------------------------------------------------------------------

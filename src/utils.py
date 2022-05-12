@@ -5,11 +5,13 @@ Authors: Ana-Maria Istrate and Kenneth Schackart
 
 import argparse
 import re
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
 import pandas as pd
 import torch
 from pandas.testing import assert_frame_equal
+from torch.utils.data.dataloader import DataLoader
+from transformers import AdamW
 
 # ---------------------------------------------------------------------------
 # Mapping from generic model name to the Huggingface Version
@@ -233,3 +235,29 @@ class Splits(NamedTuple):
     train: pd.DataFrame
     val: pd.DataFrame
     test: pd.DataFrame
+
+
+# ---------------------------------------------------------------------------
+class Settings(NamedTuple):
+    """
+    Settings used for model training
+
+    `model`: Pretrained model
+    `optimizer`: Training optimizer
+    `train_dataloader`: `DataLoader` of training data
+    `val_dataloader`: `DataLoader` of validation data
+    `lr_scheduler`: Learning rate schedule (optional)
+    `num_epochs`: Maximum number of training epochs
+    `num_training_steps`: Maximum number of training steps
+    (`num_epochs` * `num_training`)
+    `device`: Torch device
+    """
+
+    model: Any
+    optimizer: AdamW
+    train_dataloader: DataLoader
+    val_dataloader: DataLoader
+    lr_scheduler: Any
+    num_epochs: int
+    num_training_steps: int
+    device: torch.device
