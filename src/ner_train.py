@@ -173,9 +173,15 @@ def get_dataloaders(args, model_name: str) -> Tuple[DataLoader, DataLoader]:
     Return: training dataloader, validation dataloader
     """
 
+    print('Generating training and validation dataloaders ...')
+    print('=' * 30)
+
     params = RunParams(model_name, args.batch_size, args.num_training)
     train_dataloader = get_dataloader(args.train_file, params)
     val_dataloader = get_dataloader(args.val_file, params)
+
+    print('Finished generating dataloaders!')
+    print('=' * 30)
 
     return train_dataloader, val_dataloader
 
@@ -401,15 +407,8 @@ def main() -> None:
     if not os.path.exists(args.out_dir):
         os.mkdir(args.out_dir)
 
-    # Train, val, test dataloaders generation
-    print('Generating train, val, test dataloaders ...')
-    print('=' * 30)
-
     model_name = ARGS_MAP[args.model_name][0]
     train_dataloader, val_dataloader = get_dataloaders(args, model_name)
-
-    print('Finished generating dataloaders!')
-    print('=' * 30)
 
     set_random_seed(45)
     settings = initialize_model(model_name, args, train_dataloader,
