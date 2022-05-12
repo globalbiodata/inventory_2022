@@ -24,7 +24,7 @@ from utils import (ARGS_MAP, ID2NER_TAG, NER_TAG2ID, CustomHelpFormatter,
                    save_model, set_random_seed)
 
 # ---------------------------------------------------------------------------
-""" Type Aliases """
+# Type Aliases
 LabeledBatch = List[List[int]]
 TaggedBatch = List[List[str]]
 
@@ -392,7 +392,8 @@ def convert_to_tags(
     `batch_predictions`: Predicted numeric labels of batch of sequences
     `batch_labels`: True numeric labels of batch of sequences
 
-    Return: Lists of tagged sequences of tokens from predictions and true labels
+    Return: Lists of tagged sequences of tokens
+    from predictions and true labels
     """
 
     true_labels = [[
@@ -426,179 +427,6 @@ def test_convert_to_tags() -> None:
 
     assert exp_pred == res_pred
     assert exp_labels == res_labels
-
-
-# ---------------------------------------------------------------------------
-# class Trainer():
-#     """
-#      Handles training of the model
-#     """
-#     def __init__(self, model, optimizer, train_dataloader, val_dataloader,
-#                  lr_scheduler, num_epochs, num_training_steps, device):
-#         """
-#         :param model: PyTorch model
-#         :param optimizer: optimizer used
-#         :param train_dataloader: DataLoader containing data used for training
-#         :param val_dataloader: DataLoader containing data used for validation
-#         :param lr_scheduler: learning rate scheduler; could be equal to None if no lr_scheduler is used
-#         :param num_epochs: number of epochs to train the model for
-#         :param num_training_steps: total number of training steps
-#         :param device: device used for training; equal to 'cuda' if GPU is available
-#         """
-#         self.model = model
-#         self.optimizer = optimizer
-#         self.train_dataloader = train_dataloader
-#         self.val_dataloader = val_dataloader
-#         self.lr_scheduler = lr_scheduler
-#         self.num_epochs = num_epochs
-#         self.num_training_steps = num_training_steps
-#         self.device = device
-
-#     def evaluate(self, dataloader):
-#         """
-#         Computes and returns metrics (P, R, F1 score, loss) of a model on data present in a dataloader
-#         :param dataloader: DataLoader containing tokenized text entries and corresponding labels
-#         :return: precision, recall, F1 score, loss
-#         """
-#         metric = load_metric("seqeval")
-#         total_loss = 0
-#         num_seen_datapoints = 0
-
-#         for batch in dataloader:
-#             batch = {k: v.to(device) for k, v in batch.items()}
-#             with torch.no_grad():
-#                 outputs = self.model(**batch)
-#             num_seen_datapoints += len(batch['input_ids'])
-#             logits = outputs.logits
-#             predictions = logits.argmax(dim=-1)
-#             loss = outputs.loss
-
-#             labels = batch["labels"]
-#             pred_labels, true_labels = self.postprocess(predictions, labels)
-#             metric.add_batch(predictions=pred_labels, references=true_labels)
-
-#             total_loss += loss.item()
-#         total_loss /= num_seen_datapoints
-#         results = metric.compute()
-#         p, r, f1, _ = self.get_metrics(results)
-#         return p, r, f1, total_loss
-
-#     def train_epoch(self, progress_bar):
-#         """
-#         Handles training of the model over one epoch
-#         :param progress_bar: tqdm instance for tracking progress
-#         """
-#         train_loss = 0
-#         num_train = 0
-#         for batch in self.train_dataloader:
-#             batch = {k: v.to(device) for k, v in batch.items()}
-#             num_train += len(batch['input_ids'])
-#             outputs = self.model(**batch)
-#             loss = outputs.loss
-#             loss.backward()
-#             train_loss += loss.item()
-
-#             self.optimizer.step()
-#             if self.lr_scheduler:
-#                 self.lr_scheduler.step()
-#             self.optimizer.zero_grad()
-#             progress_bar.update(1)
-
-#         return train_loss / num_train
-
-#     def train(self):
-#         """
-#         Handles training of the model over all epochs
-#         """
-#         progress_bar = tqdm(range(num_training_steps))
-#         self.model.train()
-
-#         best_model = self.model
-#         best_val_f1_score = 0
-#         best_epoch = -1
-#         train_losses = []
-#         val_losses = []
-#         for epoch in range(self.num_epochs):
-#             train_loss = 0
-#             # Training
-#             train_loss = self.train_epoch(progress_bar)
-#             train_losses.append(train_loss)
-
-#             # Evaluation
-#             self.model.eval()
-#             train_p, train_r, train_f1, _ = self.evaluate(
-#                 self.train_dataloader)
-#             val_p, val_r, val_f1, val_loss = self.evaluate(self.val_dataloader)
-
-#             if val_f1 > best_val_f1_score:
-#                 best_model = copy.deepcopy(self.model)
-#                 best_val_f1_score = val_f1
-#                 best_epoch = epoch
-
-#             val_losses.append(val_loss)
-#             print(
-#                 "Epoch", (epoch + 1),
-#                 ": Train Loss: %.5f Precision: %.3f Recall: %.3f F1: %.3f || Val Loss: %.5f Precision: %.3f Recall: %.3f F1: %.3f"
-#                 % (train_loss, train_p, train_r, train_f1, val_loss, val_p,
-#                    val_r, val_f1))
-#         self.best_model = best_model
-#         self.best_epoch = best_epoch
-#         self.best_f1_score = best_val_f1_score
-#         return best_model, best_epoch, best_val_f1_score, train_losses, val_losses
-
-#     def get_metrics(self, results):
-#         """
-#         Return metrics (Precision, recall, f1, accuracy)
-#         """
-#         return [
-#             results[f"overall_{key}"]
-#             for key in ["precision", "recall", "f1", "accuracy"]
-#         ]
-
-#     def postprocess(self, predictions, labels):
-#         """
-#         Postprocess true and predicted arrays (as indices) to the corresponding labels (eg 'B-RES', 'I-RES')
-#         :param predictions: array corresponding to predicted labels (as indices)
-#         :param labels: array corresponding to true labels (as indices)
-#         :return: predicted and true labels (as tags)
-#         """
-#         predictions = predictions.detach().cpu().clone().numpy()
-#         labels = labels.detach().cpu().clone().numpy()
-#         true_labels = [[ID2NER_TAG[l] for l in label if l != -100]
-#                        for label in labels]
-#         pred_labels = [[
-#             ID2NER_TAG[p] for (p, l) in zip(prediction, label) if l != -100
-#         ] for prediction, label in zip(predictions, labels)]
-#         return pred_labels, true_labels
-
-#     def save_best_model(self, checkpt_filename):
-#         """
-#         Saves a model checkpoint, epoch and F1 score to file
-#         :param checkpt_filename: filename under which the model checkpoint will be saved
-#         """
-#         torch.save(
-#             {
-#                 'model_state_dict': self.best_model.state_dict(),
-#                 'epoch': self.best_epoch,
-#                 'f1_val': self.best_f1_score,
-#             }, checkpt_filename)
-
-#     def plot_losses(self, losses, labels, img_filename):
-#         """
-#         Plots training and val losses
-#         :param num_epochs: total number of epochs the model was trained on; corresponds to length of the losses array
-#         :param losses: array corresponding to [train_losses, val_losses]
-#         :param img_filename: filename under which to save the image
-#         :return: Generated plot
-#         """
-#         x = [i for i in range(self.num_epochs)]
-#         df = pd.DataFrame({'Epoch': x})
-#         for loss_arr, label in zip(losses, labels):
-#             df[label] = loss_arr
-#         fig = px.line(df, x="Epoch", y=labels, title='Train/Val Losses')
-#         fig.show()
-#         fig.write_image(img_filename)
-#         return fig
 
 
 # ---------------------------------------------------------------------------
