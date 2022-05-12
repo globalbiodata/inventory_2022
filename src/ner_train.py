@@ -74,7 +74,7 @@ def get_args() -> Args:
     model_params.add_argument(
         '-m',
         '--model_name',
-        metavar='MODEL',
+        metavar='',
         type=str,
         default='biomed_roberta',
         help='Name of model',
@@ -90,15 +90,16 @@ def get_args() -> Args:
                               metavar='NUM',
                               type=float,
                               default=3e-5,
-                              help='Learning Rate')
+                              help='Learning rate')
     model_params.add_argument('-decay',
                               '--weight_decay',
                               metavar='NUM',
                               type=float,
                               default=0.01,
-                              help='Weight Decay for Learning Rate')
+                              help='Weight decay for learning rate')
     model_params.add_argument('-def',
                               '--use-default-values',
+                              metavar='',
                               type=bool,
                               default=True,
                               help='Use default values in ner_utils.py')
@@ -115,17 +116,17 @@ def get_args() -> Args:
                                 metavar='INT',
                                 type=int,
                                 default=3,
-                                help='Number of Epochs')
+                                help='Number of epochs')
     runtime_params.add_argument('-batch',
                                 '--batch-size',
                                 metavar='INT',
                                 type=int,
                                 default=16,
-                                help='Batch Size')
+                                help='Batch size')
     runtime_params.add_argument('-lr',
                                 '--lr_scheduler',
                                 action='store_true',
-                                help='Use a Learning Rate Scheduler')
+                                help='Use a learning rate scheduler')
 
     args = parser.parse_args()
 
