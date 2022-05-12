@@ -4,10 +4,12 @@ Authors: Ana-Maria Istrate and Kenneth Schackart
 """
 
 import argparse
+import os
 import re
-from typing import Any, NamedTuple
+from typing import Any, List, NamedTuple, Tuple
 
 import pandas as pd
+import plotly.express as px
 import torch
 from pandas.testing import assert_frame_equal
 from torch.utils.data.dataloader import DataLoader
@@ -221,6 +223,69 @@ def test_add_period() -> None:
     assert add_period('A question?') == 'A question?'
     assert add_period('An exclamation!') == 'An exclamation!'
     assert add_period('An incomplete') == 'An incomplete.'
+
+
+# ---------------------------------------------------------------------------
+def make_filenames(out_dir: str, model_name: str) -> Tuple[str, str]:
+    """ Make output filenames """
+
+    partial_name = os.path.join(out_dir, model_name + '_')
+
+    return partial_name + 'checkpt.pt', partial_name + 'losses.png'
+
+
+# ---------------------------------------------------------------------------
+def test_make_filenames() -> None:
+    """ Test make_filenames """
+
+    assert make_filenames('out', 'scibert') == ('out/scibert_checkpt.pt',
+                                                'out/scibert_losses.png')
+
+
+# ---------------------------------------------------------------------------
+def save_model(model: Any, epoch: int, f1: float, filename: str) -> None:
+    """
+    Save model checkpoint, epoch, and F1 score to file
+
+    Parameters:
+    `model`: Model to save
+    `epoch`: Epochs used to train model
+    `f1`: F1 score obtained by model
+    `filename`: Name of file for saving model
+    """
+
+    torch.save(
+        {
+            'model_state_dict': model.state_dict(),
+            'epoch': epoch,
+            'f1_val': f1
+        }, filename)
+
+
+# ---------------------------------------------------------------------------
+def save_loss_plot(train_losses: List[float], val_losses: List[float],
+                   filename: str) -> None:
+    """
+    Plot training and validation losses, and save to file
+
+    Parameters:
+    `train_losses`: Training losses
+    `val_losses`: Validation losses
+    `filename`: Name of file for saving plot
+    """
+    df = pd.DataFrame({
+        'Epoch': list(range(1,
+                            len(val_losses) + 1)),
+        'Train': train_losses,
+        'Validation': val_losses
+    })
+
+    fig = px.line(df,
+                  x='Epoch',
+                  y=['Train', 'Validation'],
+                  title='Train and Validation Losses')
+
+    fig.write_image(filename)
 
 
 # ---------------------------------------------------------------------------

@@ -10,8 +10,6 @@ import os
 import sys
 from typing import Any, List, NamedTuple, TextIO, Tuple, cast
 
-import pandas as pd
-import plotly.express as px
 import torch
 from datasets import load_metric
 from torch.utils.data.dataloader import DataLoader
@@ -21,7 +19,7 @@ from transformers import (AdamW, AutoModelForSequenceClassification,
 
 from class_data_handler import DataFields, RunParams, get_dataloader
 from utils import (MODEL_TO_HUGGINGFACE_VERSION, CustomHelpFormatter, Metrics,
-                   Settings)
+                   Settings, make_filenames, save_loss_plot, save_model)
 
 
 # ---------------------------------------------------------------------------
@@ -304,52 +302,6 @@ def get_metrics(model: Any, dataloader: DataLoader,
 
 
 # ---------------------------------------------------------------------------
-def save_model(model: Any, epoch: int, f1: float, filename: str) -> None:
-    """
-    Save model checkpoint, epoch, and F1 score to file
-
-    Parameters:
-    `model`: Model to save
-    `epoch`: Epochs used to train model
-    `f1`: F1 score obtained by model
-    `filename`: Name of file for saving model
-    """
-
-    torch.save(
-        {
-            'model_state_dict': model.state_dict(),
-            'epoch': epoch,
-            'f1_val': f1
-        }, filename)
-
-
-# ---------------------------------------------------------------------------
-def save_loss_plot(train_losses: List[float], val_losses: List[float],
-                   filename: str) -> None:
-    """
-    Plot training and validation losses, and save to file
-
-    Parameters:
-    `train_losses`: Training losses
-    `val_losses`: Validation losses
-    `filename`: Name of file for saving plot
-    """
-    df = pd.DataFrame({
-        'Epoch': list(range(1,
-                            len(val_losses) + 1)),
-        'Train': train_losses,
-        'Validation': val_losses
-    })
-
-    fig = px.line(df,
-                  x='Epoch',
-                  y=['Train', 'Validation'],
-                  title='Train and Validation Losses')
-
-    fig.write_image(filename)
-
-
-# ---------------------------------------------------------------------------
 def get_dataloaders(args: Args,
                     model_name: str) -> Tuple[DataLoader, DataLoader]:
     """ Generate the dataloaders """
@@ -403,23 +355,6 @@ def initialize_model(model_name: str, args: Args, train_dataloader: DataLoader,
 
     return Settings(model, optimizer, train_dataloader, val_dataloader,
                     lr_scheduler, args.num_epochs, num_training_steps, device)
-
-
-# ---------------------------------------------------------------------------
-def make_filenames(out_dir: str, model_name: str) -> Tuple[str, str]:
-    """ Make output filenames """
-
-    partial_name = os.path.join(out_dir, model_name + '_')
-
-    return partial_name + 'checkpt.pt', partial_name + 'losses.png'
-
-
-# ---------------------------------------------------------------------------
-def test_make_filenames() -> None:
-    """ Test make_filenames """
-
-    assert make_filenames('out', 'scibert') == ('out/scibert_checkpt.pt',
-                                                'out/scibert_losses.png')
 
 
 # ---------------------------------------------------------------------------
