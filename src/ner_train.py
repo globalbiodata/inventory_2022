@@ -181,6 +181,45 @@ def get_dataloaders(args, model_name: str) -> Tuple[DataLoader, DataLoader]:
 
 
 # ---------------------------------------------------------------------------
+def initialize_model(model_name: str, args: Args, train_dataloader: DataLoader,
+                     val_dataloader: DataLoader) -> Settings:
+    """
+    Initialize the model and get settings
+
+    `model_name`: Trained model name
+    `args`: Command-line arguments
+    `train_dataloader`: Training dataloader
+    `val_dataloader`: Validation dataloader
+
+    Return: training settings including model
+    """
+
+    print('Initializing', model_name, 'model ...')
+    print('=' * 30)
+
+    model = AutoModelForTokenClassification.from_pretrained(
+        model_name, id2label=ID2NER_TAG, label2id=NER_TAG2ID)
+    device = torch.device(
+        'cuda') if torch.cuda.is_available() else torch.device('cpu')
+    model.to(device)
+    optimizer = AdamW(model.parameters(),
+                      lr=args.learning_rate,
+                      weight_decay=args.weight_decay)
+    num_training_steps = args.num_epochs * len(train_dataloader)
+
+    if args.lr_scheduler:
+        lr_scheduler = get_scheduler('linear',
+                                     optimizer=optimizer,
+                                     num_warmup_steps=0,
+                                     num_training_steps=num_training_steps)
+    else:
+        lr_scheduler = None
+
+    return Settings(model, optimizer, train_dataloader, val_dataloader,
+                    lr_scheduler, args.num_epochs, num_training_steps, device)
+
+
+# ---------------------------------------------------------------------------
 class Trainer():
     """
      Handles training of the model
@@ -366,33 +405,15 @@ def main() -> None:
     print('Generating train, val, test dataloaders ...')
     print('=' * 30)
 
-    model_huggingface_version = ARGS_MAP[args.model_name][0]
-    train_dataloader, val_dataloader = get_dataloaders(
-        args, model_huggingface_version)
+    model_name = ARGS_MAP[args.model_name][0]
+    train_dataloader, val_dataloader = get_dataloaders(args, model_name)
 
     print('Finished generating dataloaders!')
     print('=' * 30)
 
-    # Model Initialization
-    print('Initializing', model_huggingface_version, 'model ...')
-    print('=' * 30)
     set_random_seed(45)
-    model = AutoModelForTokenClassification.from_pretrained(
-        model_huggingface_version, id2label=ID2NER_TAG, label2id=NER_TAG2ID)
-    optimizer = AdamW(model.parameters(),
-                      lr=args.learning_rate,
-                      weight_decay=args.weight_decay)
-    num_training_steps = args.num_epochs * len(train_dataloader)
-    device = torch.device(
-        "cuda") if torch.cuda.is_available() else torch.device("cpu")
-    if args.lr_scheduler:
-        lr_scheduler = get_scheduler("linear",
-                                     optimizer=optimizer,
-                                     num_warmup_steps=0,
-                                     num_training_steps=num_training_steps)
-    else:
-        lr_scheduler = None
-    model.to(device)
+    settings = initialize_model(model_name, args, train_dataloader,
+                                val_dataloader)
 
     # Model Training
     print('Starting model training...')
