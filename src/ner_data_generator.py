@@ -58,7 +58,7 @@ def get_args() -> Args:
     """ Parse command-line arguments """
 
     parser = argparse.ArgumentParser(
-        description='Split curated classification data',
+        description='Split curated classification data.',
         formatter_class=CustomHelpFormatter)
 
     parser.add_argument('infile',
@@ -566,7 +566,7 @@ def main() -> None:
     save_df(group_tagged_df(val_df), val_out)
     save_df(group_tagged_df(test_df), test_out)
 
-    print(f'Done. Wrote 3 files to {out_dir}.')
+    print(f'Done. Wrote 6 files to {out_dir}.')
 
 
 # ---------------------------------------------------------------------------
