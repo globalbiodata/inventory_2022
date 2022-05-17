@@ -24,7 +24,6 @@ class Args(NamedTuple):
     checkpoint: TextIO
     infile: TextIO
     out_dir: str
-    out_file: str
     predictive_field: str
     descriptive_labels: List[str]
     model_name: str
@@ -63,12 +62,6 @@ def get_args() -> Args:
                         type=str,
                         default='out/',
                         help='Directory to output predictions')
-    inputs.add_argument('-of',
-                        '--out-file',
-                        metavar='STR',
-                        type=str,
-                        default='predictions.csv',
-                        help='Output filename')
 
     data_info.add_argument('-pred',
                            '--predictive-field',
@@ -115,7 +108,7 @@ def get_args() -> Args:
 
     args = parser.parse_args()
 
-    return Args(args.checkpoint, args.input_file, args.out_dir, args.out_file,
+    return Args(args.checkpoint, args.input_file, args.out_dir,
                 args.predictive_field, args.descriptive_labels,
                 args.model_name, args.max_len, args.batch_size)
 
@@ -205,7 +198,7 @@ def main() -> None:
     if not os.path.isdir(args.out_dir):
         os.makedirs(args.out_dir)
 
-    out_file = os.path.join(args.out_dir, args.out_file)
+    out_file = os.path.join(args.out_dir, 'predictions.csv')
 
     model_name = MODEL_TO_HUGGINGFACE_VERSION[args.model_name]
 

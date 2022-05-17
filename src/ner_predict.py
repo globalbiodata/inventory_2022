@@ -23,7 +23,6 @@ class Args(NamedTuple):
     checkpoint: TextIO
     infile: TextIO
     out_dir: str
-    out_file: str
     model_name: str
 
 
@@ -49,7 +48,7 @@ def get_args() -> Args:
                         '--input-file',
                         metavar='FILE',
                         type=argparse.FileType('rt'),
-                        default='data/val.csv',
+                        required=True,
                         help='Input file for prediction')
     inputs.add_argument('-o',
                         '--out-dir',
@@ -57,12 +56,6 @@ def get_args() -> Args:
                         type=str,
                         default='out/',
                         help='Directory to output predictions')
-    inputs.add_argument('-of',
-                        '--out-file',
-                        metavar='STR',
-                        type=str,
-                        default='predictions.csv',
-                        help='Output filename')
 
     model_params.add_argument(
         '-m',
@@ -81,7 +74,7 @@ def get_args() -> Args:
 
     args = parser.parse_args()
 
-    return Args(args.checkpoint, args.input_file, args.out_dir, args.out_file,
+    return Args(args.checkpoint, args.input_file, args.out_dir,
                 args.model_name)
 
 
@@ -179,6 +172,12 @@ def predict_sequence(model, device: torch.device, seq: str,
 def predict(model, tokenizer, inputs: pd.DataFrame, tag_dict: dict,
             device: torch.device):
 
+    all_preds = []
+    all_IDs = []
+    all_texts = []
+    all_probs = []
+    all_offsets_start = []
+    all_offsets_end = []
     for row in inputs.iterrows():
         id = row['id']
         seq = row['title_abstract']
@@ -190,7 +189,7 @@ def predict(model, tokenizer, inputs: pd.DataFrame, tag_dict: dict,
         offsets_end = [x['end'] for x in predicted_labels]
         all_preds.extend(mentions)
         all_IDs.extend([id] * num_preds)
-        all_texts.extend([text] * num_preds)
+        all_texts.extend([seq] * num_preds)
         all_probs.extend(probs)
         all_offsets_start.extend(offsets_start)
         all_offsets_end.extend(offsets_end)
@@ -206,94 +205,94 @@ def predict(model, tokenizer, inputs: pd.DataFrame, tag_dict: dict,
     return pred_df
 
 
-# ---------------------------------------------------------------------------
-class NERPredictor():
-    """
-  Handles prediction based on a trained model
-  """
-    def __init__(self, model_huggingface_version, checkpoint_filepath):
-        """
-    :param model_huggingface_version: HuggingFace model version to load the pretrained model weights from
-    :param checkpoint_filepath: saved checkpt to load the model from
-    """
-        # self.device = torch.device(
-        #     "cuda") if torch.cuda.is_available() else torch.device("cpu")
-        # self.model = AutoModelForTokenClassification.from_pretrained(
-        #     model_huggingface_version,
-        #     id2label=ID2NER_TAG,
-        #     label2id=NER_TAG2ID)
-        # checkpoint = torch.load(checkpoint_filepath, map_location=self.device)
-        # self.model.load_state_dict(checkpoint['model_state_dict'])
-        # self.model.to(self.device)
-        # self.model.eval()
-        # self.tokenizer = AutoTokenizer.from_pretrained(
-        #     model_huggingface_version)
+# # ---------------------------------------------------------------------------
+# class NERPredictor():
+#     """
+#   Handles prediction based on a trained model
+#   """
+#     def __init__(self, model_huggingface_version, checkpoint_filepath):
+#         """
+#     :param model_huggingface_version: HuggingFace model version to load the pretrained model weights from
+#     :param checkpoint_filepath: saved checkpt to load the model from
+#     """
+# self.device = torch.device(
+#     "cuda") if torch.cuda.is_available() else torch.device("cpu")
+# self.model = AutoModelForTokenClassification.from_pretrained(
+#     model_huggingface_version,
+#     id2label=ID2NER_TAG,
+#     label2id=NER_TAG2ID)
+# checkpoint = torch.load(checkpoint_filepath, map_location=self.device)
+# self.model.load_state_dict(checkpoint['model_state_dict'])
+# self.model.to(self.device)
+# self.model.eval()
+# self.tokenizer = AutoTokenizer.from_pretrained(
+#     model_huggingface_version)
 
-    # def predict(self, text):
-    #     """
-    # Generates predictions for a sentence using the trained model
+# def predict(self, text):
+#     """
+# Generates predictions for a sentence using the trained model
 
-    # :returns: predicted labels
-    # """
-    #     with torch.no_grad():
-    #         inputs = self.tokenizer(text, return_tensors="pt").to(self.device)
-    #         outputs = self.model(**inputs)
-    #         logits = outputs.logits
-    #         probabilities = torch.nn.functional.softmax(
-    #             outputs.logits, dim=-1).cpu().numpy()[0][1:-1]
-    #         predictions = logits.argmax(dim=-1).cpu().numpy()[0][1:-1]
-    #         word_ids = inputs.word_ids()[1:-1]
-    #         mapping = {}
+# :returns: predicted labels
+# """
+#     with torch.no_grad():
+#         inputs = self.tokenizer(text, return_tensors="pt").to(self.device)
+#         outputs = self.model(**inputs)
+#         logits = outputs.logits
+#         probabilities = torch.nn.functional.softmax(
+#             outputs.logits, dim=-1).cpu().numpy()[0][1:-1]
+#         predictions = logits.argmax(dim=-1).cpu().numpy()[0][1:-1]
+#         word_ids = inputs.word_ids()[1:-1]
+#         mapping = {}
 
-    #         for word_id, pred, prob in zip(word_ids, predictions,
-    #                                        probabilities):
-    #             label = ID2NER_TAG[pred]
-    #             score = prob[pred]
-    #             if word_id in mapping:
-    #                 mapping[word_id].append((label, score))
-    #             else:
-    #                 mapping[word_id] = [(label, score)]
-    #         new_mapping = {}
-    #         for word_id, labels_scores in mapping.items():
-    #             start, end = inputs.word_to_chars(word_id)
-    #             word = text[start:end]
-    #             new_mapping[(start, end, word)] = labels_scores[0]
-    #         running_start = None
-    #         running_end = None
-    #         running_tag = None
-    #         word2tag = []
-    #         for (start, end, word), tag_pred in new_mapping.items():
-    #             tag = tag_pred[0]
-    #             prob = tag_pred[1]
-    #             if running_end and tag == 'I-' + running_tag[2:]:
-    #                 running_end = end
-    #             elif tag[0] == 'B' or tag[0] == 'O':
-    #                 if running_start is not None and running_tag != 'O':
-    #                     running_word = text[running_start:running_end]
-    #                     entry = {
-    #                         'label': running_tag,
-    #                         'prob': running_pred,
-    #                         'word': running_word,
-    #                         'start': running_start,
-    #                         'end': running_end
-    #                     }
-    #                     word2tag.append(entry)
-    #                 running_start = start
-    #                 running_end = end
-    #                 running_tag = tag
-    #                 running_pred = prob
-    #         running_word = text[running_start:running_end]
-    #         if len(running_word) > 0 and running_tag != 'O':
-    #             entry = {
-    #                 'label': running_tag,
-    #                 'prob': running_pred,
-    #                 'word': running_word,
-    #                 'start': running_start,
-    #                 'end': running_end
-    #             }
-    #             word2tag.append(entry)
-    #             print(word2tag)
-    #     return word2tag
+#         for word_id, pred, prob in zip(word_ids, predictions,
+#                                        probabilities):
+#             label = ID2NER_TAG[pred]
+#             score = prob[pred]
+#             if word_id in mapping:
+#                 mapping[word_id].append((label, score))
+#             else:
+#                 mapping[word_id] = [(label, score)]
+#         new_mapping = {}
+#         for word_id, labels_scores in mapping.items():
+#             start, end = inputs.word_to_chars(word_id)
+#             word = text[start:end]
+#             new_mapping[(start, end, word)] = labels_scores[0]
+#         running_start = None
+#         running_end = None
+#         running_tag = None
+#         word2tag = []
+#         for (start, end, word), tag_pred in new_mapping.items():
+#             tag = tag_pred[0]
+#             prob = tag_pred[1]
+#             if running_end and tag == 'I-' + running_tag[2:]:
+#                 running_end = end
+#             elif tag[0] == 'B' or tag[0] == 'O':
+#                 if running_start is not None and running_tag != 'O':
+#                     running_word = text[running_start:running_end]
+#                     entry = {
+#                         'label': running_tag,
+#                         'prob': running_pred,
+#                         'word': running_word,
+#                         'start': running_start,
+#                         'end': running_end
+#                     }
+#                     word2tag.append(entry)
+#                 running_start = start
+#                 running_end = end
+#                 running_tag = tag
+#                 running_pred = prob
+#         running_word = text[running_start:running_end]
+#         if len(running_word) > 0 and running_tag != 'O':
+#             entry = {
+#                 'label': running_tag,
+#                 'prob': running_pred,
+#                 'word': running_word,
+#                 'start': running_start,
+#                 'end': running_end
+#             }
+#             word2tag.append(entry)
+#             print(word2tag)
+#     return word2tag
 
 
 # ---------------------------------------------------------------------------
