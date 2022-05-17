@@ -15,7 +15,7 @@ from torch.utils.data.dataloader import DataLoader
 from transformers import AutoModelForSequenceClassification as classifier
 
 from class_data_handler import get_dataloader, DataFields, RunParams
-from utils import MODEL_TO_HUGGINGFACE_VERSION, CustomHelpFormatter
+from utils import MODEL_TO_HUGGINGFACE_VERSION, CustomHelpFormatter, get_torch_device
 
 
 # ---------------------------------------------------------------------------
@@ -140,19 +140,6 @@ def get_dataloaders(args: Args, model_name: str) -> DataLoader:
     dataloader = get_dataloader(args.infile, data_fields, dataloader_params)
 
     return dataloader
-
-
-# ---------------------------------------------------------------------------
-def get_torch_device() -> torch.device:
-    """
-    Get device for torch
-
-    Returns:
-    `torch.device` either "cuda" or "cpu"
-    """
-
-    return torch.device('cuda') if torch.cuda.is_available() else torch.device(
-        'cpu')
 
 
 # ---------------------------------------------------------------------------

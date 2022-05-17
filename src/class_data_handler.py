@@ -3,7 +3,6 @@ Purpose: Preprocess and tokenize data, create DataLoader
 Authors: Ana-Maria Istrate and Kenneth Schackart
 """
 
-import io
 import random
 import sys
 from functools import partial
@@ -11,11 +10,10 @@ from typing import List, NamedTuple, Optional, TextIO, Tuple
 
 import pandas as pd
 from datasets import ClassLabel, Dataset
-from pandas.testing import assert_frame_equal
 from torch.utils.data import DataLoader
 from transformers import AutoTokenizer, PreTrainedTokenizer
 
-from utils import concat_title_abstract, strip_xml
+from utils import preprocess_data
 
 
 # ---------------------------------------------------------------------------
@@ -68,53 +66,6 @@ def get_dataloader(file: TextIO, fields: DataFields,
     data_loader = generate_dataloader(df, file.name, fields, run_params)
 
     return data_loader
-
-
-# ---------------------------------------------------------------------------
-def preprocess_data(file: TextIO) -> pd.DataFrame:
-    """
-    Strip XML tags and concatenate title and abstract columns
-
-    Parameters:
-    `file`: Input file handle
-
-    Returns:
-    a `pd.DataFrame` of preprocessed data
-    """
-
-    df = pd.read_csv(file)
-
-    if not all(map(lambda c: c in df.columns, ['title', 'abstract'])):
-        sys.exit(f'Data file {file.name} must contain columns '
-                 'labeled "title" and "abstract".')
-
-    for col in ['title', 'abstract']:
-        df[col] = df[col].apply(strip_xml)
-
-    df = concat_title_abstract(df)
-
-    return df
-
-
-# ---------------------------------------------------------------------------
-def test_preprocess_data() -> None:
-    """ Test preprocess_data() """
-
-    in_fh = io.StringIO('title,abstract\n'
-                        'A Descriptive Title,A <i>detailed</i> abstract.\n'
-                        'Another title,Another abstract.')
-
-    out_df = pd.DataFrame([[
-        'A Descriptive Title', 'A detailed abstract.',
-        'A Descriptive Title. A detailed abstract.'
-    ],
-                           [
-                               'Another title', 'Another abstract.',
-                               'Another title. Another abstract.'
-                           ]],
-                          columns=['title', 'abstract', 'title_abstract'])
-
-    assert_frame_equal(preprocess_data(in_fh), out_df)
 
 
 # ---------------------------------------------------------------------------

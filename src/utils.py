@@ -4,9 +4,11 @@ Authors: Ana-Maria Istrate and Kenneth Schackart
 """
 
 import argparse
+import io
 import os
 import re
-from typing import Any, List, NamedTuple, Tuple
+import sys
+from typing import Any, List, NamedTuple, TextIO, Tuple
 
 import pandas as pd
 import plotly.express as px
@@ -96,6 +98,19 @@ def set_random_seed(seed):
     torch.manual_seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
+
+
+# ---------------------------------------------------------------------------
+def get_torch_device() -> torch.device:
+    """
+    Get device for torch
+
+    Returns:
+    `torch.device` either "cuda" or "cpu"
+    """
+
+    return torch.device('cuda') if torch.cuda.is_available() else torch.device(
+        'cpu')
 
 
 # ---------------------------------------------------------------------------
@@ -223,6 +238,53 @@ def test_add_period() -> None:
     assert add_period('A question?') == 'A question?'
     assert add_period('An exclamation!') == 'An exclamation!'
     assert add_period('An incomplete') == 'An incomplete.'
+
+
+# ---------------------------------------------------------------------------
+def preprocess_data(file: TextIO) -> pd.DataFrame:
+    """
+    Strip XML tags and concatenate title and abstract columns
+
+    Parameters:
+    `file`: Input file handle
+
+    Returns:
+    a `pd.DataFrame` of preprocessed data
+    """
+
+    df = pd.read_csv(file)
+
+    if not all(map(lambda c: c in df.columns, ['title', 'abstract'])):
+        sys.exit(f'Data file {file.name} must contain columns '
+                 'labeled "title" and "abstract".')
+
+    for col in ['title', 'abstract']:
+        df[col] = df[col].apply(strip_xml)
+
+    df = concat_title_abstract(df)
+
+    return df
+
+
+# ---------------------------------------------------------------------------
+def test_preprocess_data() -> None:
+    """ Test preprocess_data() """
+
+    in_fh = io.StringIO('title,abstract\n'
+                        'A Descriptive Title,A <i>detailed</i> abstract.\n'
+                        'Another title,Another abstract.')
+
+    out_df = pd.DataFrame([[
+        'A Descriptive Title', 'A detailed abstract.',
+        'A Descriptive Title. A detailed abstract.'
+    ],
+                           [
+                               'Another title', 'Another abstract.',
+                               'Another title. Another abstract.'
+                           ]],
+                          columns=['title', 'abstract', 'title_abstract'])
+
+    assert_frame_equal(preprocess_data(in_fh), out_df)
 
 
 # ---------------------------------------------------------------------------
