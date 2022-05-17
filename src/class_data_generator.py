@@ -12,9 +12,8 @@ from typing import List, NamedTuple, TextIO
 import pandas as pd
 import pytest
 from pandas.testing import assert_frame_equal
-from sklearn.model_selection import train_test_split
 
-from utils import CustomHelpFormatter, Splits
+from utils import CustomHelpFormatter, split_df
 
 
 # ---------------------------------------------------------------------------
@@ -24,17 +23,11 @@ class Args(NamedTuple):
 
     `infile`: Input curated data filehandle
     `outdir`: Output directory
-    `train`: Training data output file name
-    `val`: Validation data output file name
-    `spltis`: Train, val, test proportions
-    `test`: Test data output file name
+    `splits`: Train, val, test proportions
     `seed`: Random seed
     """
     infile: TextIO
     outdir: str
-    train: str
-    val: str
-    test: str
     splits: List[float]
     seed: bool
 
@@ -76,24 +69,6 @@ def get_args() -> Args:
                         type=str,
                         default='data/',
                         help='Output directory')
-    parser.add_argument('-t',
-                        '--train',
-                        metavar='',
-                        type=str,
-                        default='train_paper_classif.csv',
-                        help='Training data output file name')
-    parser.add_argument('-v',
-                        '--val',
-                        metavar='',
-                        type=str,
-                        default='val_paper_classif.csv',
-                        help='Validation data output file name')
-    parser.add_argument('-s',
-                        '--test',
-                        metavar='',
-                        type=str,
-                        default='test_paper_classif.csv',
-                        help='Test data output file name')
     parser.add_argument('--splits',
                         metavar='',
                         type=float,
@@ -174,60 +149,6 @@ def check_data(df: pd.DataFrame) -> None:
 
 
 # ---------------------------------------------------------------------------
-def split_df(df: pd.DataFrame, rand_seed: bool, splits: List[float]) -> Splits:
-    """
-    Split manually curated data into train, validation and test sets
-
-    `df`: Manually curated classification data
-    `rand_seed`: Optionally use random seed
-    `splits`: Proportions of data for [train, validation, test]
-
-    Return:
-    train, validation, test dataframes
-    """
-
-    seed = 241 if rand_seed else None
-
-    _, val_split, test_split = splits
-    val_test_split = val_split + test_split
-
-    train, val_test = train_test_split(df,
-                                       test_size=val_test_split,
-                                       random_state=seed)
-    val, test = train_test_split(val_test,
-                                 test_size=test_split / val_test_split,
-                                 random_state=seed)
-
-    return Splits(train, val, test)
-
-
-# ---------------------------------------------------------------------------
-def test_random_split(unsplit_data: pd.DataFrame) -> None:
-    """ Test that split_df() gives correct proportions """
-
-    in_df = unsplit_data
-
-    train, val, test = split_df(in_df, False, [0.5, 0.25, 0.25])
-
-    assert len(train.index) == 4
-    assert len(val.index) == 2
-    assert len(test.index) == 2
-
-
-# ---------------------------------------------------------------------------
-def test_seeded_split(unsplit_data: pd.DataFrame) -> None:
-    """ Test that split_df() behaves deterministically """
-
-    in_df = unsplit_data
-
-    train, val, test = split_df(in_df, True, [0.5, 0.25, 0.25])
-
-    assert list(train['id'].values) == [321, 789, 741, 654]
-    assert list(val['id'].values) == [987, 456]
-    assert list(test['id'].values) == [852, 123]
-
-
-# ---------------------------------------------------------------------------
 def main() -> None:
     """ Main function """
 
@@ -247,8 +168,10 @@ def main() -> None:
 
     train_df, val_df, test_df = split_df(df, args.seed, args.splits)
 
-    train_out, val_out, test_out = map(lambda f: os.path.join(out_dir, f),
-                                       [args.train, args.val, args.test])
+    train_out, val_out, test_out = map(lambda f: os.path.join(out_dir, f), [
+        'train_paper_classif.csv', 'val_paper_classif.csv',
+        'test_paper_classif.csv'
+    ])
 
     train_df.to_csv(train_out, index=False)
     val_df.to_csv(val_out, index=False)

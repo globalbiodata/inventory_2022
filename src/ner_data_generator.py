@@ -11,13 +11,13 @@ import sys
 from typing import List, NamedTuple, TextIO
 
 import nltk
-from numpy.core.numeric import NaN
 import pandas as pd
+from numpy.core.numeric import NaN
 from pandas._testing.asserters import assert_series_equal
 from pandas.testing import assert_frame_equal
-from sklearn.model_selection import train_test_split
 
-from utils import CustomHelpFormatter, Splits, concat_title_abstract, strip_xml
+from utils import (CustomHelpFormatter, concat_title_abstract, split_df,
+                   strip_xml)
 
 # nltk.download('punkt')
 # RND_SEED = 241
@@ -30,17 +30,11 @@ class Args(NamedTuple):
 
     `infile`: Input curated data filehandle
     `outdir`: Output directory
-    `train`: Training data output file name
-    `val`: Validation data output file name
-    `spltis`: Train, val, test proportions
-    `test`: Test data output file name
+    `splits`: Train, val, test proportions
     `seed`: Random seed
     """
     infile: TextIO
     outdir: str
-    train: str
-    val: str
-    test: str
     splits: List[float]
     seed: bool
 
@@ -78,24 +72,6 @@ def get_args() -> Args:
                         type=str,
                         default='data/',
                         help='Output directory')
-    parser.add_argument('-t',
-                        '--train',
-                        metavar='',
-                        type=str,
-                        default='train_ner.pkl',
-                        help='Training data output file name')
-    parser.add_argument('-v',
-                        '--val',
-                        metavar='',
-                        type=str,
-                        default='val_ner.pkl',
-                        help='Validation data output file name')
-    parser.add_argument('-s',
-                        '--test',
-                        metavar='',
-                        type=str,
-                        default='test_ner.pkl',
-                        help='Test data output file name')
     parser.add_argument('--splits',
                         metavar='',
                         type=float,
@@ -112,8 +88,7 @@ def get_args() -> Args:
     if not sum(args.splits) == 1.0:
         parser.error(f'--splits {args.splits} must sum to 1')
 
-    return Args(args.infile, args.outdir, args.train, args.val, args.test,
-                args.splits, args.seed)
+    return Args(args.infile, args.outdir, args.splits, args.seed)
 
 
 # ---------------------------------------------------------------------------
@@ -489,36 +464,6 @@ def test_BIO_scheme_transform() -> None:
 
 
 # ---------------------------------------------------------------------------
-def split_df(df: pd.DataFrame, rand_seed: bool, splits: List[float]) -> Splits:
-    """
-    Split manually curated data into train, validation and test sets
-
-    `df`: Manually curated classification data
-    `rand_seed`: Optionally use random seed
-    `splits`: Proportions of data for [train, validation, test]
-
-    Return:
-    train, validation, test dataframes
-    """
-
-    seed = 241 if rand_seed else None
-
-    _, val_split, test_split = splits
-    val_test_split = val_split + test_split
-
-    ids = df['pmid'].unique()
-    train_ids, val_test_ids = train_test_split(ids,
-                                               test_size=val_test_split,
-                                               random_state=seed)
-    val_ids, test_ids = train_test_split(val_test_ids,
-                                         test_size=test_split / val_test_split,
-                                         random_state=seed)
-
-    return Splits(df[df['pmid'].isin(train_ids)], df[df['pmid'].isin(val_ids)],
-                  df[df['pmid'].isin(test_ids)])
-
-
-# ---------------------------------------------------------------------------
 def group_tagged_df(df: pd.DataFrame) -> pd.DataFrame:
     """
     Group dataframe by pmid and sentence index
@@ -600,12 +545,22 @@ def main() -> None:
 
     df = combine_rows(clean_data(filter_data(df)))
 
-    ner_df = BIO_scheme_transform(df)
+    raw_train, raw_val, raw_test = split_df(df, args.seed, args.splits)
 
-    train_df, val_df, test_df = split_df(ner_df, args.seed, args.splits)
+    train_df, val_df, test_df = map(lambda df: BIO_scheme_transform(df),
+                                    [raw_train, raw_val, raw_test])
 
-    train_out, val_out, test_out = map(lambda f: os.path.join(out_dir, f),
-                                       [args.train, args.val, args.test])
+    raw_train_out, raw_val_out, raw_test_out = map(
+        lambda f: os.path.join(out_dir, f),
+        ['train_ner.csv', 'val_ner.csv', 'test_ner.csv'])
+
+    raw_train.to_csv(raw_train_out, index=False)
+    raw_val.to_csv(raw_val_out, index=False)
+    raw_test.to_csv(raw_test_out, index=False)
+
+    train_out, val_out, test_out = map(
+        lambda f: os.path.join(out_dir, f),
+        ['train_ner.pkl', 'val_ner.pkl', 'test_ner.pkl'])
 
     save_df(group_tagged_df(train_df), train_out)
     save_df(group_tagged_df(val_df), val_out)

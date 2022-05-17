@@ -14,6 +14,7 @@ import pandas as pd
 import plotly.express as px
 import torch
 from pandas.testing import assert_frame_equal
+from sklearn.model_selection import train_test_split
 from torch.utils.data.dataloader import DataLoader
 from transformers import AdamW
 
@@ -91,29 +92,6 @@ ID2NER_TAG = {v: k for k, v in NER_TAG2ID.items()}
 
 
 # ---------------------------------------------------------------------------
-def set_random_seed(seed):
-    """
-    Sets random seed for deterministic outcome of ML-trained models
-    """
-    torch.manual_seed(seed)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed_all(seed)
-
-
-# ---------------------------------------------------------------------------
-def get_torch_device() -> torch.device:
-    """
-    Get device for torch
-
-    Returns:
-    `torch.device` either "cuda" or "cpu"
-    """
-
-    return torch.device('cuda') if torch.cuda.is_available() else torch.device(
-        'cpu')
-
-
-# ---------------------------------------------------------------------------
 class CustomHelpFormatter(argparse.ArgumentDefaultsHelpFormatter):
     """ Custom Argparse help formatter """
     def _get_help_string(self, action):
@@ -137,6 +115,140 @@ class CustomHelpFormatter(argparse.ArgumentDefaultsHelpFormatter):
                 parts.append('%s' % option_string)
             parts[-1] += ' %s' % args_string
         return ', '.join(parts)
+
+
+# ---------------------------------------------------------------------------
+class Splits(NamedTuple):
+    """
+    Training, validation, and test dataframes
+
+    `train`: Training data
+    `val`: Validation data
+    `test`: Test data
+    """
+    train: pd.DataFrame
+    val: pd.DataFrame
+    test: pd.DataFrame
+
+
+# ---------------------------------------------------------------------------
+class Settings(NamedTuple):
+    """
+    Settings used for model training
+
+    `model`: Pretrained model
+    `optimizer`: Training optimizer
+    `train_dataloader`: `DataLoader` of training data
+    `val_dataloader`: `DataLoader` of validation data
+    `lr_scheduler`: Learning rate schedule (optional)
+    `num_epochs`: Maximum number of training epochs
+    `num_training_steps`: Maximum number of training steps
+    (`num_epochs` * `num_training`)
+    `device`: Torch device
+    """
+
+    model: Any
+    optimizer: AdamW
+    train_dataloader: DataLoader
+    val_dataloader: DataLoader
+    lr_scheduler: Any
+    num_epochs: int
+    num_training_steps: int
+    device: torch.device
+
+
+# ---------------------------------------------------------------------------
+class Metrics(NamedTuple):
+    """
+    Performance metrics
+
+    `precision`: Model precision
+    `recall`: Model recall
+    `f1`: Model F1 score
+    `loss`: Model loss
+    """
+
+    precision: float
+    recall: float
+    f1: float
+    loss: float
+
+
+# ---------------------------------------------------------------------------
+def set_random_seed(seed):
+    """
+    Sets random seed for deterministic outcome of ML-trained models
+    """
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+
+
+# ---------------------------------------------------------------------------
+def get_torch_device() -> torch.device:
+    """
+    Get device for torch
+
+    Returns:
+    `torch.device` either "cuda" or "cpu"
+    """
+
+    return torch.device('cuda') if torch.cuda.is_available() else torch.device(
+        'cpu')
+
+
+# ---------------------------------------------------------------------------
+def split_df(df: pd.DataFrame, rand_seed: bool, splits: List[float]) -> Splits:
+    """
+    Split manually curated data into train, validation and test sets
+
+    `df`: Manually curated classification data
+    `rand_seed`: Optionally use random seed
+    `splits`: Proportions of data for [train, validation, test]
+
+    Return:
+    train, validation, test dataframes
+    """
+
+    seed = 241 if rand_seed else None
+
+    _, val_split, test_split = splits
+    val_test_split = val_split + test_split
+
+    train, val_test = train_test_split(df,
+                                       test_size=val_test_split,
+                                       random_state=seed)
+    val, test = train_test_split(val_test,
+                                 test_size=test_split / val_test_split,
+                                 random_state=seed)
+
+    return Splits(train, val, test)
+
+
+# ---------------------------------------------------------------------------
+def test_random_split(unsplit_data: pd.DataFrame) -> None:
+    """ Test that split_df() gives correct proportions """
+
+    in_df = unsplit_data
+
+    train, val, test = split_df(in_df, False, [0.5, 0.25, 0.25])
+
+    assert len(train.index) == 4
+    assert len(val.index) == 2
+    assert len(test.index) == 2
+
+
+# ---------------------------------------------------------------------------
+def test_seeded_split(unsplit_data: pd.DataFrame) -> None:
+    """ Test that split_df() behaves deterministically """
+
+    in_df = unsplit_data
+
+    train, val, test = split_df(in_df, True, [0.5, 0.25, 0.25])
+
+    assert list(train['id'].values) == [321, 789, 741, 654]
+    assert list(val['id'].values) == [987, 456]
+    assert list(test['id'].values) == [852, 123]
 
 
 # ---------------------------------------------------------------------------
@@ -348,60 +460,3 @@ def save_loss_plot(train_losses: List[float], val_losses: List[float],
                   title='Train and Validation Losses')
 
     fig.write_image(filename)
-
-
-# ---------------------------------------------------------------------------
-class Splits(NamedTuple):
-    """
-    Training, validation, and test dataframes
-
-    `train`: Training data
-    `val`: Validation data
-    `test`: Test data
-    """
-    train: pd.DataFrame
-    val: pd.DataFrame
-    test: pd.DataFrame
-
-
-# ---------------------------------------------------------------------------
-class Settings(NamedTuple):
-    """
-    Settings used for model training
-
-    `model`: Pretrained model
-    `optimizer`: Training optimizer
-    `train_dataloader`: `DataLoader` of training data
-    `val_dataloader`: `DataLoader` of validation data
-    `lr_scheduler`: Learning rate schedule (optional)
-    `num_epochs`: Maximum number of training epochs
-    `num_training_steps`: Maximum number of training steps
-    (`num_epochs` * `num_training`)
-    `device`: Torch device
-    """
-
-    model: Any
-    optimizer: AdamW
-    train_dataloader: DataLoader
-    val_dataloader: DataLoader
-    lr_scheduler: Any
-    num_epochs: int
-    num_training_steps: int
-    device: torch.device
-
-
-# ---------------------------------------------------------------------------
-class Metrics(NamedTuple):
-    """
-    Performance metrics
-
-    `precision`: Model precision
-    `recall`: Model recall
-    `f1`: Model F1 score
-    `loss`: Model loss
-    """
-
-    precision: float
-    recall: float
-    f1: float
-    loss: float
