@@ -6,6 +6,7 @@ Authors: Ana-Maria Istrate and Kenneth Schackart
 
 import argparse
 import os
+import string
 from typing import NamedTuple, TextIO
 
 import pandas as pd
@@ -145,9 +146,9 @@ def predict_sequence(model, device: torch.device, seq: str,
                     entry = {
                         'label': running_tag,
                         'prob': running_pred,
-                        'word': running_word,
-                        'start': running_start,
-                        'end': running_end
+                        'word': running_word  #,
+                        # 'start': running_start,
+                        # 'end': running_end
                     }
                     word2tag.append(entry)
                 running_start = start
@@ -159,12 +160,11 @@ def predict_sequence(model, device: torch.device, seq: str,
             entry = {
                 'label': running_tag,
                 'prob': running_pred,
-                'word': running_word,
-                'start': running_start,
-                'end': running_end
+                'word': running_word  #,
+                # 'start': running_start,
+                # 'end': running_end
             }
             word2tag.append(entry)
-            print(word2tag)
     return word2tag
 
 
@@ -176,30 +176,32 @@ def predict(model, tokenizer, inputs: pd.DataFrame, tag_dict: dict,
     all_IDs = []
     all_texts = []
     all_probs = []
-    all_offsets_start = []
-    all_offsets_end = []
-    for row in inputs.iterrows():
+    # all_offsets_start = []
+    # all_offsets_end = []
+    for _, row in inputs.iterrows():
         id = row['id']
         seq = row['title_abstract']
         predicted_labels = predict_sequence(model, device, seq, tokenizer)
         num_preds = len(predicted_labels)
-        mentions = [x['word'] for x in predicted_labels]
+        mentions = [
+            x['word'].strip(string.punctuation) for x in predicted_labels
+        ]
         probs = [x['prob'] for x in predicted_labels]
-        offsets_start = [x['start'] for x in predicted_labels]
-        offsets_end = [x['end'] for x in predicted_labels]
+        # offsets_start = [x['start'] for x in predicted_labels]
+        # offsets_end = [x['end'] for x in predicted_labels]
         all_preds.extend(mentions)
         all_IDs.extend([id] * num_preds)
         all_texts.extend([seq] * num_preds)
         all_probs.extend(probs)
-        all_offsets_start.extend(offsets_start)
-        all_offsets_end.extend(offsets_end)
+        # all_offsets_start.extend(offsets_start)
+        # all_offsets_end.extend(offsets_end)
     pred_df = pd.DataFrame({
         'ID': all_IDs,
         'text': all_texts,
         'mention': all_preds,
-        'prob': all_probs,
-        'start_offset': all_offsets_start,
-        'end_offset': all_offsets_end
+        'prob': all_probs  #,
+        # 'start_offset': all_offsets_start,
+        # 'end_offset': all_offsets_end
     })
 
     return pred_df
@@ -306,7 +308,7 @@ def main() -> None:
     if not os.path.isdir(args.out_dir):
         os.makedirs(args.out_dir)
 
-    out_file = os.path.join(args.out_dir, args.out_file)
+    out_file = os.path.join(args.out_dir, 'predictions.csv')
 
     model_name = MODEL_TO_HUGGINGFACE_VERSION[args.model_name]
 
