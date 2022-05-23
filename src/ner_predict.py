@@ -11,11 +11,14 @@ from typing import NamedTuple, TextIO
 
 import pandas as pd
 import torch
+from pandas.testing import assert_frame_equal
 from transformers import AutoModelForTokenClassification, AutoTokenizer
 from transformers.tokenization_utils import PreTrainedTokenizer
-from pandas.testing import assert_frame_equal
+
 from utils import (ID2NER_TAG, MODEL_TO_HUGGINGFACE_VERSION, NER_TAG2ID,
                    CustomHelpFormatter, get_torch_device, preprocess_data)
+
+pd.options.mode.chained_assignment = None
 
 
 # ---------------------------------------------------------------------------
@@ -220,11 +223,8 @@ def deduplicate(df: pd.DataFrame) -> pd.DataFrame:
 
     for _, mention in df.groupby(['ID', 'mention']):
         mention.reset_index(inplace=True, drop=True)
-        new_row = pd.DataFrame([[
-            mention['ID'][0], mention['text'][0], mention['mention'][0],
-            mention['prob'].max()
-        ]],
-                               columns=df.columns)
+        new_row = mention.head(1)
+        new_row['prob'] = mention['prob'].max()
         out_df = pd.concat([out_df, new_row])
 
     out_df.reset_index(inplace=True, drop=True)
