@@ -175,12 +175,11 @@ def predict_sequence(model, device: torch.device, seq: str,
 def predict(model, tokenizer, inputs: pd.DataFrame, tag_dict: dict,
             device: torch.device):
 
+    all_labels = []
     all_preds = []
     all_IDs = []
     all_texts = []
     all_probs = []
-    # all_offsets_start = []
-    # all_offsets_end = []
     for _, row in inputs.iterrows():
         id = row['id']
         seq = row['title_abstract']
@@ -189,22 +188,19 @@ def predict(model, tokenizer, inputs: pd.DataFrame, tag_dict: dict,
         mentions = [
             x['word'].strip(string.punctuation) for x in predicted_labels
         ]
+        labels = [x['label'][2:] for x in predicted_labels]
         probs = [x['prob'] for x in predicted_labels]
-        # offsets_start = [x['start'] for x in predicted_labels]
-        # offsets_end = [x['end'] for x in predicted_labels]
+        all_labels.extend(labels)
         all_preds.extend(mentions)
         all_IDs.extend([id] * num_preds)
         all_texts.extend([seq] * num_preds)
         all_probs.extend(probs)
-        # all_offsets_start.extend(offsets_start)
-        # all_offsets_end.extend(offsets_end)
     pred_df = pd.DataFrame({
         'ID': all_IDs,
         'text': all_texts,
         'mention': all_preds,
-        'prob': all_probs  #,
-        # 'start_offset': all_offsets_start,
-        # 'end_offset': all_offsets_end
+        'label': all_labels,
+        'prob': all_probs
     })
 
     return pred_df
@@ -222,10 +218,9 @@ def deduplicate(df: pd.DataFrame) -> pd.DataFrame:
     out_df = pd.DataFrame(columns=df.columns)
 
     for _, mention in df.groupby(['ID', 'mention']):
-        mention.reset_index(inplace=True, drop=True)
-        new_row = mention.head(1)
-        new_row['prob'] = mention['prob'].max()
-        out_df = pd.concat([out_df, new_row])
+        mention = mention.reset_index(drop=True).sort_values('prob',
+                                                             ascending=False)
+        out_df = pd.concat([out_df, mention.head(1)])
 
     out_df.reset_index(inplace=True, drop=True)
 
@@ -237,26 +232,35 @@ def test_deduplicate() -> None:
     """ Test deduplicate() """
 
     in_df = pd.DataFrame([
-        [123, 'SAVI Synthetically Accessible Virtual Inventory', 'SAVI', 0.98],
+        [
+            123, 'SAVI Synthetically Accessible Virtual Inventory', 'SAVI',
+            'B-COM', 0.98
+        ],
         [
             123, 'SAVI Synthetically Accessible Virtual Inventory',
-            'Synthetically Accessible Virtual Inventory', 0.64
+            'Synthetically Accessible Virtual Inventory', 'B-FUL', 0.64
         ],
-        [456, 'PANTHER PANTHER PANTHER', 'PANTHER', 0.67],
-        [456, 'PANTHER PANTHER PANTHER', 'PANTHER', 0.95],
-        [456, 'PANTHER PANTHER PANTHER', 'PANTHER', 0.55],
+        [456, 'PANTHER PANTHER PANTHER', 'PANTHER', 'B-COM', 0.67],
+        [456, 'PANTHER PANTHER PANTHER', 'PANTHER', 'B-COM', 0.95],
+        [456, 'PANTHER PANTHER PANTHER', 'PANTHER', 'B-COM', 0.55],
+        [789, 'MicrobPad MD (MicrobPad)', 'MicrobPad', 'B-FUL', 0.54],
+        [789, 'MicrobPad MD (MicrobPad)', 'MicrobPad', 'B-COM', 0.96],
     ],
-                         columns=['ID', 'text', 'mention', 'prob'])
+                         columns=['ID', 'text', 'mention', 'label', 'prob'])
 
     out_df = pd.DataFrame([
-        [123, 'SAVI Synthetically Accessible Virtual Inventory', 'SAVI', 0.98],
+        [
+            123, 'SAVI Synthetically Accessible Virtual Inventory', 'SAVI',
+            'B-COM', 0.98
+        ],
         [
             123, 'SAVI Synthetically Accessible Virtual Inventory',
-            'Synthetically Accessible Virtual Inventory', 0.64
+            'Synthetically Accessible Virtual Inventory', 'B-FUL', 0.64
         ],
-        [456, 'PANTHER PANTHER PANTHER', 'PANTHER', 0.95],
+        [456, 'PANTHER PANTHER PANTHER', 'PANTHER', 'B-COM', 0.95],
+        [789, 'MicrobPad MD (MicrobPad)', 'MicrobPad', 'B-COM', 0.96],
     ],
-                          columns=['ID', 'text', 'mention', 'prob'])
+                          columns=['ID', 'text', 'mention', 'label', 'prob'])
 
     assert_frame_equal(deduplicate(in_df), out_df, check_dtype=False)
 
