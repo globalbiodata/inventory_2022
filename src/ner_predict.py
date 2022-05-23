@@ -13,7 +13,7 @@ import pandas as pd
 import torch
 from transformers import AutoModelForTokenClassification, AutoTokenizer
 from transformers.tokenization_utils import PreTrainedTokenizer
-
+from pandas.testing import assert_frame_equal
 from utils import (ID2NER_TAG, MODEL_TO_HUGGINGFACE_VERSION, NER_TAG2ID,
                    CustomHelpFormatter, get_torch_device, preprocess_data)
 
@@ -207,6 +207,60 @@ def predict(model, tokenizer, inputs: pd.DataFrame, tag_dict: dict,
     return pred_df
 
 
+# ---------------------------------------------------------------------------
+def deduplicate(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Deduplicate predicted entities, keeping only highest probability for each
+    predicted named entity
+
+    df: Predicted entities dataframe
+    """
+
+    out_df = pd.DataFrame(columns=df.columns)
+
+    for _, mention in df.groupby(['ID', 'mention']):
+        mention.reset_index(inplace=True, drop=True)
+        new_row = pd.DataFrame([[
+            mention['ID'][0], mention['text'][0], mention['mention'][0],
+            mention['prob'].max()
+        ]],
+                               columns=df.columns)
+        out_df = pd.concat([out_df, new_row])
+
+    out_df.reset_index(inplace=True, drop=True)
+
+    return out_df
+
+
+# ---------------------------------------------------------------------------
+def test_deduplicate() -> None:
+    """ Test deduplicate() """
+
+    in_df = pd.DataFrame([
+        [123, 'SAVI Synthetically Accessible Virtual Inventory', 'SAVI', 0.98],
+        [
+            123, 'SAVI Synthetically Accessible Virtual Inventory',
+            'Synthetically Accessible Virtual Inventory', 0.64
+        ],
+        [456, 'PANTHER PANTHER PANTHER', 'PANTHER', 0.67],
+        [456, 'PANTHER PANTHER PANTHER', 'PANTHER', 0.95],
+        [456, 'PANTHER PANTHER PANTHER', 'PANTHER', 0.55],
+    ],
+                         columns=['ID', 'text', 'mention', 'prob'])
+
+    out_df = pd.DataFrame([
+        [123, 'SAVI Synthetically Accessible Virtual Inventory', 'SAVI', 0.98],
+        [
+            123, 'SAVI Synthetically Accessible Virtual Inventory',
+            'Synthetically Accessible Virtual Inventory', 0.64
+        ],
+        [456, 'PANTHER PANTHER PANTHER', 'PANTHER', 0.95],
+    ],
+                          columns=['ID', 'text', 'mention', 'prob'])
+
+    assert_frame_equal(deduplicate(in_df), out_df, check_dtype=False)
+
+
 # # ---------------------------------------------------------------------------
 # class NERPredictor():
 #     """
@@ -316,7 +370,8 @@ def main() -> None:
 
     model, tokenizer = get_model(model_name, args.checkpoint, device)
 
-    predictions = predict(model, tokenizer, input_df, ID2NER_TAG, device)
+    predictions = deduplicate(
+        predict(model, tokenizer, input_df, ID2NER_TAG, device))
 
     print(predictions[:20])
 
