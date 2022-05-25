@@ -52,6 +52,20 @@ class SeqPrediction(NamedTuple):
 
 
 # ---------------------------------------------------------------------------
+class NamedEntity(NamedTuple):
+    """
+    Predicted named entity
+
+    `string`: String predicted to be a named entity
+    `label`: Predicted label
+    `prob`: Probability of predicted label
+    """
+    string: str
+    label: str
+    prob: float
+
+
+# ---------------------------------------------------------------------------
 def get_args() -> Args:
     """ Parse command-line arguments """
 
@@ -130,7 +144,7 @@ def get_model(model_name: str, checkpoint_fh: TextIO, device: torch.device):
 
 
 # ---------------------------------------------------------------------------
-def convert_predictions(seq_preds: SeqPrediction):
+def convert_predictions(seq_preds: SeqPrediction) -> List[NamedEntity]:
     """
     Convert raw predictions to meaningful predictions
     """
@@ -162,11 +176,7 @@ def convert_predictions(seq_preds: SeqPrediction):
         elif tag[0] == 'B' or tag[0] == 'O':
             if running_start is not None and running_tag != 'O':
                 running_word = seq[running_start:running_end]
-                entry = {
-                    'label': running_tag,
-                    'prob': running_pred,
-                    'word': running_word
-                }
+                entry = NamedEntity(running_word, running_tag, running_pred)
                 word2tag.append(entry)
             running_start = start
             running_end = end
@@ -174,11 +184,7 @@ def convert_predictions(seq_preds: SeqPrediction):
             running_pred = prob
     running_word = seq[running_start:running_end]
     if len(running_word) > 0 and running_tag != 'O':
-        entry = {
-            'label': running_tag,
-            'prob': running_pred,
-            'word': running_word
-        }
+        entry = NamedEntity(running_word, running_tag, running_pred)
         word2tag.append(entry)
     return word2tag
 
@@ -211,15 +217,11 @@ def test_convert_predictions() -> None:
 
     seq_preds = SeqPrediction(seq, word_ids, word_locs, preds, probs)
 
-    expected = [{
-        'label': 'B-COM',
-        'prob': 0.9914267,
-        'word': 'ALCOdb:'
-    }, {
-        'label': 'B-FUL',
-        'prob': 0.98841196,
-        'word': 'Gene Coexpression Database for Microalgae.'
-    }]
+    expected = [
+        NamedEntity('ALCOdb:', 'B-COM', 0.9914267),
+        NamedEntity('Gene Coexpression Database for Microalgae.', 'B-FUL',
+                    0.98841196)
+    ]
 
     assert convert_predictions(seq_preds) == expected
 
@@ -263,10 +265,10 @@ def predict(model, tokenizer, inputs: pd.DataFrame, tag_dict: dict,
         predicted_labels = predict_sequence(model, device, seq, tokenizer)
         num_preds = len(predicted_labels)
         mentions = [
-            x['word'].strip(string.punctuation) for x in predicted_labels
+            x.string.strip(string.punctuation) for x in predicted_labels
         ]
-        labels = [x['label'][2:] for x in predicted_labels]
-        probs = [x['prob'] for x in predicted_labels]
+        labels = [x.label[2:] for x in predicted_labels]
+        probs = [x.prob for x in predicted_labels]
         all_labels.extend(labels)
         all_preds.extend(mentions)
         all_IDs.extend([id] * num_preds)
