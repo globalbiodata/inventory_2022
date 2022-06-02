@@ -57,15 +57,15 @@ class LabeledSentence(NamedTuple):
 def get_args() -> Args:
     """ Parse command-line arguments """
 
-    parser = argparse.ArgumentParser(
-        description='Split curated classification data.',
-        formatter_class=CustomHelpFormatter)
+    parser = argparse.ArgumentParser(description='Split curated NER data.',
+                                     formatter_class=CustomHelpFormatter)
 
-    parser.add_argument('infile',
-                        metavar='FILE',
-                        type=argparse.FileType('rt', encoding='ISO-8859-1'),
-                        default='data/manual_ner_extraction.csv',
-                        help='Manually classified input file')
+    parser.add_argument(
+        'infile',
+        metavar='FILE',
+        # type=argparse.FileType('rt', encoding='ISO-8859-1'),
+        default='data/manual_ner_extraction.csv',
+        help='Manually curated input file')
     parser.add_argument('-o',
                         '--outdir',
                         metavar='',
@@ -539,7 +539,7 @@ def main() -> None:
     if not os.path.isdir(out_dir):
         os.makedirs(out_dir)
 
-    df = pd.read_csv(args.infile, )
+    df = pd.read_csv(args.infile)
 
     check_input(df)
 
@@ -554,7 +554,7 @@ def main() -> None:
         lambda f: os.path.join(out_dir, f),
         ['train_ner.csv', 'val_ner.csv', 'test_ner.csv'])
 
-    raw_train.to_csv(raw_train_out, index=False)
+    raw_train.to_csv(raw_train_out, index=False, encoding='utf-8')
     raw_val.to_csv(raw_val_out, index=False)
     raw_test.to_csv(raw_test_out, index=False)
 
