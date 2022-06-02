@@ -170,7 +170,7 @@ def train(settings: Settings) -> Tuple:
     """
 
     model = settings.model
-    model.train()
+    # model.train()
     progress_bar = tqdm(range(settings.num_training_steps))
     best_model = model
     train_losses = []
@@ -181,7 +181,8 @@ def train(settings: Settings) -> Tuple:
 
     for epoch in range(settings.num_epochs):
 
-        train_loss, model = train_epoch(model, settings, progress_bar)
+        model.train()
+        train_loss = train_epoch(model, settings, progress_bar)
 
         model.eval()
         train_metrics = get_metrics(model, settings.train_dataloader,
@@ -226,8 +227,7 @@ def train(settings: Settings) -> Tuple:
 
 
 # ---------------------------------------------------------------------------
-def train_epoch(model, settings: Settings,
-                progress_bar: tqdm) -> Tuple[float, Any]:
+def train_epoch(model, settings: Settings, progress_bar: tqdm) -> float:
     """
     Perform one epoch of model training
 
@@ -251,7 +251,7 @@ def train_epoch(model, settings: Settings,
             settings.lr_scheduler.step()
         settings.optimizer.zero_grad()
         progress_bar.update(1)
-    return train_loss / num_train, copy.deepcopy(model)
+    return train_loss / num_train
 
 
 # ---------------------------------------------------------------------------
