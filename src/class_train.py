@@ -287,14 +287,14 @@ def get_metrics(model: Any, dataloader: DataLoader,
         total_loss += outputs.loss.item()
     total_loss /= num_seen_datapoints
 
-    if not all([(precision := cast(dict, calc_precision.compute())),
-                (recall := cast(dict, calc_recall.compute())),
-                (f1 := cast(dict, calc_f1.compute()))]):
-        sys.exit('Unable to calculate metrics.')
+    # if not all([(precision := cast(dict, calc_precision.compute())),
+    #             (recall := cast(dict, calc_recall.compute())),
+    #             (f1 := cast(dict, calc_f1.compute()))]):
+    #     sys.exit('Unable to calculate metrics.')
 
-    # precision = cast(dict, calc_precision.compute())
-    # recall = cast(dict, calc_recall.compute())
-    # f1 = cast(dict, calc_f1.compute())
+    precision = cast(dict, calc_precision.compute())
+    recall = cast(dict, calc_recall.compute())
+    f1 = cast(dict, calc_f1.compute())
 
     return Metrics(precision['precision'], recall['recall'], f1['f1'],
                    total_loss)
