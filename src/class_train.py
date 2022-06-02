@@ -181,8 +181,7 @@ def train(settings: Settings) -> Tuple:
 
     for epoch in range(settings.num_epochs):
 
-        train_loss, settings = train_epoch(settings, progress_bar)
-        model = settings.model
+        train_loss, model = train_epoch(model, settings, progress_bar)
 
         model.eval()
         train_metrics = get_metrics(model, settings.train_dataloader,
@@ -227,8 +226,8 @@ def train(settings: Settings) -> Tuple:
 
 
 # ---------------------------------------------------------------------------
-def train_epoch(settings: Settings,
-                progress_bar: tqdm) -> Tuple[float, Settings]:
+def train_epoch(model, settings: Settings,
+                progress_bar: tqdm) -> Tuple[float, Any]:
     """
     Perform one epoch of model training
 
@@ -243,7 +242,7 @@ def train_epoch(settings: Settings,
     for batch in settings.train_dataloader:
         batch = {k: v.to(settings.device) for k, v in batch.items()}
         num_train += len(batch['input_ids'])
-        outputs = settings.model(**batch)
+        outputs = model(**batch)
         loss = outputs.loss
         loss.backward()
         train_loss += loss.item()
@@ -252,7 +251,7 @@ def train_epoch(settings: Settings,
             settings.lr_scheduler.step()
         settings.optimizer.zero_grad()
         progress_bar.update(1)
-    return train_loss / num_train, settings
+    return train_loss / num_train, model
 
 
 # ---------------------------------------------------------------------------
