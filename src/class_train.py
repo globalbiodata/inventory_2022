@@ -251,7 +251,7 @@ def train_epoch(model, settings: Settings,
             settings.lr_scheduler.step()
         settings.optimizer.zero_grad()
         progress_bar.update(1)
-    return train_loss / num_train, model
+    return train_loss / num_train, copy.deepcopy(model)
 
 
 # ---------------------------------------------------------------------------
