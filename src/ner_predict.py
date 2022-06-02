@@ -322,25 +322,23 @@ def deduplicate(df: pd.DataFrame) -> pd.DataFrame:
 def test_deduplicate() -> None:
     """ Test deduplicate() """
 
-    in_df = pd.DataFrame([
-        [
+    in_df = pd.DataFrame(
+        [[
             123, 'SAVI Synthetically Accessible Virtual Inventory', 'SAVI',
             'B-COM', 0.98
         ],
-        [
-            123, 'SAVI Synthetically Accessible Virtual Inventory',
-            'Synthetically Accessible Virtual Inventory', 'B-FUL', 0.64
-        ],
-        [456, 'PANTHER PANTHER PANTHER', 'PANTHER', 'B-COM', 0.67],
-        [456, 'PANTHER PANTHER PANTHER', 'PANTHER', 'B-COM', 0.95],
-        [456, 'PANTHER PANTHER PANTHER', 'PANTHER', 'B-COM', 0.55],
-        [789, 'MicrobPad MD (MicrobPad)', 'MicrobPad', 'B-FUL', 0.54],
-        [789, 'MicrobPad MD (MicrobPad)', 'MicrobPad', 'B-COM', 0.96],
-        [147, 'Chewie-NS Chewie-NS chewie-NS', 'Chewie-NS', 'B-COM', 0.88],
-        [147, 'Chewie-NS Chewie-NS chewie-NS', 'Chewie-NS', 'B-COM', 0.72],
-        [147, 'Chewie-NS Chewie-NS chewie-NS', 'chewie-NS', 'B-COM', 0.92],
-    ],
-                         columns=['ID', 'text', 'mention', 'label', 'prob'])
+         [
+             123, 'SAVI Synthetically Accessible Virtual Inventory',
+             'Synthetically Accessible Virtual Inventory', 'B-FUL', 0.64
+         ], [456, 'PANTHER PANTHER PANTHER', 'PANTHER', 'B-COM', 0.67],
+         [456, 'PANTHER PANTHER PANTHER', 'PANTHER', 'B-COM', 0.95],
+         [456, 'PANTHER PANTHER PANTHER', 'PANTHER', 'B-COM', 0.55],
+         [789, 'MicrobPad MD (MicrobPad)', 'MicrobPad', 'B-FUL', 0.54],
+         [789, 'MicrobPad MD (MicrobPad)', 'MicrobPad', 'B-COM', 0.96],
+         [147, 'Chewie-NS Chewie-NS chewie-NS', 'Chewie-NS', 'B-COM', 0.88],
+         [147, 'Chewie-NS Chewie-NS chewie-NS', 'Chewie-NS', 'B-COM', 0.72],
+         [147, 'Chewie-NS Chewie-NS chewie-NS', 'chewie-NS', 'B-COM', 0.92]],
+        columns=['ID', 'text', 'mention', 'label', 'prob'])
 
     out_df = pd.DataFrame(
         [[
