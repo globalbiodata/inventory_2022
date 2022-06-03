@@ -10,7 +10,6 @@ import sys
 from typing import List, NamedTuple, TextIO
 
 import pandas as pd
-import pytest
 from pandas.testing import assert_frame_equal
 
 from utils import CustomHelpFormatter, split_df
@@ -30,24 +29,6 @@ class Args(NamedTuple):
     outdir: str
     splits: List[float]
     seed: bool
-
-
-# ---------------------------------------------------------------------------
-@pytest.fixture(name='unsplit_data')
-def fixture_unsplit_data() -> pd.DataFrame:
-    """ Example dataframe for testing splitting function """
-
-    df = pd.DataFrame([[123, 'First title', 'First abstract', 0],
-                       [456, 'Second title', 'Second abstract', 1],
-                       [789, 'Third title', 'Third abstract', 0],
-                       [321, 'Fourth title', 'Fourth abstract', 1],
-                       [654, 'Fifth title', 'Fifth abstract', 0],
-                       [987, 'Sixth title', 'Sixth abstract', 1],
-                       [741, 'Seventh title', 'Seventh abstract', 0],
-                       [852, 'Eighth title', 'Eighth abstract', 1]],
-                      columns=['id', 'title', 'abstract', 'curation_score'])
-
-    return df
 
 
 # ---------------------------------------------------------------------------
@@ -85,8 +66,7 @@ def get_args() -> Args:
     if not sum(args.splits) == 1.0:
         parser.error(f'--splits {args.splits} must sum to 1')
 
-    return Args(args.infile, args.outdir,
-                args.splits, args.seed)
+    return Args(args.infile, args.outdir, args.splits, args.seed)
 
 
 # ---------------------------------------------------------------------------

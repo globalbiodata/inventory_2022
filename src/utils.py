@@ -12,6 +12,7 @@ from typing import Any, List, NamedTuple, TextIO, Tuple
 
 import pandas as pd
 import plotly.express as px
+import pytest
 import torch
 from pandas.testing import assert_frame_equal
 from sklearn.model_selection import train_test_split
@@ -223,6 +224,24 @@ def split_df(df: pd.DataFrame, rand_seed: bool, splits: List[float]) -> Splits:
                                  random_state=seed)
 
     return Splits(train, val, test)
+
+
+# ---------------------------------------------------------------------------
+@pytest.fixture(name='unsplit_data')
+def fixture_unsplit_data() -> pd.DataFrame:
+    """ Example dataframe for testing splitting function """
+
+    df = pd.DataFrame([[123, 'First title', 'First abstract', 0],
+                       [456, 'Second title', 'Second abstract', 1],
+                       [789, 'Third title', 'Third abstract', 0],
+                       [321, 'Fourth title', 'Fourth abstract', 1],
+                       [654, 'Fifth title', 'Fifth abstract', 0],
+                       [987, 'Sixth title', 'Sixth abstract', 1],
+                       [741, 'Seventh title', 'Seventh abstract', 0],
+                       [852, 'Eighth title', 'Eighth abstract', 1]],
+                      columns=['id', 'title', 'abstract', 'curation_score'])
+
+    return df
 
 
 # ---------------------------------------------------------------------------
