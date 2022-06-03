@@ -85,7 +85,7 @@ def get_args() -> Args:
     if not sum(args.splits) == 1.0:
         parser.error(f'--splits {args.splits} must sum to 1')
 
-    return Args(args.infile, args.outdir, args.train, args.val, args.test,
+    return Args(args.infile, args.outdir,
                 args.splits, args.seed)
 
 
