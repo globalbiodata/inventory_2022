@@ -389,6 +389,8 @@ def preprocess_data(file: TextIO) -> pd.DataFrame:
         sys.exit(f'Data file {file.name} must contain columns '
                  'labeled "title" and "abstract".')
 
+    df.fillna('', inplace=True)
+
     for col in ['title', 'abstract']:
         df[col] = df[col].apply(strip_xml)
 
