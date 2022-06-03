@@ -422,11 +422,11 @@ def test_preprocess_data() -> None:
 
 # ---------------------------------------------------------------------------
 def make_filenames(out_dir: str, model_name: str) -> Tuple[str, str]:
-    """ Make output filenames """
+    """ Make output filename """
 
     partial_name = os.path.join(out_dir, model_name + '_')
 
-    return partial_name + 'checkpt.pt', partial_name + 'losses.png'
+    return partial_name + 'checkpt.pt', partial_name + 'train_stats.csv'
 
 
 # ---------------------------------------------------------------------------
@@ -434,27 +434,31 @@ def test_make_filenames() -> None:
     """ Test make_filenames """
 
     assert make_filenames('out', 'scibert') == ('out/scibert_checkpt.pt',
-                                                'out/scibert_losses.png')
+                                                'out/scibert_train_stats.csv')
 
 
 # ---------------------------------------------------------------------------
-def save_model(model: Any, epoch: int, f1: float, filename: str) -> None:
+def save_model(model: Any, filename: str) -> None:
     """
     Save model checkpoint, epoch, and F1 score to file
 
     Parameters:
     `model`: Model to save
-    `epoch`: Epochs used to train model
-    `f1`: F1 score obtained by model
     `filename`: Name of file for saving model
     """
 
-    torch.save(
-        {
-            'model_state_dict': model.state_dict(),
-            'epoch': epoch,
-            'f1_val': f1
-        }, filename)
+    torch.save({
+        'model_state_dict': model.state_dict(),
+    }, filename)
+
+
+# ---------------------------------------------------------------------------
+def save_train_stats(df: pd.DataFrame, filename: str) -> None:
+    """
+    Save training performance metrics to file
+    """
+
+    df.to_csv(filename, index=False)
 
 
 # ---------------------------------------------------------------------------

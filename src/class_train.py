@@ -7,9 +7,9 @@ Authors: Ana-Maria Istrate and Kenneth Schackart
 import argparse
 import copy
 import os
-import sys
 from typing import Any, List, NamedTuple, TextIO, Tuple, cast
 
+import pandas as pd
 import torch
 from datasets import load_metric
 from torch.utils.data.dataloader import DataLoader
@@ -19,7 +19,7 @@ from transformers import (AdamW, AutoModelForSequenceClassification,
 
 from class_data_handler import DataFields, RunParams, get_dataloader
 from utils import (MODEL_TO_HUGGINGFACE_VERSION, CustomHelpFormatter, Metrics,
-                   Settings, make_filenames, save_loss_plot, save_model)
+                   Settings, make_filenames, save_train_stats, save_model)
 
 
 # ---------------------------------------------------------------------------
@@ -161,7 +161,7 @@ def get_args():
 
 
 # ---------------------------------------------------------------------------
-def train(settings: Settings) -> Tuple:
+def train(settings: Settings) -> Tuple[Any, pd.DataFrame]:
     """
     Train the classifier
 
@@ -170,14 +170,14 @@ def train(settings: Settings) -> Tuple:
     """
 
     model = settings.model
-    # model.train()
     progress_bar = tqdm(range(settings.num_training_steps))
+    train_progress = pd.DataFrame(columns=[
+        'epoch', 'train_precision', 'train_recall', 'train_f1', 'train_loss',
+        'val_precision', 'val_recall', 'val_f1', 'val_loss'
+    ])
     best_model = model
-    train_losses = []
-    val_losses = []
     best_val = Metrics(0, 0, 0, 0)
     best_train = Metrics(0, 0, 0, 0)
-    best_epoch = 0
 
     for epoch in range(settings.num_epochs):
 
@@ -194,15 +194,24 @@ def train(settings: Settings) -> Tuple:
             best_val = val_metrics
             best_train = train_metrics
             best_model = copy.deepcopy(model)
-            best_epoch = epoch
 
         # Stop training once validation F1 goes down
         # Overfitting has begun
         if val_metrics.f1 < best_val.f1 and epoch > 0:
             break
 
-        train_losses.append(train_metrics.loss)
-        val_losses.append(val_metrics.loss)
+        epoch_row = {
+            'epoch': epoch,
+            'train_precision': train_metrics.precision,
+            'train_recall': train_metrics.recall,
+            'train_f1': train_metrics.f1,
+            'train_loss': train_metrics.loss,
+            'val_precision': val_metrics.precision,
+            'val_recall': val_metrics.recall,
+            'val_f1': val_metrics.f1,
+            'val_loss': val_metrics.loss
+        }
+        train_progress = train_progress.append(epoch_row)
 
         print(f'Epoch {epoch + 1}:\n'
               f'Train Loss: {train_loss:.5f}\n'
@@ -223,7 +232,7 @@ def train(settings: Settings) -> Tuple:
           f'Best Val Recall: {best_val.recall:.3f}\n'
           f'Best Val F1: {best_val.f1:.3f}\n')
 
-    return best_model, best_epoch, best_val.f1, train_losses, val_losses
+    return best_model, train_progress
 
 
 # ---------------------------------------------------------------------------
@@ -287,11 +296,6 @@ def get_metrics(model: Any, dataloader: DataLoader,
         calc_f1.add_batch(predictions=predictions, references=batch['labels'])
         total_loss += outputs.loss.item()
     total_loss /= num_seen_datapoints
-
-    # if not all([(precision := cast(dict, calc_precision.compute())),
-    #             (recall := cast(dict, calc_recall.compute())),
-    #             (f1 := cast(dict, calc_f1.compute()))]):
-    #     sys.exit('Unable to calculate metrics.')
 
     precision = cast(dict, calc_precision.compute())
     recall = cast(dict, calc_recall.compute())
@@ -377,11 +381,12 @@ def main() -> None:
     print('Starting model training...')
     print('=' * 30)
 
-    model, epoch, f1, train_losses, val_losses = train(settings)
+    model, train_stats_df = train(settings)
 
-    checkpt_filename, img_filename = make_filenames(out_dir, args.model_name)
-    save_model(model, epoch, f1, checkpt_filename)
-    save_loss_plot(train_losses, val_losses, img_filename)
+    checkpt_filename, train_stats_filename = make_filenames(
+        out_dir, args.model_name)
+    save_model(model, checkpt_filename)
+    save_train_stats(train_stats_df, train_stats_filename)
 
     print('Done. Saved best checkpoint to', checkpt_filename)
 
