@@ -53,7 +53,7 @@ def get_args() -> Args:
     inputs.add_argument('-i',
                         '--input-file',
                         metavar='FILE',
-                        type=argparse.FileType('rt'),
+                        type=argparse.FileType('rt', encoding='ISO-8859-1'),
                         default='data/val.csv',
                         help='Input file for prediction')
     inputs.add_argument('-o',
@@ -210,7 +210,7 @@ def main() -> None:
     class_labels = ClassLabel(num_classes=2, names=args.descriptive_labels)
 
     # Predict labels
-    df = pd.read_csv(open(args.infile.name))
+    df = pd.read_csv(open(args.infile.name, encoding='ISO-8859-1'))
     predicted_labels = predict(model, dataloader, class_labels, device)
     df['predicted_label'] = predicted_labels
 
