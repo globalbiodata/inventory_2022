@@ -2,7 +2,7 @@ rule all:
     input:
         expand(
             "{d}/{model}_checkpt.pt",
-            d=config["classif_checkpoint_dir"],
+            d=config["classif_train_outdir"],
             m=config["models"],
         ),
 
@@ -11,9 +11,9 @@ rule split_classif_data:
     input:
         config["classif_data"],
     output:
-        config["classif_splits_dir"]+"/train_paper_classif.csv",
-        config["classif_splits_dir"]+"/val_paper_classif.csv",
-        config["classif_splits_dir"]+"/test_paper_classif.csv",
+        config["classif_splits_dir"] + "/train_paper_classif.csv",
+        config["classif_splits_dir"] + "/val_paper_classif.csv",
+        config["classif_splits_dir"] + "/test_paper_classif.csv",
     params:
         out_dir=config["classif_splits_dir"],
     shell:
@@ -27,10 +27,11 @@ rule split_classif_data:
 
 rule train_classif:
     input:
-        train=config["classif_splits_dir"]+"/train_paper_classif.csv",
-        val=config["classif_splits_dir"]+"/val_paper_classif.csv",
+        train=config["classif_splits_dir"] + "/train_paper_classif.csv",
+        val=config["classif_splits_dir"] + "/val_paper_classif.csv",
     output:
         config["classif_train_outdir"] + "/{model}_checkpt.pt",
+        config["classif_train_outdir"] + "/{model}_train_stats.csv",
     params:
         out_dir=config["classif_train_outdir"],
         epochs=config["classif_epochs"],
@@ -50,13 +51,33 @@ rule train_classif:
         """
 
 
+rule find_best_classifier:
+    input:
+        expand(
+            "{d}/{model}_train_stats.csv",
+            d=config["classif_train_outdir"],
+            m=config["models"],
+        ),
+    output:
+        config["classif_train_outdir"] + "/combined/best_checkpt.pt",
+        config["classif_train_outdir"] + "/combined/combined_stats.csv",
+    params:
+        out_dir=config["classif_train_outdir"] + "/combined",
+    shell:
+        """
+        python3 model_picker.py \
+            -o {params.out_dir} \
+            {input}
+        """
+
+
 rule split_ner_data:
     input:
         config["ner_data"],
     output:
-        config["ner_splits_dir"]+"/train_ner.csv",
-        config["ner_splits_dir"]+"/val_ner.csv",
-        config["ner_splits_dir"]+"/test_ner.csv",
+        config["ner_splits_dir"] + "/train_ner.csv",
+        config["ner_splits_dir"] + "/val_ner.csv",
+        config["ner_splits_dir"] + "/test_ner.csv",
     params:
         out_dir=config["ner_splits_dir"],
     shell:
