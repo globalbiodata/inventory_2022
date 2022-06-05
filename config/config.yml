@@ -2,17 +2,22 @@
 project_env: './env'
 
 # Directories
-checkpoint_dir: 'out/checkpoints'
-benchmark_dir: 'out/benchmarks'
-log_dir: 'out/logs'
+## Classification
+classif_splits_dir: 'data/classif_splits'
+classif_train_outdir: 'out/classif_train_out'
+classif_benchmark_dir: 'out/benchmarks/classif'
+classif_log_dir: 'out/logs/classif'
+
+## NER
+ner_splits_dir: 'data/ner_splits'
+ner_checkpoint_dir: 'out/ner_checkpoints'
+
 
 # Input files
-train_data: 'data/train.csv'
-test_data: 'data/test.csv'
-val_data: 'data/val.csv'
+classif_data: 'data/manual_classifications.csv'
+ner_data: 'data/manual_ner_extraction.csv'
 
-### Parameters
-## train
+# Parameters
 # Models
 models:
   ['scibert']
@@ -23,8 +28,7 @@ models:
   #   ]
 
 # Number of epochs
-epochs:
-  ['10']
+classif_epochs: 10
 
 # Number of threads, each gets 5 Gb
 train_threads: 12
