@@ -19,7 +19,6 @@ graph TD
     pos --> ner(Manual named entity extraction)
     ner -- Name --> nertrain[(NER training set)]
     ner -- Description --> nertrain
-    ner -- URL --> nertrain
 ```
 
 ## Classifier Training
@@ -67,7 +66,7 @@ graph TD
 
 ## Inventory
 
-Once the classifier and NER models have been trained and selected, they are applied to the full corpus. Those papers that are classified as biodata resource by the trained classifier are passed to the trained NER model for extracting attributes of the resource such as title, URL, and description.
+Once the classifier and NER models have been trained and selected, they are applied to the full corpus. Those papers that are classified as biodata resource by the trained classifier are passed to the trained NER model for extracting attributes of the resource such as resource name and description. Other scripts will be used to glean other information, such as resource URLs, authors, country of origin, etc.
 
 ```mermaid
 graph TD
@@ -76,7 +75,12 @@ graph TD
     classifier --> neg[Negative]
     classifier --> pos[Positive]
     pos --> ner{{NER Model}}
-    ner --> attr[Resource Attributes]
+    pos --> regex(regex)
+    pos --> scrape(scraping)
+    ner -- name --> attr[Resource Information]
+    ner -- description --> attr
+    regex -- URL --> attr
+    scrape -- authors, country --> attr
 ```
 
 # Repository Structure
@@ -85,9 +89,7 @@ graph TD
 .
 ├── config/          # Workflow configuration files
 ├── data/            # Manual curation files and data splits
-├── src/
-|    ├── class/      # Scripts for classification
-|    └── ner/        # Scripts for NER
+├── src/             # Python scripts
 ├── tests/           # pytest scripts
 ├── .gitignore
 ├── LICENSE
