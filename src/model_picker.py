@@ -55,7 +55,7 @@ def get_args() -> Args:
 def get_model_name(filename: str) -> str:
     """
     Get model name from input file name
-    
+
     Parameters:
     `filename`: Input filename containing model name
     """
