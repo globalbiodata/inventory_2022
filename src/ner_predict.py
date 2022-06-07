@@ -275,7 +275,13 @@ def predict(model, tokenizer: PreTrainedTokenizer, inputs: pd.DataFrame,
         probs = [x.prob for x in predicted_labels]
         pred_df = pd.concat([
             pred_df,
-            [[row['id']] * num_preds, seq * num_preds, mentions, labels, probs]
+            pd.DataFrame({
+                'ID': [row['id']] * num_preds,
+                'text': seq * num_preds,
+                'mention': mentions,
+                'label': labels,
+                'prob': probs
+            }, index=[0])
         ])
 
     return pred_df
