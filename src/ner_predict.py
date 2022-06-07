@@ -152,6 +152,7 @@ def convert_predictions(seq_preds: SeqPrediction) -> List[NamedEntity]:
 
     seq = seq_preds.seq
     entities: List[NamedEntity] = []
+    began_entity = False
 
     for loc_id, span in seq_preds.word_locs.items():
         mask = [word_id == loc_id for word_id in seq_preds.word_ids]
@@ -159,22 +160,34 @@ def convert_predictions(seq_preds: SeqPrediction) -> List[NamedEntity]:
         probs = list(compress(seq_preds.probs, mask))
         substring = seq[span.start:span.end + 1]
         if any(label[0] == 'B' for label in labels):
+            began_entity = True
             label = list(
                 compress(labels, [label[0] == 'B' for label in labels]))[0]
-            prob = mean(probs)
-            entities.append(NamedEntity(substring, label, prob))
+            entities.append(NamedEntity(substring, label, mean(probs)))
             prob_count = len(probs)
-        if all(label[0] == 'I' for label in labels):
-            if seq_preds.word_locs[loc_id - 1].end == span.start:
-                substring = ''
-            last_entity = entities[-1]
-            prob = (last_entity.prob * prob_count + sum(probs)) / (prob_count +
-                                                                   len(probs))
-            prob_count += len(probs)
-            entities[-1] = NamedEntity(last_entity.string + substring,
-                                       last_entity.label, prob)
+        elif all(label[0] == 'I' for label in labels):
+            if len(labels) == 1 and not began_entity:
+                entities.append(
+                    NamedEntity(substring, labels.pop(), mean(probs)))
+            else:
+                if seq_preds.word_locs[loc_id - 1].end == span.start:
+                    substring = ''
+                last_entity = entities[-1]
+                prob = (last_entity.prob * prob_count +
+                        sum(probs)) / (prob_count + len(probs))
+                prob_count += len(probs)
+                entities[-1] = NamedEntity(last_entity.string + substring,
+                                           last_entity.label, prob)
+        else:
+            began_entity = False
 
-    return entities
+    out_entities = []
+
+    for entity in entities:
+        out_entities.append(
+            NamedEntity(entity.string.rstrip(), entity.label, entity.prob))
+
+    return out_entities
 
 
 # ---------------------------------------------------------------------------
@@ -209,6 +222,27 @@ def test_convert_predictions() -> None:
         NamedEntity('ALCOdb:', 'B-COM', 0.994609525),
         NamedEntity('Gene Coexpression Database for Microalgae.', 'B-FUL',
                     0.98376288)
+    ]
+
+    assert convert_predictions(seq_preds) == expected
+
+    seq = 'Inside outside inside inside'
+    word_ids = [0, 1, 2, 3]
+    word_locs = {
+        0: CharSpan(0, 6),
+        1: CharSpan(7, 14),
+        2: CharSpan(15, 21),
+        3: CharSpan(22, 27)
+    }
+    preds = ['I-COM', 'O', 'I-FUL', 'I-FUL']
+    probs = [0.996, 0.999, 0.998, 0.978]
+
+    seq_preds = SeqPrediction(seq, word_ids, word_locs, preds, probs)
+
+    expected = [
+        NamedEntity('Inside', 'I-COM', 0.996),
+        NamedEntity('inside', 'I-FUL', 0.998),
+        NamedEntity('inside', 'I-FUL', 0.978)
     ]
 
     assert convert_predictions(seq_preds) == expected
@@ -327,32 +361,32 @@ def test_deduplicate() -> None:
     in_df = pd.DataFrame(
         [[
             123, 'SAVI Synthetically Accessible Virtual Inventory', 'SAVI',
-            'B-COM', 0.98
+            'COM', 0.98
         ],
          [
              123, 'SAVI Synthetically Accessible Virtual Inventory',
-             'Synthetically Accessible Virtual Inventory', 'B-FUL', 0.64
-         ], [456, 'PANTHER PANTHER PANTHER', 'PANTHER', 'B-COM', 0.67],
-         [456, 'PANTHER PANTHER PANTHER', 'PANTHER', 'B-COM', 0.95],
-         [456, 'PANTHER PANTHER PANTHER', 'PANTHER', 'B-COM', 0.55],
-         [789, 'MicrobPad MD (MicrobPad)', 'MicrobPad', 'B-FUL', 0.54],
-         [789, 'MicrobPad MD (MicrobPad)', 'MicrobPad', 'B-COM', 0.96],
-         [147, 'Chewie-NS Chewie-NS chewie-NS', 'Chewie-NS', 'B-COM', 0.88],
-         [147, 'Chewie-NS Chewie-NS chewie-NS', 'Chewie-NS', 'B-COM', 0.72],
-         [147, 'Chewie-NS Chewie-NS chewie-NS', 'chewie-NS', 'B-COM', 0.92]],
+             'Synthetically Accessible Virtual Inventory', 'FUL', 0.64
+         ], [456, 'PANTHER PANTHER PANTHER', 'PANTHER', 'COM', 0.67],
+         [456, 'PANTHER PANTHER PANTHER', 'PANTHER', 'COM', 0.95],
+         [456, 'PANTHER PANTHER PANTHER', 'PANTHER', 'COM', 0.55],
+         [789, 'MicrobPad MD (MicrobPad)', 'MicrobPad', 'FUL', 0.54],
+         [789, 'MicrobPad MD (MicrobPad)', 'MicrobPad', 'COM', 0.96],
+         [147, 'Chewie-NS Chewie-NS chewie-NS', 'Chewie-NS', 'COM', 0.88],
+         [147, 'Chewie-NS Chewie-NS chewie-NS', 'Chewie-NS', 'COM', 0.72],
+         [147, 'Chewie-NS Chewie-NS chewie-NS', 'chewie-NS', 'COM', 0.92]],
         columns=['ID', 'text', 'mention', 'label', 'prob'])
 
     out_df = pd.DataFrame(
         [[
             123, 'SAVI Synthetically Accessible Virtual Inventory', 'SAVI',
-            'B-COM', 0.98
+            'COM', 0.98
         ],
          [
              123, 'SAVI Synthetically Accessible Virtual Inventory',
-             'Synthetically Accessible Virtual Inventory', 'B-FUL', 0.64
-         ], [147, 'Chewie-NS Chewie-NS chewie-NS', 'Chewie-NS', 'B-COM', 0.88],
-         [456, 'PANTHER PANTHER PANTHER', 'PANTHER', 'B-COM', 0.95],
-         [789, 'MicrobPad MD (MicrobPad)', 'MicrobPad', 'B-COM', 0.96]],
+             'Synthetically Accessible Virtual Inventory', 'FUL', 0.64
+         ], [147, 'Chewie-NS Chewie-NS chewie-NS', 'Chewie-NS', 'COM', 0.88],
+         [456, 'PANTHER PANTHER PANTHER', 'PANTHER', 'COM', 0.95],
+         [789, 'MicrobPad MD (MicrobPad)', 'MicrobPad', 'COM', 0.96]],
         columns=['ID', 'text', 'mention', 'label', 'prob'])
 
     assert_frame_equal(deduplicate(in_df), out_df, check_dtype=False)
@@ -388,11 +422,11 @@ def reformat_output(df: pd.DataFrame) -> pd.DataFrame:
 
     # Split mentions and probs to their own columns
     # and drop the unsplit columns
-    df2[['common_name', 'common_prob']] = pd.DataFrame(df2['B-COM'].tolist(),
+    df2[['common_name', 'common_prob']] = pd.DataFrame(df2['COM'].tolist(),
                                                        index=df2.index)
-    df2[['full_name', 'full_prob']] = pd.DataFrame(df2['B-FUL'].tolist(),
+    df2[['full_name', 'full_prob']] = pd.DataFrame(df2['FUL'].tolist(),
                                                    index=df2.index)
-    df2.drop(['B-COM', 'B-FUL'], inplace=True, axis='columns')
+    df2.drop(['COM', 'FUL'], inplace=True, axis='columns')
 
     # Convert lists of multiple mentions to string with commas between
     for col in [c for c in list(df2.columns) if c not in ['ID', 'text']]:
@@ -410,15 +444,15 @@ def test_reformat_output() -> None:
     in_df = pd.DataFrame(
         [[
             123, 'SAVI Synthetically Accessible Virtual Inventory', 'SAVI',
-            'B-COM', 0.98
+            'COM', 0.98
         ],
          [
              123, 'SAVI Synthetically Accessible Virtual Inventory',
-             'Synthetically Accessible Virtual Inventory', 'B-FUL', 0.64
-         ], [147, 'Chewie-NS Chewie-NS chewie-NS', 'Chewie-NS', 'B-COM', 0.88],
-         [456, 'PANTHER PANTHER LION', 'PANTHER', 'B-COM', 0.95],
-         [456, 'PANTHER PANTHER LION', 'LION', 'B-COM', 0.92],
-         [789, 'MicrobPad MD (MicrobPad)', 'MicrobPad', 'B-COM', 0.96]],
+             'Synthetically Accessible Virtual Inventory', 'FUL', 0.64
+         ], [147, 'Chewie-NS Chewie-NS chewie-NS', 'Chewie-NS', 'COM', 0.88],
+         [456, 'PANTHER PANTHER LION', 'PANTHER', 'COM', 0.95],
+         [456, 'PANTHER PANTHER LION', 'LION', 'COM', 0.92],
+         [789, 'MicrobPad MD (MicrobPad)', 'MicrobPad', 'COM', 0.96]],
         columns=['ID', 'text', 'mention', 'label', 'prob'])
 
     out_df = pd.DataFrame(
