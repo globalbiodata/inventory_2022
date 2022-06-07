@@ -8,14 +8,15 @@ import argparse
 import os
 from typing import List, NamedTuple, TextIO
 
-import torch
 import pandas as pd
+import torch
 from datasets import ClassLabel
 from torch.utils.data.dataloader import DataLoader
 from transformers import AutoModelForSequenceClassification as classifier
 
-from class_data_handler import get_dataloader, DataFields, RunParams
-from utils import MODEL_TO_HUGGINGFACE_VERSION, CustomHelpFormatter, get_torch_device
+from class_data_handler import DataFields, RunParams, get_dataloader
+from utils import (MODEL_TO_HUGGINGFACE_VERSION, CustomHelpFormatter,
+                   get_torch_device)
 
 
 # ---------------------------------------------------------------------------
