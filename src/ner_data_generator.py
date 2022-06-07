@@ -63,7 +63,7 @@ def get_args() -> Args:
     parser.add_argument(
         'infile',
         metavar='FILE',
-        # type=argparse.FileType('rt', encoding='ISO-8859-1'),
+        type=argparse.FileType('rt', encoding='ISO-8859-1'),
         default='data/manual_ner_extraction.csv',
         help='Manually curated input file')
     parser.add_argument('-o',
