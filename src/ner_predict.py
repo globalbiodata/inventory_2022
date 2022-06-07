@@ -357,6 +357,86 @@ def test_deduplicate() -> None:
 
 
 # ---------------------------------------------------------------------------
+def reformat_output(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Reformat output datframe to wide format
+
+    `df`: Dataframe output by deduplicate()
+
+    Return
+    Wide-format datframe
+    """
+
+    df['prob'] = df['prob'].astype(str)
+
+    # For each article, aggregate multiple occurences
+    # of same label into single row
+    df2 = df['mention'].groupby([df.ID, df.text,
+                                 df.label]).apply(list).reset_index()
+    df2['prob'] = df['prob'].groupby([df.ID, df.text, df.label
+                                      ]).apply(list).reset_index()['prob']
+
+    # Create combined column of mentions and their probs
+    df2['mention_prob'] = list(zip(df2['mention'], df2['prob']))
+
+    # Pivot to wide format, each label gets its own column
+    df2 = df2.pivot(index=['ID', 'text'],
+                    columns='label',
+                    values='mention_prob')
+
+    # Split mentions and probs to their own columns
+    # and drop the unsplit columns
+    df2[['common_name', 'common_prob']] = pd.DataFrame(df2['B-COM'].tolist(),
+                                                       index=df2.index)
+    df2[['full_name', 'full_prob']] = pd.DataFrame(df2['B-FUL'].tolist(),
+                                                   index=df2.index)
+    df2.drop(['B-COM', 'B-FUL'], inplace=True, axis='columns')
+
+    # Convert lists of multiple mentions to string with commas between
+    df2['common_name'] = df2['common_name'].fillna('').apply(', '.join)
+    df2['common_prob'] = df2['common_prob'].fillna('').apply(', '.join)
+    df2['full_name'] = df2['full_name'].fillna('').apply(', '.join)
+    df2['full_prob'] = df2['full_prob'].fillna('').apply(', '.join)
+
+    df2.reset_index(inplace=True)
+
+    return df2
+
+
+# ---------------------------------------------------------------------------
+def test_reformat_output() -> None:
+    """ Test reformat_output() """
+
+    in_df = pd.DataFrame(
+        [[
+            123, 'SAVI Synthetically Accessible Virtual Inventory', 'SAVI',
+            'B-COM', 0.98
+        ],
+         [
+             123, 'SAVI Synthetically Accessible Virtual Inventory',
+             'Synthetically Accessible Virtual Inventory', 'B-FUL', 0.64
+         ], [147, 'Chewie-NS Chewie-NS chewie-NS', 'Chewie-NS', 'B-COM', 0.88],
+         [456, 'PANTHER PANTHER LION', 'PANTHER', 'B-COM', 0.95],
+         [456, 'PANTHER PANTHER LION', 'LION', 'B-COM', 0.92],
+         [789, 'MicrobPad MD (MicrobPad)', 'MicrobPad', 'B-COM', 0.96]],
+        columns=['ID', 'text', 'mention', 'label', 'prob'])
+
+    out_df = pd.DataFrame(
+        [[
+            123, 'SAVI Synthetically Accessible Virtual Inventory', 'SAVI',
+            '0.98', 'Synthetically Accessible Virtual Inventory', '0.64'
+        ], [147, 'Chewie-NS Chewie-NS chewie-NS', 'Chewie-NS', '0.88', '', ''],
+         [456, 'PANTHER PANTHER LION', 'PANTHER, LION', '0.95, 0.92', '', ''],
+         [789, 'MicrobPad MD (MicrobPad)', 'MicrobPad', '0.96', '', '']],
+        columns=[
+            'ID', 'text', 'common_name', 'common_prob', 'full_name',
+            'full_prob'
+        ])
+
+    assert_frame_equal(reformat_output(in_df), out_df, check_names=False)
+
+
+# ---------------------------------------------------------------------------
 def main() -> None:
     """ Main function """
 
@@ -375,8 +455,8 @@ def main() -> None:
 
     model, tokenizer = get_model(model_name, args.checkpoint, device)
 
-    predictions = deduplicate(
-        predict(model, tokenizer, input_df, ID2NER_TAG, device))
+    predictions = reformat_output(
+        deduplicate(predict(model, tokenizer, input_df, ID2NER_TAG, device)))
 
     predictions.to_csv(out_file, index=False)
 
