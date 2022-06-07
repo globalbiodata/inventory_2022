@@ -45,6 +45,7 @@ class Args(NamedTuple):
     batch_size: int
     lr_scheduler: bool
     model_checkpoint: Optional[str]
+    seed: bool
 
 
 # ---------------------------------------------------------------------------
@@ -134,13 +135,17 @@ def get_args() -> Args:
                                 '--lr_scheduler',
                                 action='store_true',
                                 help='Use a learning rate scheduler')
+    runtime_params.add_argument('-r',
+                                '--seed',
+                                action='store_true',
+                                help='Set random seed')
 
     args = parser.parse_args()
 
     args = Args(args.train_file, args.val_file, args.out_dir, args.model_name,
                 args.learning_rate, args.weight_decay, args.use_default_values,
                 args.num_training, args.num_epochs, args.batch_size,
-                args.lr_scheduler, None)
+                args.lr_scheduler, None, args.seed)
 
     if args.use_default_values:
         args = get_default_args(args)
@@ -453,7 +458,8 @@ def main() -> None:
     model_name = ARGS_MAP[args.model_name][0]
     train_dataloader, val_dataloader = get_dataloaders(args, model_name)
 
-    set_random_seed(45)
+    if args.seed:
+        set_random_seed(45)
     settings = initialize_model(model_name, args, train_dataloader,
                                 val_dataloader)
 

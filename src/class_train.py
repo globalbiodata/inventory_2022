@@ -19,7 +19,8 @@ from transformers import (AdamW, AutoModelForSequenceClassification,
 
 from class_data_handler import DataFields, RunParams, get_dataloader
 from utils import (MODEL_TO_HUGGINGFACE_VERSION, CustomHelpFormatter, Metrics,
-                   Settings, make_filenames, save_train_stats, save_model)
+                   Settings, make_filenames, save_model, save_train_stats,
+                   set_random_seed)
 
 
 # ---------------------------------------------------------------------------
@@ -39,6 +40,7 @@ class Args(NamedTuple):
     num_epochs: int
     batch_size: int
     lr_scheduler: bool
+    seed: bool
 
 
 # ---------------------------------------------------------------------------
@@ -150,6 +152,10 @@ def get_args():
                                 '--lr-scheduler',
                                 action='store_true',
                                 help='Use a Learning Rate Scheduler')
+    runtime_params.add_argument('-r',
+                                '--seed',
+                                action='store_true',
+                                help='Set random seed')
 
     args = parser.parse_args()
 
@@ -157,7 +163,7 @@ def get_args():
                 args.predictive_field, args.labels_field,
                 args.descriptive_labels, args.model_name, args.max_len,
                 args.learning_rate, args.weight_decay, args.num_training,
-                args.num_epochs, args.batch_size, args.lr_scheduler)
+                args.num_epochs, args.batch_size, args.lr_scheduler, args.seed)
 
 
 # ---------------------------------------------------------------------------
@@ -375,6 +381,8 @@ def main() -> None:
 
     train_dataloader, val_dataloader = get_dataloaders(args, model_name)
 
+    if args.seed:
+        set_random_seed(45)
     settings = initialize_model(model_name, args, train_dataloader,
                                 val_dataloader)
 
