@@ -7,8 +7,9 @@ Authors: Ana-Maria Istrate and Kenneth Schackart
 import argparse
 import os
 import string
-from collections import defaultdict
-from typing import DefaultDict, Dict, List, NamedTuple, TextIO, Tuple, cast
+from itertools import compress
+from statistics import mean
+from typing import Dict, List, NamedTuple, TextIO, cast
 
 import pandas as pd
 import torch
@@ -16,7 +17,7 @@ from pandas.testing import assert_frame_equal
 from transformers import AutoModelForTokenClassification, AutoTokenizer
 from transformers.modeling_outputs import TokenClassifierOutput
 from transformers.tokenization_utils import PreTrainedTokenizer
-from transformers.tokenization_utils_base import BatchEncoding, CharSpan
+from transformers.tokenization_utils_base import CharSpan
 
 from utils import (ID2NER_TAG, MODEL_TO_HUGGINGFACE_VERSION, NER_TAG2ID,
                    CustomHelpFormatter, get_torch_device, preprocess_data)
@@ -150,43 +151,30 @@ def convert_predictions(seq_preds: SeqPrediction) -> List[NamedEntity]:
     """
 
     seq = seq_preds.seq
-    word_locs = seq_preds.word_locs
-    mapping: DefaultDict[int, List[Tuple[str, float]]] = defaultdict(list)
+    entities: List[NamedEntity] = []
 
-    for word_id, label, score in zip(seq_preds.word_ids, seq_preds.preds,
-                                     seq_preds.probs):
-        mapping[word_id].append((label, score))
+    for loc_id, span in seq_preds.word_locs.items():
+        mask = [word_id == loc_id for word_id in seq_preds.word_ids]
+        labels = set(compress(seq_preds.preds, mask))
+        probs = list(compress(seq_preds.probs, mask))
+        substring = seq[span.start:span.end + 1]
+        if any(label[0] == 'B' for label in labels):
+            label = list(
+                compress(labels, [label[0] == 'B' for label in labels]))[0]
+            prob = mean(probs)
+            entities.append(NamedEntity(substring, label, prob))
+            prob_count = len(probs)
+        if all(label[0] == 'I' for label in labels):
+            if seq_preds.word_locs[loc_id - 1].end == span.start:
+                substring = ''
+            last_entity = entities[-1]
+            prob = (last_entity.prob * prob_count + sum(probs)) / (prob_count +
+                                                                   len(probs))
+            prob_count += len(probs)
+            entities[-1] = NamedEntity(last_entity.string + substring,
+                                       last_entity.label, prob)
 
-    new_mapping = {}
-    for word_id, labels_scores in mapping.items():
-        start, end = word_locs[word_id]
-        word = seq[start:end]
-        new_mapping[(
-            start, end,
-            word)] = labels_scores[0]  # taking first label and probability
-    running_start = None
-    running_end = None
-    running_tag = None
-    word2tag = []
-    for (start, end, word), tag_pred in new_mapping.items():
-        tag = tag_pred[0]
-        prob = tag_pred[1]
-        if running_end and tag == 'I-' + running_tag[2:]:
-            running_end = end
-        elif tag[0] == 'B' or tag[0] == 'O':
-            if running_start is not None and running_tag != 'O':
-                running_word = seq[running_start:running_end]
-                entry = NamedEntity(running_word, running_tag, running_pred)
-                word2tag.append(entry)
-            running_start = start
-            running_end = end
-            running_tag = tag
-            running_pred = prob
-    running_word = seq[running_start:running_end]
-    if len(running_word) > 0 and running_tag != 'O':
-        entry = NamedEntity(running_word, running_tag, running_pred)
-        word2tag.append(entry)
-    return word2tag
+    return entities
 
 
 # ---------------------------------------------------------------------------
@@ -210,7 +198,7 @@ def test_convert_predictions() -> None:
         'I-FUL', 'I-FUL', 'I-FUL', 'I-FUL', 'I-FUL'
     ]
     probs = [
-        0.9914267, 0.9947973, 0.9970765, 0.9951375, 0.98841196, 0.9884289,
+        0.9914268, 0.9947973, 0.9970765, 0.9951375, 0.98841196, 0.9884289,
         0.99392915, 0.9951815, 0.9865631, 0.99616784, 0.99818134, 0.9980192,
         0.90898293
     ]
@@ -218,9 +206,9 @@ def test_convert_predictions() -> None:
     seq_preds = SeqPrediction(seq, word_ids, word_locs, preds, probs)
 
     expected = [
-        NamedEntity('ALCOdb:', 'B-COM', 0.9914267),
+        NamedEntity('ALCOdb:', 'B-COM', 0.994609525),
         NamedEntity('Gene Coexpression Database for Microalgae.', 'B-FUL',
-                    0.98841196)
+                    0.98376288)
     ]
 
     assert convert_predictions(seq_preds) == expected
@@ -228,7 +216,17 @@ def test_convert_predictions() -> None:
 
 # ---------------------------------------------------------------------------
 def predict_sequence(model, device: torch.device, seq: str,
-                     tokenizer: PreTrainedTokenizer):
+                     tokenizer: PreTrainedTokenizer) -> List[NamedEntity]:
+    """
+    Run token prediction on sequence
+
+    `model`: Trained token classification model
+    `device`: Device to use
+    `seq`: Input string/sequence
+    `tokenizer`: Pretrained tokenizer
+
+    Return list of named entities
+    """
 
     with torch.no_grad():
         tokenized_seq = tokenizer(seq, return_tensors="pt").to(device)
@@ -251,16 +249,22 @@ def predict_sequence(model, device: torch.device, seq: str,
 
 
 # ---------------------------------------------------------------------------
-def predict(model, tokenizer, inputs: pd.DataFrame, tag_dict: dict,
-            device: torch.device):
+def predict(model, tokenizer: PreTrainedTokenizer, inputs: pd.DataFrame,
+            device: torch.device) -> pd.DataFrame:
+    """
+    Perform NER prediction on rows of input dataframe
 
-    all_labels = []
-    all_preds = []
-    all_IDs = []
-    all_texts = []
-    all_probs = []
+    `model`: Trained token classification model
+    `tokenizer`: Pretrained tokenizer
+    `inputs`: Input dataframe
+    `device`: Device to use
+
+    return
+    """
+
+    pred_df = pd.DataFrame(columns=['ID', 'text', 'mention', 'label', 'prob'])
+
     for _, row in inputs.iterrows():
-        id = row['id']
         seq = row['title_abstract']
         predicted_labels = predict_sequence(model, device, seq, tokenizer)
         num_preds = len(predicted_labels)
@@ -269,18 +273,10 @@ def predict(model, tokenizer, inputs: pd.DataFrame, tag_dict: dict,
         ]
         labels = [x.label[2:] for x in predicted_labels]
         probs = [x.prob for x in predicted_labels]
-        all_labels.extend(labels)
-        all_preds.extend(mentions)
-        all_IDs.extend([id] * num_preds)
-        all_texts.extend([seq] * num_preds)
-        all_probs.extend(probs)
-    pred_df = pd.DataFrame({
-        'ID': all_IDs,
-        'text': all_texts,
-        'mention': all_preds,
-        'label': all_labels,
-        'prob': all_probs
-    })
+        pred_df = pd.concat([
+            pred_df,
+            [[row['id']] * num_preds, seq * num_preds, mentions, labels, probs]
+        ])
 
     return pred_df
 
@@ -454,7 +450,7 @@ def main() -> None:
     model, tokenizer = get_model(model_name, args.checkpoint, device)
 
     predictions = reformat_output(
-        deduplicate(predict(model, tokenizer, input_df, ID2NER_TAG, device)))
+        deduplicate(predict(model, tokenizer, input_df, device)))
 
     predictions.to_csv(out_file, index=False)
 
