@@ -217,7 +217,7 @@ def train(settings: Settings) -> Tuple[Any, pd.DataFrame]:
             'val_f1': val_metrics.f1,
             'val_loss': val_metrics.loss
         }
-        train_progress = train_progress.append(epoch_row)
+        train_progress = pd.concat([train_progress, epoch_row])
 
         print(f'Epoch {epoch + 1}:\n'
               f'Train Loss: {train_loss:.5f}\n'
