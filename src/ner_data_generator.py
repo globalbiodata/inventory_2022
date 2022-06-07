@@ -547,7 +547,7 @@ def main() -> None:
 
     raw_train, raw_val, raw_test = split_df(df, args.seed, args.splits)
 
-    train_df, val_df, test_df = map(lambda df: BIO_scheme_transform(df),
+    train_df, val_df, test_df = map(BIO_scheme_transform,
                                     [raw_train, raw_val, raw_test])
 
     raw_train_out, raw_val_out, raw_test_out = map(
