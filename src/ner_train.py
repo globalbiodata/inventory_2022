@@ -255,10 +255,10 @@ def train(settings: Settings) -> Tuple[Any, pd.DataFrame]:
     best_model = model
     best_val = Metrics(0, 0, 0, 0)
     best_train = Metrics(0, 0, 0, 0)
+    model.train()
 
     for epoch in range(settings.num_epochs):
 
-        model.train()
         train_loss = train_epoch(settings, progress_bar)
 
         model.eval()
