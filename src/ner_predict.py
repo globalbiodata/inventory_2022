@@ -393,10 +393,8 @@ def reformat_output(df: pd.DataFrame) -> pd.DataFrame:
     df2.drop(['B-COM', 'B-FUL'], inplace=True, axis='columns')
 
     # Convert lists of multiple mentions to string with commas between
-    df2['common_name'] = df2['common_name'].fillna('').apply(', '.join)
-    df2['common_prob'] = df2['common_prob'].fillna('').apply(', '.join)
-    df2['full_name'] = df2['full_name'].fillna('').apply(', '.join)
-    df2['full_prob'] = df2['full_prob'].fillna('').apply(', '.join)
+    for col in [c for c in list(df2.columns) if c not in ['ID', 'text']]:
+        df2[col] = df2[col].fillna('').apply(', '.join)
 
     df2.reset_index(inplace=True)
 
