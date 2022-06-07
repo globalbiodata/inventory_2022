@@ -172,7 +172,8 @@ def get_default_args(args: Args) -> Args:
 
     return Args(args.train_file, args.val_file, args.out_dir, model_name,
                 learning_rate, weight_decay, True, args.num_training,
-                args.num_epochs, batch_size, use_scheduler, model_checkpoint)
+                args.num_epochs, batch_size, use_scheduler, model_checkpoint,
+                True)
 
 
 # ---------------------------------------------------------------------------
