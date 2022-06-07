@@ -206,7 +206,7 @@ def train(settings: Settings) -> Tuple[Any, pd.DataFrame]:
         if val_metrics.f1 < best_val.f1 and epoch > 0:
             break
 
-        epoch_row = {
+        epoch_row = pd.DataFrame({
             'epoch': epoch,
             'train_precision': train_metrics.precision,
             'train_recall': train_metrics.recall,
@@ -216,7 +216,7 @@ def train(settings: Settings) -> Tuple[Any, pd.DataFrame]:
             'val_recall': val_metrics.recall,
             'val_f1': val_metrics.f1,
             'val_loss': val_metrics.loss
-        }
+        })
         train_progress = pd.concat([train_progress, epoch_row])
 
         print(f'Epoch {epoch + 1}:\n'
