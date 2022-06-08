@@ -418,6 +418,7 @@ def reformat_output(df: pd.DataFrame) -> pd.DataFrame:
     # Add two dummy rows so that both COM and FUL are present as labels
     df.loc[len(df)] = ['-1', '', '', 'COM', '0']
     df.loc[len(df)] = ['-1', '', '', 'FUL', '0']
+    df = df[df['mention'] != '']
 
     # For each article, aggregate multiple occurences
     # of same label into single row
