@@ -415,6 +415,10 @@ def reformat_output(df: pd.DataFrame) -> pd.DataFrame:
 
     df['prob'] = df['prob'].astype(str)
 
+    # Add two dummy rows so that both COM and FUL are present as labels
+    df.loc[len(df)] = ['-1', '', '', 'COM', '0']
+    df.loc[len(df)] = ['-1', '', '', 'FUL', '0']
+
     # For each article, aggregate multiple occurences
     # of same label into single row
     df2 = df['mention'].groupby([df.ID, df.text,
@@ -450,6 +454,9 @@ def reformat_output(df: pd.DataFrame) -> pd.DataFrame:
         df2[col] = df2[col].apply(', '.join)
 
     df2.reset_index(inplace=True)
+
+    # Remove the dummy row
+    df2 = df2[df2['ID'] != '-1']
 
     return df2
 
