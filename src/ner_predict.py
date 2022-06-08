@@ -159,19 +159,21 @@ def convert_predictions(seq_preds: SeqPrediction) -> List[NamedEntity]:
         labels = set(compress(seq_preds.preds, mask))
         probs = list(compress(seq_preds.probs, mask))
         substring = seq[span.start:span.end + 1]
+        if loc_id > 0:
+            if seq_preds.word_locs[loc_id - 1].end == span.start:
+                substring = seq[span.start + 1:span.end + 1]
         if any(label[0] == 'B' for label in labels):
             began_entity = True
             label = list(
                 compress(labels, [label[0] == 'B' for label in labels]))[0]
             entities.append(NamedEntity(substring, label, mean(probs)))
             prob_count = len(probs)
-        elif all(label[0] == 'I' for label in labels):
-            if len(labels) == 1 and not began_entity:
-                entities.append(
-                    NamedEntity(substring, labels.pop(), mean(probs)))
+        elif any(label[0] == 'I' for label in labels) and substring != ' ':
+            if not began_entity:
+                label = list(
+                    compress(labels, [label[0] == 'I' for label in labels]))[0]
+                entities.append(NamedEntity(substring, label, mean(probs)))
             else:
-                if seq_preds.word_locs[loc_id - 1].end == span.start:
-                    substring = ''
                 last_entity = entities[-1]
                 prob = (last_entity.prob * prob_count +
                         sum(probs)) / (prob_count + len(probs))
@@ -226,23 +228,27 @@ def test_convert_predictions() -> None:
 
     assert convert_predictions(seq_preds) == expected
 
-    seq = 'Inside outside inside inside'
-    word_ids = [0, 1, 2, 3]
+    seq = 'Inside outside inside inside (inside).'
+    word_ids = [0, 1, 2, 3, 4, 5, 6]
     word_locs = {
         0: CharSpan(0, 6),
         1: CharSpan(7, 14),
         2: CharSpan(15, 21),
-        3: CharSpan(22, 27)
+        3: CharSpan(22, 28),
+        4: CharSpan(29, 30),
+        5: CharSpan(30, 36),
+        6: CharSpan(36, 37)
     }
-    preds = ['I-COM', 'O', 'I-FUL', 'I-FUL']
-    probs = [0.996, 0.999, 0.998, 0.978]
+    preds = ['I-COM', 'O', 'I-FUL', 'I-FUL', 'B-COM', 'I-COM', 'I-COM']
+    probs = [0.996, 0.999, 0.998, 0.978, 0.99, 0.98, 0.97]
 
     seq_preds = SeqPrediction(seq, word_ids, word_locs, preds, probs)
 
     expected = [
         NamedEntity('Inside', 'I-COM', 0.996),
         NamedEntity('inside', 'I-FUL', 0.998),
-        NamedEntity('inside', 'I-FUL', 0.978)
+        NamedEntity('inside', 'I-FUL', 0.978),
+        NamedEntity('(inside).', 'B-COM', 0.98)
     ]
 
     assert convert_predictions(seq_preds) == expected
@@ -424,6 +430,12 @@ def reformat_output(df: pd.DataFrame) -> pd.DataFrame:
                     columns='label',
                     values='mention_prob')
 
+    # Fill missing values
+    for col in [c for c in list(df2.columns) if c not in ['ID', 'text']]:
+        isna = df2[col].isna()
+        df2.loc[isna, col] = pd.Series([[[''], ['']]] * isna.sum(),
+                                       dtype='object').values
+
     # Split mentions and probs to their own columns
     # and drop the unsplit columns
     df2[['common_name', 'common_prob']] = pd.DataFrame(df2['COM'].tolist(),
@@ -434,7 +446,8 @@ def reformat_output(df: pd.DataFrame) -> pd.DataFrame:
 
     # Convert lists of multiple mentions to string with commas between
     for col in [c for c in list(df2.columns) if c not in ['ID', 'text']]:
-        df2[col] = df2[col].fillna('').apply(', '.join)
+        df2[col] = df2[col].fillna('')
+        df2[col] = df2[col].apply(', '.join)
 
     df2.reset_index(inplace=True)
 
