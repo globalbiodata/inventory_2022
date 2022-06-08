@@ -11,7 +11,8 @@ test:
 	src/ner_data_generator.py \
 	src/ner_data_handler.py \
 	src/ner_train.py \
-	src/ner_predict.py
+	src/ner_predict.py \
+	src/model_picker.py
 	
 
 dryrun:
