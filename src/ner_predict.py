@@ -263,7 +263,11 @@ def predict_sequence(model, device: torch.device, seq: str,
     """
 
     with torch.no_grad():
-        tokenized_seq = tokenizer(seq, return_tensors="pt").to(device)
+        tokenized_seq = tokenizer(seq,
+                                  return_tensors="pt",
+                                  padding=True,
+                                  truncation=True,
+                                  max_length=512).to(device)
         outputs = cast(TokenClassifierOutput, model(**tokenized_seq))
         logits = outputs.logits
         preds = logits.argmax(dim=-1).cpu().numpy()[0][1:-1]
