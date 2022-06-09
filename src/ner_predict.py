@@ -19,8 +19,8 @@ from transformers.modeling_outputs import TokenClassifierOutput
 from transformers.tokenization_utils import PreTrainedTokenizer
 from transformers.tokenization_utils_base import CharSpan
 
-from utils import (ID2NER_TAG, NER_TAG2ID,
-                   CustomHelpFormatter, get_torch_device, preprocess_data)
+from utils import (ID2NER_TAG, NER_TAG2ID, CustomHelpFormatter,
+                   get_torch_device, preprocess_data)
 
 pd.options.mode.chained_assignment = None
 
@@ -205,7 +205,7 @@ def test_convert_predictions() -> None:
         'I-FUL', 'I-FUL', 'I-FUL', 'I-FUL', 'I-FUL'
     ]
     probs = [
-        0.9914268, 0.9947973, 0.9970765, 0.9951375, 0.98841196, 0.9884289,
+        0.9914268, 0.9947973, 0.9970761, 0.9951375, 0.98841196, 0.9884289,
         0.99392915, 0.9951815, 0.9865631, 0.99616784, 0.99818134, 0.9980192,
         0.90898293
     ]
@@ -213,7 +213,7 @@ def test_convert_predictions() -> None:
     seq_preds = SeqPrediction(seq, word_ids, word_locs, preds, probs)
 
     expected = [
-        NamedEntity('ALCOdb:', 'B-COM', 0.994609525),
+        NamedEntity('ALCOdb:', 'B-COM', 0.9944334),
         NamedEntity('Gene Coexpression Database for Microalgae.', 'B-FUL',
                     0.98376288)
     ]
