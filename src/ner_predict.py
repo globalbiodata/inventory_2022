@@ -142,7 +142,6 @@ def convert_predictions(seq_preds: SeqPrediction) -> List[NamedEntity]:
     Convert raw predictions to meaningful predictions
     """
 
-    seq = seq_preds.seq
     entities: List[NamedEntity] = []
     began_entity = False
 
@@ -150,10 +149,10 @@ def convert_predictions(seq_preds: SeqPrediction) -> List[NamedEntity]:
         mask = [word_id == loc_id for word_id in seq_preds.word_ids]
         labels = set(compress(seq_preds.preds, mask))
         probs = list(compress(seq_preds.probs, mask))
-        substring = seq[span.start:span.end + 1]
+        substring = seq_preds.seq[span.start:span.end + 1]
         if loc_id > 0:
             if seq_preds.word_locs[loc_id - 1].end == span.start:
-                substring = seq[span.start + 1:span.end + 1]
+                substring = seq_preds.seq[span.start + 1:span.end + 1]
         if any(label[0] == 'B' for label in labels):
             began_entity = True
             label = list(
