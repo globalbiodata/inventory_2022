@@ -51,13 +51,6 @@ def test_bad_input_files() -> None:
 
 
 # ---------------------------------------------------------------------------
-def test_bad_model() -> None:
-    """ Dies on bad model choice """
-
-    tu.bad_model(PRG)
-
-
-# ---------------------------------------------------------------------------
 def test_bad_predictor() -> None:
     """ Dies on bad predictor choice """
 
@@ -77,8 +70,8 @@ def test_bad_numeric_args() -> None:
 
     bad_float = tu.random_string()
 
-    for flag in ['-r', '-decay']:
-        retval, out = getstatusoutput(f'{PRG} {flag} {bad_float}')
+    for flag in ['-rate', '-decay']:
+        retval, out = getstatusoutput(f'{PRG} {flag} {bad_float} -m model')
         assert retval != 0
         assert out.lower().startswith('usage')
         assert re.search(f"invalid float value: '{bad_float}'", out)
@@ -86,7 +79,7 @@ def test_bad_numeric_args() -> None:
     bad_int = tu.random_float()
 
     for flag in ['-max', '-nt', '-ne', '-batch']:
-        retval, out = getstatusoutput(f'{PRG} {flag} {bad_int}')
+        retval, out = getstatusoutput(f'{PRG} {flag} {bad_int} -m model')
         assert retval != 0
         assert out.lower().startswith('usage')
         assert re.search(f"invalid int value: '{bad_int}'", out)

@@ -19,7 +19,7 @@ from transformers.modeling_outputs import TokenClassifierOutput
 from transformers.tokenization_utils import PreTrainedTokenizer
 from transformers.tokenization_utils_base import CharSpan
 
-from utils import (ID2NER_TAG, MODEL_TO_HUGGINGFACE_VERSION, NER_TAG2ID,
+from utils import (ID2NER_TAG, NER_TAG2ID,
                    CustomHelpFormatter, get_torch_device, preprocess_data)
 
 pd.options.mode.chained_assignment = None
@@ -97,20 +97,12 @@ def get_args() -> Args:
                         default='out/',
                         help='Directory to output predictions')
 
-    model_params.add_argument(
-        '-m',
-        '--model-name',
-        metavar='MODEL',
-        type=str,
-        default='scibert',
-        help='Name of model',
-        choices=[
-            'bert', 'biobert', 'bioelectra', 'bioelectra_pmc',
-            'biomed_roberta', 'biomed_roberta_chemprot',
-            'biomed_roberta_rct_500', 'bluebert', 'bluebert_mimic3',
-            'electramed', 'pubmedbert', 'pubmedbert_pmc', 'sapbert',
-            'sapbert_mean_token', 'scibert'
-        ])
+    model_params.add_argument('-m',
+                              '--model-name',
+                              metavar='MODEL',
+                              type=str,
+                              required=True,
+                              help='Name of model')
 
     args = parser.parse_args()
 
@@ -508,7 +500,7 @@ def main() -> None:
 
     out_file = os.path.join(args.out_dir, 'predictions.csv')
 
-    model_name = MODEL_TO_HUGGINGFACE_VERSION[args.model_name]
+    model_name = args.model_name
 
     device = get_torch_device()
 
@@ -519,7 +511,7 @@ def main() -> None:
 
     predictions.to_csv(out_file, index=False)
 
-    print(f'Done. Wrote output to {out_file}.')
+    print(f'Done. Saved predictions to {out_file}.')
 
 
 # ---------------------------------------------------------------------------

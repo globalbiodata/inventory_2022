@@ -20,71 +20,6 @@ from torch.utils.data.dataloader import DataLoader
 from transformers import AdamW
 
 # ---------------------------------------------------------------------------
-# Mapping from generic model name to the Huggingface Version
-MODEL_TO_HUGGINGFACE_VERSION = {
-    'bert': 'bert_base_uncased',
-    'biobert': 'dmis-lab/biobert-v1.1',
-    'bioelectra': 'kamalkraj/bioelectra-base-discriminator-pubmed',
-    'bioelectra_pmc': 'kamalkraj/bioelectra-base-discriminator-pubmed-pmc',
-    'biomed_roberta': 'allenai/biomed_roberta_base',
-    'biomed_roberta_chemprot':
-    'allenai/dsp_roberta_base_dapt_biomed_tapt_chemprot_4169',
-    'biomed_roberta_rct_500':
-    'allenai/dsp_roberta_base_dapt_biomed_tapt_rct_500',
-    'bluebert': 'bionlp/bluebert_pubmed_uncased_L-12_H-768_A-12',
-    'bluebert_mimic3': 'bionlp/bluebert_pubmed_mimic_uncased_L-12_H-768_A-12',
-    'electramed': 'giacomomiolo/electramed_base_scivocab_1M',
-    'pubmedbert': 'microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract',
-    'pubmedbert_pmc':
-    'microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract-fulltext',
-    'sapbert': 'cambridgeltl/SapBERT-from-PubMedBERT-fulltext',
-    'sapbert_mean_token':
-    'cambridgeltl/SapBERT-from-PubMedBERT-fulltext-mean-token',
-    'scibert': 'allenai/scibert_scivocab_uncased',
-}
-
-# ---------------------------------------------------------------------------
-# Hyperparameters used for training
-ARGS_MAP = {
-    'bert': ['bert-base-uncased', 16, 3e-5, 0, False],
-    'biobert': ['dmis-lab/biobert-v1.1', 16, '3e-5', 0, False],
-    'scibert': ['allenai/scibert_scivocab_uncased', 16, 3e-5, 0, False],
-    'pubmedbert': [
-        'microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract', 16, 3e-5, 0,
-        True
-    ],
-    'pubmedbert_fulltext': [
-        'microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract-fulltext', 32,
-        3e-5, 0, True
-    ],
-    'bluebert':
-    ['bionlp/bluebert_pubmed_uncased_L-12_H-768_A-12', 16, 3e-5, 0, True],
-    'bluebert_mimic3': [
-        'bionlp/bluebert_pubmed_mimic_uncased_L-12_H-768_A-12', 32, 3e-5, 0,
-        False
-    ],
-    'sapbert':
-    ['cambridgeltl/SapBERT-from-PubMedBERT-fulltext', 16, 2e-5, 0.01, False],
-    'sapbert_mean_token': [
-        'cambridgeltl/SapBERT-from-PubMedBERT-fulltext-mean-token', 32, 2e-5,
-        0.01, False
-    ],
-    'bioelectra':
-    ['kamalkraj/bioelectra-base-discriminator-pubmed', 16, 5e-5, 0, True],
-    'bioelectra_pmc':
-    ['kamalkraj/bioelectra-base-discriminator-pubmed-pmc', 32, 5e-5, 0, True],
-    'electramed':
-    ['giacomomiolo/electramed_base_scivocab_1M', 16, 5e-5, 0, True],
-    'biomed_roberta': ['allenai/biomed_roberta_base', 16, 2e-5, 0, False],
-    'biomed_roberta_rct500': [
-        'allenai/dsp_roberta_base_dapt_biomed_tapt_chemprot_4169', 16, 2e-5, 0,
-        False
-    ],
-    'biomed_roberta_chemprot':
-    ['allenai/dsp_roberta_base_dapt_biomed_tapt_rct_500', 16, 2e-5, 0, False]
-}
-
-# ---------------------------------------------------------------------------
 # Mapping from NER tag to ID
 NER_TAG2ID = {'O': 0, 'B-COM': 1, 'I-COM': 2, 'B-FUL': 3, 'I-FUL': 4}
 
@@ -421,20 +356,25 @@ def test_preprocess_data() -> None:
 
 
 # ---------------------------------------------------------------------------
-def make_filenames(out_dir: str, model_name: str) -> Tuple[str, str]:
-    """ Make output filename """
+def make_filenames(out_dir: str) -> Tuple[str, str]:
+    """
+    Make output filename
 
-    partial_name = os.path.join(out_dir, model_name + '_')
+    `out_dir`: Output directory to be included in filename
 
-    return partial_name + 'checkpt.pt', partial_name + 'train_stats.csv'
+    Return: Tuple['{out_dir}/checkpt.pt', '{out_dir}/train_stats.csv']
+    """
+
+    return os.path.join(out_dir,
+                        'checkpt.pt'), os.path.join(out_dir, 'train_stats.csv')
 
 
 # ---------------------------------------------------------------------------
 def test_make_filenames() -> None:
     """ Test make_filenames """
 
-    assert make_filenames('out', 'scibert') == ('out/scibert_checkpt.pt',
-                                                'out/scibert_train_stats.csv')
+    assert make_filenames('out/scibert') == ('out/scibert/checkpt.pt',
+                                             'out/scibert/train_stats.csv')
 
 
 # ---------------------------------------------------------------------------

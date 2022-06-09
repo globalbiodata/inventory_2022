@@ -15,8 +15,7 @@ from torch.utils.data.dataloader import DataLoader
 from transformers import AutoModelForSequenceClassification as classifier
 
 from class_data_handler import DataFields, RunParams, get_dataloader
-from utils import (MODEL_TO_HUGGINGFACE_VERSION, CustomHelpFormatter,
-                   get_torch_device)
+from utils import (CustomHelpFormatter, get_torch_device)
 
 
 # ---------------------------------------------------------------------------
@@ -79,20 +78,12 @@ def get_args() -> Args:
                            default=['not-bio-resource', 'bio-resource'],
                            help='Descriptions of the classification labels')
 
-    model_params.add_argument(
-        '-m',
-        '--model-name',
-        metavar='MODEL',
-        type=str,
-        default='scibert',
-        help='Name of model',
-        choices=[
-            'bert', 'biobert', 'bioelectra', 'bioelectra_pmc',
-            'biomed_roberta', 'biomed_roberta_chemprot',
-            'biomed_roberta_rct_500', 'bluebert', 'bluebert_mimic3',
-            'electramed', 'pubmedbert', 'pubmedbert_pmc', 'sapbert',
-            'sapbert_mean_token', 'scibert'
-        ])
+    model_params.add_argument('-m',
+                              '--model-name',
+                              metavar='MODEL',
+                              type=str,
+                              required=True,
+                              help='Name of model')
     model_params.add_argument('-max',
                               '--max-len',
                               metavar='INT',
@@ -201,7 +192,7 @@ def main() -> None:
 
     out_file = os.path.join(args.out_dir, 'predictions.csv')
 
-    model_name = MODEL_TO_HUGGINGFACE_VERSION[args.model_name]
+    model_name = args.model_name
 
     dataloader = get_dataloaders(args, model_name)
 
@@ -217,7 +208,7 @@ def main() -> None:
 
     # Save labels to file
     df.to_csv(out_file)
-    print('Saved predictions to', out_file)
+    print('Done. Saved predictions to', out_file)
 
 
 # ---------------------------------------------------------------------------

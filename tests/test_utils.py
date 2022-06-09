@@ -37,13 +37,6 @@ def run_bad_option(prg: str, flag: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-def bad_model(prg: str) -> None:
-    """ Dies on bad model choice """
-
-    run_bad_option(prg, '--model-name')
-
-
-# ---------------------------------------------------------------------------
 def bad_predictor(prg: str) -> None:
     """ Dies on bad predictor choice """
 

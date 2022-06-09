@@ -20,9 +20,9 @@ from tqdm.auto import tqdm
 from transformers import AutoModelForTokenClassification, get_scheduler
 
 from ner_data_handler import RunParams, get_dataloader
-from utils import (ARGS_MAP, ID2NER_TAG, NER_TAG2ID, CustomHelpFormatter,
-                   Metrics, Settings, make_filenames, save_model,
-                   save_train_stats, set_random_seed)
+from utils import (ID2NER_TAG, NER_TAG2ID, CustomHelpFormatter, Metrics,
+                   Settings, make_filenames, save_model, save_train_stats,
+                   set_random_seed)
 
 # ---------------------------------------------------------------------------
 # Type Aliases
@@ -39,7 +39,6 @@ class Args(NamedTuple):
     model_name: str
     learning_rate: float
     weight_decay: float
-    use_default_values: bool
     num_training: int
     num_epochs: int
     batch_size: int
@@ -79,20 +78,12 @@ def get_args() -> Args:
                         default='out/',
                         help='Directory to output checkpt and loss plot')
 
-    model_params.add_argument(
-        '-m',
-        '--model_name',
-        metavar='',
-        type=str,
-        default='biomed_roberta',
-        help='Name of model',
-        choices=[
-            'bert', 'biobert', 'bioelectra', 'bioelectra_pmc',
-            'biomed_roberta', 'biomed_roberta_chemprot',
-            'biomed_roberta_rct_500', 'bluebert', 'bluebert_mimic3',
-            'electramed', 'pubmedbert', 'pubmedbert_pmc', 'sapbert',
-            'sapbert_mean_token', 'scibert'
-        ])
+    model_params.add_argument('-m',
+                              '--model_name',
+                              metavar='',
+                              type=str,
+                              required=True,
+                              help='Name of HuggingFace model')
     model_params.add_argument('-rate',
                               '--learning-rate',
                               metavar='NUM',
@@ -105,12 +96,6 @@ def get_args() -> Args:
                               type=float,
                               default=0.01,
                               help='Weight decay for learning rate')
-    model_params.add_argument('-def',
-                              '--use-default-values',
-                              metavar='',
-                              type=bool,
-                              default=True,
-                              help='Use default values in ner_utils.py')
 
     runtime_params.add_argument(
         '-nt',
@@ -142,38 +127,10 @@ def get_args() -> Args:
 
     args = parser.parse_args()
 
-    args = Args(args.train_file, args.val_file, args.out_dir, args.model_name,
-                args.learning_rate, args.weight_decay, args.use_default_values,
-                args.num_training, args.num_epochs, args.batch_size,
-                args.lr_scheduler, None, args.seed)
-
-    if args.use_default_values:
-        args = get_default_args(args)
-
-    return args
-
-
-# ---------------------------------------------------------------------------
-def get_default_args(args: Args) -> Args:
-    """
-    Get default options based on model
-
-    `args`: Command-line arguments
-
-    Return: Updated arguments
-    """
-
-    model_name = args.model_name
-    model_checkpoint = ARGS_MAP[model_name][0]
-    batch_size = ARGS_MAP[model_name][1]
-    learning_rate = ARGS_MAP[model_name][2]
-    weight_decay = ARGS_MAP[model_name][3]
-    use_scheduler = ARGS_MAP[model_name][4]
-
-    return Args(args.train_file, args.val_file, args.out_dir, model_name,
-                learning_rate, weight_decay, True, args.num_training,
-                args.num_epochs, batch_size, use_scheduler, model_checkpoint,
-                True)
+    return Args(args.train_file, args.val_file, args.out_dir, args.model_name,
+                args.learning_rate, args.weight_decay, args.num_training,
+                args.num_epochs, args.batch_size, args.lr_scheduler, None,
+                args.seed)
 
 
 # ---------------------------------------------------------------------------
@@ -358,9 +315,6 @@ def get_metrics(model: Any, dataloader: DataLoader,
     Returns:
     A `Metrics` NamedTuple
     """
-    # calc_precision = load_metric('precision')
-    # calc_recall = load_metric('recall')
-    # calc_f1 = load_metric('f1')
     calc_seq_metrics = load_metric('seqeval')
     total_loss = 0.
     num_seen_datapoints = 0
@@ -455,10 +409,10 @@ def main() -> None:
     args = get_args()
     out_dir = args.out_dir
 
-    if not os.path.exists(out_dir):
+    if not os.path.isdir(out_dir):
         os.mkdir(out_dir)
 
-    model_name = ARGS_MAP[args.model_name][0]
+    model_name = args.model_name
     train_dataloader, val_dataloader = get_dataloaders(args, model_name)
 
     if args.seed:
@@ -470,9 +424,9 @@ def main() -> None:
     print('=' * 30)
 
     model, train_stats_df = train(settings)
+    train_stats_df['model_name'] = model_name
 
-    checkpt_filename, train_stats_filename = make_filenames(
-        out_dir, args.model_name)
+    checkpt_filename, train_stats_filename = make_filenames(out_dir)
 
     save_model(model, checkpt_filename)
     save_train_stats(train_stats_df, train_stats_filename)
