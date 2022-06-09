@@ -13,11 +13,13 @@ from typing import Any, List, NamedTuple, Optional, Tuple, cast
 import pandas as pd
 import torch
 from datasets import load_metric
+from numpy import array
 from torch.functional import Tensor
 from torch.optim import AdamW
 from torch.utils.data.dataloader import DataLoader
 from tqdm.auto import tqdm
-from transformers import AutoModelForTokenClassification, get_scheduler
+from transformers import (AutoModelForTokenClassification, get_scheduler,
+                          optimization)
 
 from ner_data_handler import RunParams, get_dataloader
 from utils import (ID2NER_TAG, NER_TAG2ID, CustomHelpFormatter, Metrics,
@@ -26,7 +28,6 @@ from utils import (ID2NER_TAG, NER_TAG2ID, CustomHelpFormatter, Metrics,
 
 # ---------------------------------------------------------------------------
 # Type Aliases
-LabeledBatch = List[List[int]]
 TaggedBatch = List[List[str]]
 
 
@@ -178,9 +179,11 @@ def initialize_model(model_name: str, args: Args, train_dataloader: DataLoader,
     device = torch.device(
         'cuda') if torch.cuda.is_available() else torch.device('cpu')
     model.to(device)
-    optimizer = AdamW(model.parameters(),
-                      lr=args.learning_rate,
-                      weight_decay=args.weight_decay)
+    optimizer = cast(
+        optimization.AdamW,
+        AdamW(model.parameters(),
+              lr=args.learning_rate,
+              weight_decay=args.weight_decay))
     num_training_steps = args.num_epochs * len(train_dataloader)
 
     if args.lr_scheduler:
@@ -356,9 +359,8 @@ def extract_metrics(metric_dict: Optional[dict]) -> List[float]:
 
 
 # ---------------------------------------------------------------------------
-def convert_to_tags(
-        batch_predictions: LabeledBatch,
-        batch_labels: LabeledBatch) -> Tuple[TaggedBatch, TaggedBatch]:
+def convert_to_tags(batch_predictions: array,
+                    batch_labels: array) -> Tuple[TaggedBatch, TaggedBatch]:
     """
     Convert numeric labels to string tags
 
@@ -387,8 +389,10 @@ def test_convert_to_tags() -> None:
     """ Test convert_to_tags """
 
     # Inputs
-    predictions = [[0, 0, 1, 2, 2, 0, 3, 4, 0], [0, 0, 0, 1, 0]]
-    labels = [[-100, 0, 1, 2, 2, 0, 3, 4, -100], [-100, 0, 0, 3, -100]]
+    predictions = array([[0, 0, 1, 2, 2, 0, 3, 4, 0],
+                         [0, 0, 0, 1, 0, 0, 0, 0, 0]])
+    labels = array([[-100, 0, 1, 2, 2, 0, 3, 4, -100],
+                    [-100, 0, 0, 3, -100, -100, -100, -100, -100]])
 
     # Expected outputs
     exp_pred = [['O', 'B-COM', 'I-COM', 'I-COM', 'O', 'B-FUL', 'I-FUL'],
