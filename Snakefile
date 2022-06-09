@@ -1,10 +1,11 @@
+import pandas as pd
+model_df = pd.read_table(config["models"]).set_index("model", drop=True)
+model_df = model_df.fillna('')
+
 rule all:
     input:
-        expand(
-            "{d}/{model}_checkpt.pt",
-            d=config["classif_train_outdir"],
-            m=config["models"],
-        ),
+        config["classif_train_outdir"] + "/combined/best_checkpt.pt",
+        config["classif_train_outdir"] + "/combined/combined_stats.csv",
 
 
 rule split_classif_data:
@@ -30,11 +31,16 @@ rule train_classif:
         train=config["classif_splits_dir"] + "/train_paper_classif.csv",
         val=config["classif_splits_dir"] + "/val_paper_classif.csv",
     output:
-        config["classif_train_outdir"] + "/{model}_checkpt.pt",
-        config["classif_train_outdir"] + "/{model}_train_stats.csv",
+        config["classif_train_outdir"] + "/{model}/checkpt.pt",
+        config["classif_train_outdir"] + "/{model}/train_stats.csv",
     params:
         out_dir=config["classif_train_outdir"],
         epochs=config["classif_epochs"],
+        hf_model=lambda w: model_df.loc[w.model, "hf_name"],
+        batch_size=lambda w: model_df.loc[w.model, "batch_size"],
+        learn_rate=lambda w: model_df.loc[w.model, "learning_rate"],
+        weight_decay=lambda w: model_df.loc[w.model, "weight_decay"],
+        scheduler_flag=lambda w: model_df.loc[w.model, "scheduler"],
     log:
         config["classif_log_dir"] + "/{model}.log",
     benchmark:
@@ -42,11 +48,15 @@ rule train_classif:
     shell:
         """
         (python3 src/class_train.py \
-            -m {wildcards.model} \
+            -m {params.hf_model} \
             -ne {params.epochs} \
             -t {input.train} \
             -v {input.val} \
             -o {params.out_dir} \
+            -batch {params.batch_size} \
+            -rate {params.learn_rate} \
+            -decay {params.weight_decay} \
+            {params.scheduler_flag}
         )2> {log}
         """
 
@@ -54,9 +64,9 @@ rule train_classif:
 rule find_best_classifier:
     input:
         expand(
-            "{d}/{model}_train_stats.csv",
+            "{d}/{model}/train_stats.csv",
             d=config["classif_train_outdir"],
-            m=config["models"],
+            model=model_df.index,
         ),
     output:
         config["classif_train_outdir"] + "/combined/best_checkpt.pt",
