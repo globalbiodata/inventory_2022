@@ -378,7 +378,7 @@ def test_make_filenames() -> None:
 
 
 # ---------------------------------------------------------------------------
-def save_model(model: Any, filename: str) -> None:
+def save_model(model: Any, model_name: str, filename: str) -> None:
     """
     Save model checkpoint, epoch, and F1 score to file
 
@@ -387,9 +387,11 @@ def save_model(model: Any, filename: str) -> None:
     `filename`: Name of file for saving model
     """
 
-    torch.save({
-        'model_state_dict': model.state_dict(),
-    }, filename)
+    torch.save(
+        {
+            'model_state_dict': model.state_dict(),
+            'model_name': model_name
+        }, filename)
 
 
 # ---------------------------------------------------------------------------
