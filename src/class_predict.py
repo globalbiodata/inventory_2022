@@ -6,7 +6,7 @@ Authors: Ana-Maria Istrate and Kenneth Schackart
 
 import argparse
 import os
-from typing import List, NamedTuple, TextIO
+from typing import Any, List, NamedTuple, TextIO, Tuple
 
 import pandas as pd
 import torch
@@ -26,7 +26,6 @@ class Args(NamedTuple):
     out_dir: str
     predictive_field: str
     descriptive_labels: List[str]
-    model_name: str
     max_len: int
     batch_size: int
 
@@ -78,12 +77,6 @@ def get_args() -> Args:
                            default=['not-bio-resource', 'bio-resource'],
                            help='Descriptions of the classification labels')
 
-    model_params.add_argument('-m',
-                              '--model-name',
-                              metavar='MODEL',
-                              type=str,
-                              required=True,
-                              help='Name of model')
     model_params.add_argument('-max',
                               '--max-len',
                               metavar='INT',
@@ -101,8 +94,8 @@ def get_args() -> Args:
     args = parser.parse_args()
 
     return Args(args.checkpoint, args.input_file, args.out_dir,
-                args.predictive_field, args.descriptive_labels,
-                args.model_name, args.max_len, args.batch_size)
+                args.predictive_field, args.descriptive_labels, args.max_len,
+                args.batch_size)
 
 
 # ---------------------------------------------------------------------------
@@ -128,26 +121,26 @@ def get_dataloaders(args: Args, model_name: str) -> DataLoader:
 
 
 # ---------------------------------------------------------------------------
-def get_model(model_name: str, checkpoint_fh: TextIO, device: torch.device):
+def get_model(checkpoint_fh: TextIO, device: torch.device) -> Tuple[Any, str]:
     """
     Instatiate predictive model from checkpoint
 
     Params:
-    `model_name`: Huggingface model name
     `checkpoint_fh`: Model checkpoint filehandle
     `device`: The `torch.device` to use
 
     Retturns:
-    Model instance from checkpoint
+    Model instance from checkpoint, and model name
     """
 
-    model = classifier.from_pretrained(model_name, num_labels=2)
     checkpoint = torch.load(checkpoint_fh, map_location=device)
+    model_name = checkpoint['model_name']
+    model = classifier.from_pretrained(model_name, num_labels=2)
     model.load_state_dict(checkpoint['model_state_dict'])
     model.to(device)
     model.eval()
 
-    return model
+    return model, model_name
 
 
 # ---------------------------------------------------------------------------
@@ -192,13 +185,12 @@ def main() -> None:
 
     out_file = os.path.join(args.out_dir, 'predictions.csv')
 
-    model_name = args.model_name
+    device = get_torch_device()
+
+    model, model_name = get_model(args.checkpoint, device)
 
     dataloader = get_dataloaders(args, model_name)
 
-    device = get_torch_device()
-
-    model = get_model(model_name, args.checkpoint, device)
     class_labels = ClassLabel(num_classes=2, names=args.descriptive_labels)
 
     # Predict labels

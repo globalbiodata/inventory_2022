@@ -432,7 +432,7 @@ def main() -> None:
 
     checkpt_filename, train_stats_filename = make_filenames(out_dir)
 
-    save_model(model, checkpt_filename)
+    save_model(model, model_name, checkpt_filename)
     save_train_stats(train_stats_df, train_stats_filename)
 
     print('Done. Saved best checkpoint to', checkpt_filename)

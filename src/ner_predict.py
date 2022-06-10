@@ -9,7 +9,7 @@ import os
 import string
 from itertools import compress
 from statistics import mean
-from typing import Dict, List, NamedTuple, TextIO, cast
+from typing import Dict, List, NamedTuple, TextIO, cast, Tuple, Any
 
 import pandas as pd
 import torch
@@ -31,7 +31,6 @@ class Args(NamedTuple):
     checkpoint: TextIO
     infile: TextIO
     out_dir: str
-    model_name: str
 
 
 # ---------------------------------------------------------------------------
@@ -74,59 +73,48 @@ def get_args() -> Args:
         description='Predict article classifications using trained BERT model',
         formatter_class=CustomHelpFormatter)
 
-    inputs = parser.add_argument_group('Inputs and Outputs')
-    model_params = parser.add_argument_group('Model Parameters')
-    # runtime_params = parser.add_argument_group('Runtime Parameters')
-
-    inputs.add_argument('-c',
+    parser.add_argument('-c',
                         '--checkpoint',
                         metavar='CHKPT',
                         type=argparse.FileType('rb'),
                         required=True,
                         help='Trained model checkpoint')
-    inputs.add_argument('-i',
+    parser.add_argument('-i',
                         '--input-file',
                         metavar='FILE',
                         type=argparse.FileType('rt'),
                         required=True,
                         help='Input file for prediction')
-    inputs.add_argument('-o',
+    parser.add_argument('-o',
                         '--out-dir',
                         metavar='DIR',
                         type=str,
                         default='out/',
                         help='Directory to output predictions')
 
-    model_params.add_argument('-m',
-                              '--model-name',
-                              metavar='MODEL',
-                              type=str,
-                              required=True,
-                              help='Name of model')
-
     args = parser.parse_args()
 
-    return Args(args.checkpoint, args.input_file, args.out_dir,
-                args.model_name)
+    return Args(args.checkpoint, args.input_file, args.out_dir)
 
 
 # ---------------------------------------------------------------------------
-def get_model(model_name: str, checkpoint_fh: TextIO, device: torch.device):
+def get_model(checkpoint_fh: TextIO,
+              device: torch.device) -> Tuple[Any, PreTrainedTokenizer]:
     """
     Instatiate predictive model from checkpoint
 
     Params:
-    `model_name`: Huggingface model name
     `checkpoint_fh`: Model checkpoint filehandle
     `device`: The `torch.device` to use
 
     Return:
-    Model instance from checkpoint and tokenizer
+    Model instance from checkpoint, tokenizer
     """
 
+    checkpoint = torch.load(checkpoint_fh, map_location=device)
+    model_name = checkpoint['model_name']
     model = AutoModelForTokenClassification.from_pretrained(
         model_name, id2label=ID2NER_TAG, label2id=NER_TAG2ID)
-    checkpoint = torch.load(checkpoint_fh, map_location=device)
     model.load_state_dict(checkpoint['model_state_dict'])
     model.to(device)
     model.eval()
@@ -499,11 +487,9 @@ def main() -> None:
 
     out_file = os.path.join(args.out_dir, 'predictions.csv')
 
-    model_name = args.model_name
-
     device = get_torch_device()
 
-    model, tokenizer = get_model(model_name, args.checkpoint, device)
+    model, tokenizer = get_model(args.checkpoint, device)
 
     predictions = reformat_output(
         deduplicate(predict(model, tokenizer, input_df, device)))
