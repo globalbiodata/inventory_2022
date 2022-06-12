@@ -40,7 +40,7 @@ rule train_classif:
         config["classif_train_outdir"] + "/{model}/checkpt.pt",
         config["classif_train_outdir"] + "/{model}/train_stats.csv",
     params:
-        out_dir=config["classif_train_outdir"],
+        out_dir=config["classif_train_outdir"] +"/{model}",
         epochs=config["classif_epochs"],
         hf_model=lambda w: model_df.loc[w.model, "hf_name"],
         batch_size=lambda w: model_df.loc[w.model, "batch_size"],
@@ -150,7 +150,7 @@ rule train_ner:
         config["ner_train_outdir"] + "/{model}/checkpt.pt",
         config["ner_train_outdir"] + "/{model}/train_stats.csv",
     params:
-        out_dir=config["ner_train_outdir"],
+        out_dir=config["ner_train_outdir"] + "/{model}",
         epochs=config["ner_epochs"],
         hf_model=lambda w: model_df.loc[w.model, "hf_name"],
         batch_size=lambda w: model_df.loc[w.model, "batch_size"],
