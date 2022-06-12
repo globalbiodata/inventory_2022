@@ -24,7 +24,7 @@ rule split_classif_data:
         out_dir=config["classif_splits_dir"],
     shell:
         """
-        python3 class_data_generator.py \
+        python3 src/class_data_generator.py \
             -o {params.out_dir} \
             -r \
             {input}
@@ -83,7 +83,7 @@ rule find_best_classifier:
         out_dir=config["classif_train_outdir"] + "/best",
     shell:
         """
-        python3 model_picker.py \
+        python3 src/model_picker.py \
             -o {params.out_dir} \
             {input}
         """
@@ -99,7 +99,7 @@ rule classify_full_corpus:
         out_dir="data/full_corpus_predicted_classification",
     shell:
         """
-        python3 class_predict.py \
+        python3 src/class_predict.py \
             -o {params.out_dir} \
             -c {input.classifier} \
             -i {input.infile}
@@ -134,7 +134,7 @@ rule split_ner_data:
         out_dir=config["ner_splits_dir"],
     shell:
         """
-        python3 ner_data_generator.py \
+        python3 src/ner_data_generator.py \
             -o {params.out_dir} \
             -r \
             {input}
@@ -193,7 +193,7 @@ rule find_best_ner:
         out_dir=config["ner_train_outdir"] + "/best",
     shell:
         """
-        python3 model_picker.py \
+        python3 src/model_picker.py \
             -o {params.out_dir} \
             {input}
         """
@@ -210,7 +210,7 @@ rule ner_full_corpus:
         out_dir="data/full_corpus_predicted/ner",
     shell:
         """
-        python3 ner_predict.py \
+        python3 src/ner_predict.py \
             -o {params.out_dir} \
             -c {input.classifier} \
             -i {input.infile}
