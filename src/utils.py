@@ -11,7 +11,6 @@ import sys
 from typing import Any, List, NamedTuple, TextIO, Tuple
 
 import pandas as pd
-import plotly.express as px
 import pytest
 import torch
 from pandas.testing import assert_frame_equal
@@ -111,9 +110,11 @@ class Metrics(NamedTuple):
 
 
 # ---------------------------------------------------------------------------
-def set_random_seed(seed):
+def set_random_seed(seed: int):
     """
-    Sets random seed for deterministic outcome of ML-trained models
+    Set random seed for deterministic outcome of ML-trained models
+
+    `seed`: Value to use for seed
     """
     torch.manual_seed(seed)
     if torch.cuda.is_available():
@@ -125,7 +126,7 @@ def get_torch_device() -> torch.device:
     """
     Get device for torch
 
-    Returns:
+    Return:
     `torch.device` either "cuda" or "cpu"
     """
 
@@ -138,12 +139,13 @@ def split_df(df: pd.DataFrame, rand_seed: bool, splits: List[float]) -> Splits:
     """
     Split manually curated data into train, validation and test sets
 
+    Parameters:
     `df`: Manually curated classification data
     `rand_seed`: Optionally use random seed
     `splits`: Proportions of data for [train, validation, test]
 
     Return:
-    train, validation, test dataframes
+    `Splits` containing train, validation, and test dataframes
     """
 
     seed = 241 if rand_seed else None
@@ -213,7 +215,7 @@ def strip_xml(text: str) -> str:
     Parameters:
     `text`: String possibly containing XML tags
 
-    Returns:
+    Return:
     String without XML tags
     """
     # If header tag between two adjacent strings, replace with a space
@@ -256,7 +258,7 @@ def concat_title_abstract(df: pd.DataFrame) -> pd.DataFrame:
     Parameters:
     `df`: Dataframe with columns "title" and "abstract"
 
-    Returns:
+    Return:
     A `pd.DataFrame` with new column "title_abstract"
     """
 
@@ -286,11 +288,11 @@ def add_period(text: str) -> str:
     """
     Add period to end of sentence if punctuation not present
 
-    Parameter:
+    Parameters:
     `text`: String that may be missing final puncturation
 
-    Returns:
-    `text` With final punctuation
+    Return:
+    `text` with final punctuation
     """
 
     return text if text[-1] in '.?!' else text + '.'
@@ -360,6 +362,7 @@ def make_filenames(out_dir: str) -> Tuple[str, str]:
     """
     Make output filename
 
+    Parameters:
     `out_dir`: Output directory to be included in filename
 
     Return: Tuple['{out_dir}/checkpt.pt', '{out_dir}/train_stats.csv']
@@ -384,6 +387,7 @@ def save_model(model: Any, model_name: str, filename: str) -> None:
 
     Parameters:
     `model`: Model to save
+    `model_name`: Model HuggingFace name
     `filename`: Name of file for saving model
     """
 
@@ -398,32 +402,10 @@ def save_model(model: Any, model_name: str, filename: str) -> None:
 def save_train_stats(df: pd.DataFrame, filename: str) -> None:
     """
     Save training performance metrics to file
+
+    Parameters:
+    `df`: Training stats dataframe
+    `filename`: Name of file for saving dataframe
     """
 
     df.to_csv(filename, index=False)
-
-
-# ---------------------------------------------------------------------------
-def save_loss_plot(train_losses: List[float], val_losses: List[float],
-                   filename: str) -> None:
-    """
-    Plot training and validation losses, and save to file
-
-    Parameters:
-    `train_losses`: Training losses
-    `val_losses`: Validation losses
-    `filename`: Name of file for saving plot
-    """
-    df = pd.DataFrame({
-        'Epoch': list(range(1,
-                            len(val_losses) + 1)),
-        'Train': train_losses,
-        'Validation': val_losses
-    })
-
-    fig = px.line(df,
-                  x='Epoch',
-                  y=['Train', 'Validation'],
-                  title='Train and Validation Losses')
-
-    fig.write_image(filename)

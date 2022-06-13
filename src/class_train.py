@@ -164,6 +164,8 @@ def train(settings: Settings) -> Tuple[Any, pd.DataFrame]:
 
     Parameters:
     `settings`: Model settings (NamedTuple)
+
+    Return: Tuple of best model, and training stats dataframe
     """
 
     model = settings.model
@@ -243,7 +245,7 @@ def train_epoch(settings: Settings, progress_bar: tqdm) -> float:
     `settings`: Model settings (NamedTuple)
     `progress_bar`: tqdm instance for tracking progress
 
-    Return: Train loss per observation
+    Return: Average train loss per observation
     """
     train_loss = 0
     num_train = 0
@@ -274,7 +276,7 @@ def get_metrics(model: Any, dataloader: DataLoader,
     corresponding labels
     `device`: Torch device
 
-    Returns:
+    Return:
     A `Metrics` NamedTuple
     """
     calc_precision = load_metric('precision')
@@ -307,7 +309,16 @@ def get_metrics(model: Any, dataloader: DataLoader,
 # ---------------------------------------------------------------------------
 def get_dataloaders(args: Args,
                     model_name: str) -> Tuple[DataLoader, DataLoader]:
-    """ Generate the dataloaders """
+    """
+    Generate the dataloaders
+
+    Parameters:
+    `args`: Command-line arguments
+    `model_name`: Huggingface model name
+
+    Return:
+    A Tuple of trianing, validation `DataLoader`s
+    """
 
     print('Generating dataloaders ...')
     print('=' * 30)
@@ -335,7 +346,18 @@ def get_dataloaders(args: Args,
 # ---------------------------------------------------------------------------
 def initialize_model(model_name: str, args: Args, train_dataloader: DataLoader,
                      val_dataloader: DataLoader) -> Settings:
-    """ Initialize the model and get settings  """
+    """
+    Instatiate predictive model from HFHub and get settings
+
+    Params:
+    `model_name`: Pretrained model name
+    `args`: Command-line arguments
+    `trin_dataloader`: Training `DataLoader`
+    `val_dataloader`: Validation `DataLoader`
+
+    Return:
+    `Settings` including pretrained model
+    """
 
     print(f'Initializing {model_name} model ...')
     print('=' * 30)

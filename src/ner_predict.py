@@ -9,7 +9,7 @@ import os
 import string
 from itertools import compress
 from statistics import mean
-from typing import Dict, List, NamedTuple, TextIO, cast, Tuple, Any
+from typing import Any, Dict, List, NamedTuple, TextIO, Tuple, cast
 
 import pandas as pd
 import torch
@@ -103,7 +103,7 @@ def get_model(checkpoint_fh: TextIO,
     """
     Instatiate predictive model from checkpoint
 
-    Params:
+    Parameters:
     `checkpoint_fh`: Model checkpoint filehandle
     `device`: The `torch.device` to use
 
@@ -128,6 +128,11 @@ def get_model(checkpoint_fh: TextIO,
 def convert_predictions(seq_preds: SeqPrediction) -> List[NamedEntity]:
     """
     Convert raw predictions to meaningful predictions
+
+    Parameters:
+    seq_preds: `SeqPrediction` output from model
+
+    Return: List of `NamedEntity`s
     """
 
     entities: List[NamedEntity] = []
@@ -239,12 +244,13 @@ def predict_sequence(model, device: torch.device, seq: str,
     """
     Run token prediction on sequence
 
+    Parameters:
     `model`: Trained token classification model
     `device`: Device to use
     `seq`: Input string/sequence
     `tokenizer`: Pretrained tokenizer
 
-    Return list of named entities
+    Return: List of `NamedEntity`s
     """
 
     with torch.no_grad():
@@ -277,12 +283,14 @@ def predict(model, tokenizer: PreTrainedTokenizer, inputs: pd.DataFrame,
     """
     Perform NER prediction on rows of input dataframe
 
+    Parameters:
     `model`: Trained token classification model
     `tokenizer`: Pretrained tokenizer
     `inputs`: Input dataframe
     `device`: Device to use
 
-    return
+    Return: Dataframe containining one row per named entity including id, text,
+    mention, lable, and probability columns
     """
 
     pred_df = pd.DataFrame(columns=['ID', 'text', 'mention', 'label', 'prob'])
@@ -316,7 +324,10 @@ def deduplicate(df: pd.DataFrame) -> pd.DataFrame:
     Deduplicate predicted entities, keeping only highest probability for each
     predicted named entity
 
+    Parameters:
     df: Predicted entities dataframe
+
+    Return: Deduplicated dataframe
     """
 
     unique_df = pd.DataFrame(columns=[*df.columns, 'count'])
@@ -386,9 +397,10 @@ def reformat_output(df: pd.DataFrame) -> pd.DataFrame:
     """
     Reformat output datframe to wide format
 
+    Parameters:
     `df`: Dataframe output by deduplicate()
 
-    Return
+    Return:
     Wide-format datframe
     """
 

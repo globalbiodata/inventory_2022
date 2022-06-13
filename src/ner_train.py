@@ -135,10 +135,11 @@ def get_args() -> Args:
 
 
 # ---------------------------------------------------------------------------
-def get_dataloaders(args, model_name: str) -> Tuple[DataLoader, DataLoader]:
+def get_dataloaders(args) -> Tuple[DataLoader, DataLoader]:
     """
     Generate training and validation dataloaders
 
+    Parameters:
     `args`: Command-line arguments
 
     Return: training dataloader, validation dataloader
@@ -147,7 +148,7 @@ def get_dataloaders(args, model_name: str) -> Tuple[DataLoader, DataLoader]:
     print('Generating training and validation dataloaders ...')
     print('=' * 30)
 
-    params = RunParams(model_name, args.batch_size, args.num_training)
+    params = RunParams(args.model_name, args.batch_size, args.num_training)
     train_dataloader = get_dataloader(args.train_file, params)
     val_dataloader = get_dataloader(args.val_file, params)
 
@@ -158,24 +159,23 @@ def get_dataloaders(args, model_name: str) -> Tuple[DataLoader, DataLoader]:
 
 
 # ---------------------------------------------------------------------------
-def initialize_model(model_name: str, args: Args, train_dataloader: DataLoader,
+def initialize_model(args: Args, train_dataloader: DataLoader,
                      val_dataloader: DataLoader) -> Settings:
     """
     Initialize the model and get settings
 
-    `model_name`: Trained model name
     `args`: Command-line arguments
     `train_dataloader`: Training dataloader
     `val_dataloader`: Validation dataloader
 
-    Return: training settings including model
+    Return: Training settings including model
     """
 
-    print('Initializing', model_name, 'model ...')
+    print('Initializing', args.model_name, 'model ...')
     print('=' * 30)
 
     model = AutoModelForTokenClassification.from_pretrained(
-        model_name, id2label=ID2NER_TAG, label2id=NER_TAG2ID)
+        args.model_name, id2label=ID2NER_TAG, label2id=NER_TAG2ID)
     device = torch.device(
         'cuda') if torch.cuda.is_available() else torch.device('cpu')
     model.to(device)
@@ -205,6 +205,8 @@ def train(settings: Settings) -> Tuple[Any, pd.DataFrame]:
 
     Parameters:
     `settings`: Model settings (NamedTuple)
+
+    Return: Tuple of best model, and training stats dataframe
     """
 
     model = settings.model
@@ -284,7 +286,7 @@ def train_epoch(settings: Settings, progress_bar: tqdm) -> float:
     `settings`: Model settings (NamedTuple)
     `progress_bar`: tqdm instance for tracking progress
 
-    Return: Train loss per observation
+    Return: Average train loss per observation
     """
     train_loss = 0
     num_train = 0
@@ -315,7 +317,7 @@ def get_metrics(model: Any, dataloader: DataLoader,
     corresponding labels
     `device`: Torch device
 
-    Returns:
+    Return:
     A `Metrics` NamedTuple
     """
     calc_seq_metrics = load_metric('seqeval')
@@ -347,7 +349,14 @@ def get_metrics(model: Any, dataloader: DataLoader,
 
 # ---------------------------------------------------------------------------
 def extract_metrics(metric_dict: Optional[dict]) -> List[float]:
-    """ Extract precision, recall, and F1 """
+    """
+    Extract precision, recall, and F1
+
+    Parameters:
+    `metric_dict`: Dictionary of metrics
+
+    Return: List of precision, recall, and F1
+    """
 
     if not metric_dict:
         sys.exit('Unable to calculate metrics.')
@@ -364,6 +373,7 @@ def convert_to_tags(batch_predictions: array,
     """
     Convert numeric labels to string tags
 
+    Parameters:
     `batch_predictions`: Predicted numeric labels of batch of sequences
     `batch_labels`: True numeric labels of batch of sequences
 
@@ -417,12 +427,11 @@ def main() -> None:
         os.mkdir(out_dir)
 
     model_name = args.model_name
-    train_dataloader, val_dataloader = get_dataloaders(args, model_name)
+    train_dataloader, val_dataloader = get_dataloaders(args)
 
     if args.seed:
         set_random_seed(45)
-    settings = initialize_model(model_name, args, train_dataloader,
-                                val_dataloader)
+    settings = initialize_model(args, train_dataloader, val_dataloader)
 
     print('Starting model training...')
     print('=' * 30)

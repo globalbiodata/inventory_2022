@@ -49,7 +49,14 @@ def get_args() -> Args:
 
 # ---------------------------------------------------------------------------
 def extract_urls(text: str) -> List[str]:
-    """ Extract URLs from a string """
+    """
+    Extract URLs from a string
+
+    Parameters:
+    `text`: String possible containing one or more URLs
+
+    Return: List of URLs
+    """
 
     url_pattern = re.compile(
         r'''http[s]? # http and optional s
@@ -107,7 +114,14 @@ def test_extract_urls() -> None:
 
 # ---------------------------------------------------------------------------
 def add_url_column(df: pd.DataFrame) -> pd.DataFrame:
-    """ Add column of extracted URLs"""
+    """
+    Add column of extracted URLs
+
+    Parameters:
+    `df`: Input dataframe that has text column
+
+    Return: Dataframe with new column of URLs, with URLs separated by commas
+    """
 
     df['url'] = df['text'].apply(extract_urls)
 
@@ -153,7 +167,16 @@ def test_add_url_column() -> None:
 
 # ---------------------------------------------------------------------------
 def get_outname(outdir: str, filename: str) -> str:
-    """ Creaate output file name """
+    """
+    Creaate output file name using output directory and basename of input
+    file
+
+    Parameters:
+    `outdir`: Output directory
+    `filename`: Input filename
+
+    Return: Output filepath
+    """
 
     return os.path.join(outdir, os.path.basename(filename))
 

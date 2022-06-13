@@ -74,6 +74,7 @@ def check_input(df: pd.DataFrame) -> None:
     """
     Check the input data columns
 
+    Parameters:
     `df`: Input dataframe
     """
 
@@ -90,7 +91,10 @@ def filter_data(df: pd.DataFrame) -> pd.DataFrame:
     """
     Return only data with curation score of 0 or 1
 
+    Parameters:
     `df`: Manually curated data
+
+    Return: Filtered dataframe
     """
 
     df = df[['id', 'title', 'abstract', 'curation_score']]
@@ -118,7 +122,13 @@ def test_filter_data() -> None:
 
 # ---------------------------------------------------------------------------
 def check_data(df: pd.DataFrame) -> None:
-    """ Check that input data is valid """
+    """
+    Check that input data is valid, with same numnber of curation scores as
+    number of unique id's
+
+    Parameters:
+    `df`: Curated data
+    """
 
     num_certain = df['id'].count()
     unique_ids = df['id'].nunique()

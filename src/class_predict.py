@@ -15,7 +15,7 @@ from torch.utils.data.dataloader import DataLoader
 from transformers import AutoModelForSequenceClassification as classifier
 
 from class_data_handler import DataFields, RunParams, get_dataloader
-from utils import (CustomHelpFormatter, get_torch_device)
+from utils import CustomHelpFormatter, get_torch_device
 
 
 # ---------------------------------------------------------------------------
@@ -107,7 +107,7 @@ def get_dataloaders(args: Args, model_name: str) -> DataLoader:
     `args`: Command-line arguments
     `model_name`: Huggingface model name
 
-    Returns:
+    Return:
     A `DataLoader` of preprocessed data
     """
 
@@ -129,7 +129,7 @@ def get_model(checkpoint_fh: TextIO, device: torch.device) -> Tuple[Any, str]:
     `checkpoint_fh`: Model checkpoint filehandle
     `device`: The `torch.device` to use
 
-    Retturns:
+    Return:
     Model instance from checkpoint, and model name
     """
 
@@ -155,7 +155,7 @@ def predict(model, dataloader: DataLoader, class_labels: ClassLabel,
     `class_labels`: Class labels to apply in prediction
     `device`: The `torch.device` to use
 
-    Returns:
+    Return:
     List of predicted labels
     """
 

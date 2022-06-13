@@ -55,8 +55,12 @@ def get_model_name(filename: str) -> str:
     """
     Get model name from input file name
 
+    e.g. 'out/scibert/checkpoint.pt' -> 'scibert'
+
     Parameters:
     `filename`: Input filename containing model name
+
+    Return: Model (short)name
     """
 
     model_name = filename.split('/')[-2]
@@ -84,6 +88,9 @@ def get_checkpoint_dir(filename: str) -> str:
 
     Parameters:
     `filename`: Input filename
+
+    Return:
+    Checkpoint directory name
     """
 
     return os.path.split(filename)[0]
