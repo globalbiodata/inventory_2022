@@ -28,13 +28,14 @@ def get_args() -> Args:
     """ Parse command-line arguments """
 
     parser = argparse.ArgumentParser(
-        description='Extract URLs from title and abstracts',
+        description=
+        'Extract URLs from text. File must have a column named "text".',
         formatter_class=CustomHelpFormatter)
 
     parser.add_argument('file',
                         metavar='FILE',
                         type=argparse.FileType('rt', encoding='ISO-8859-1'),
-                        help='Input file')
+                        help='Input file (csv)')
     parser.add_argument('-o',
                         '--out-dir',
                         metavar='DIR',
