@@ -1,6 +1,6 @@
 import pandas as pd
 
-# Import tab separated file containined the configurations
+# Import tab separated file containing the configurations
 # used for training each model.
 model_df = pd.read_table(config["models"]).set_index("model", drop=True)
 model_df = model_df.fillna("")
@@ -9,7 +9,8 @@ model_df = model_df.fillna("")
 rule all:
     input:
         "data/full_corpus_predictions/predicted_positives.csv",
-        "data/full_corpus_predictions/ner/predictions.csv"
+        "data/full_corpus_predictions/ner/predictions.csv",
+        "data/full_corpus_predictions/urls/predictions.csv"
 
 
 # Split curated classification set into train, val, and test
@@ -214,4 +215,19 @@ rule ner_full_corpus:
             -o {params.out_dir} \
             -c {input.classifier} \
             -i {input.infile}
+        """
+
+# Extract out URLS
+rule get_urls:
+    input:
+        "data/full_corpus_predictions/ner/predictions.csv",
+    output:
+        "data/full_corpus_predictions/urls/predictions.csv",
+    params:
+        out_dir="data/full_corpus_predictions/urls",
+    shell:
+        """
+        python3 src/url_extractor.py \
+            -o {params.out_dir} \
+            {input}
         """
