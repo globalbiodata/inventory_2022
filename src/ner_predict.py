@@ -70,7 +70,7 @@ def get_args() -> Args:
     """ Parse command-line arguments """
 
     parser = argparse.ArgumentParser(
-        description='Predict article classifications using trained BERT model',
+        description='Predict named entities using trained BERT model',
         formatter_class=CustomHelpFormatter)
 
     parser.add_argument('-c',
@@ -82,7 +82,7 @@ def get_args() -> Args:
     parser.add_argument('-i',
                         '--input-file',
                         metavar='FILE',
-                        type=argparse.FileType('rt'),
+                        type=argparse.FileType('rt', encoding='ISO-8859-1'),
                         required=True,
                         help='Input file for prediction')
     parser.add_argument('-o',
@@ -341,6 +341,7 @@ def deduplicate(df: pd.DataFrame) -> pd.DataFrame:
         unique_df = pd.concat([unique_df, mention.head(1)])
 
     unique_df['uncased_mention'] = unique_df['mention'].str.lower()
+    out_df = pd.DataFrame(columns=unique_df.columns)
 
     # Remove duplicates that differ only in case
     # Choose which to keep by prioritizing number of occurences then prob
@@ -407,8 +408,8 @@ def reformat_output(df: pd.DataFrame) -> pd.DataFrame:
     df['prob'] = df['prob'].astype(str)
 
     # Add two dummy rows so that both COM and FUL are present as labels
-    df.loc[len(df)] = ['-1', '', '', 'COM', '0']
-    df.loc[len(df)] = ['-1', '', '', 'FUL', '0']
+    df.loc[len(df)] = ['-1', 'foo bar', 'foo', 'COM', '0']
+    df.loc[len(df)] = ['-1', 'foo bar', 'bar', 'FUL', '0']
     df = df[df['mention'] != '']
 
     # For each article, aggregate multiple occurences
