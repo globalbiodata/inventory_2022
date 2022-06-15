@@ -196,8 +196,8 @@ def train(settings: Settings) -> Tuple[Any, pd.DataFrame]:
 
         # Stop training once validation F1 goes down
         # Overfitting has begun
-        if val_metrics.f1 < best_val.f1 and epoch > 0:
-            break
+        # if val_metrics.f1 < best_val.f1 and epoch > 0:
+        #     break
 
         epoch_row = pd.DataFrame(
             {
