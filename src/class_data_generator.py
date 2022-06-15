@@ -163,9 +163,9 @@ def main() -> None:
         'test_paper_classif.csv'
     ])
 
-    train_df.to_csv(train_out, index=False)
-    val_df.to_csv(val_out, index=False)
-    test_df.to_csv(test_out, index=False)
+    train_df.to_csv(train_out, index=False, sep='\t')
+    val_df.to_csv(val_out, index=False, sep='\t')
+    test_df.to_csv(test_out, index=False, sep='\t')
 
     print(f'Done. Wrote 3 files to {out_dir}.')
 

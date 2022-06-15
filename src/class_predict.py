@@ -199,7 +199,7 @@ def main() -> None:
     df['predicted_label'] = predicted_labels
 
     # Save labels to file
-    df.to_csv(out_file)
+    df.to_csv(out_file, sep='\t')
     print('Done. Saved predictions to', out_file)
 
 
