@@ -125,6 +125,7 @@ def main() -> None:
 
         if max(df['val_f1']) > best_f1:
             best_model, _ = make_filenames(checkpoint_dir)
+            best_f1 = max(df['val_f1'])
 
         df['model'] = model_name
         out_df = pd.concat([out_df, df])
