@@ -48,7 +48,8 @@ def get_dataloader(file: str, run_params: RunParams) -> DataLoader:
     dataset = load_dataset('pandas', data_files={'set': file})
     dataset = cast(DatasetDict, dataset)  # Cast for type checker
 
-    tokenizer = AutoTokenizer.from_pretrained(run_params.model_name)
+    tokenizer = AutoTokenizer.from_pretrained(run_params.model_name,
+                                              add_prefix_space=True)
     collator = DataCollatorForTokenClassification(tokenizer=tokenizer)
 
     tokenize_align_labels_with_tokenizer = partial(tokenize_align_labels,
