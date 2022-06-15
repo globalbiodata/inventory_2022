@@ -115,7 +115,7 @@ rule filter_positives:
         "data/full_corpus_predictions/predicted_positives.csv",
     shell:
         """
-        head -n 1 > {output}
+        head -n 1 {input} > {output}
         grep -v 'not-bio-resource' {input} >> {output}
         """
 
