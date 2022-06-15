@@ -199,6 +199,7 @@ def main() -> None:
     df['predicted_label'] = predicted_labels
 
     # Save labels to file
+    df = df.replace(r'\n', ' ', regex=True)
     df.to_csv(out_file, index=False)
     print('Done. Saved predictions to', out_file)
 
