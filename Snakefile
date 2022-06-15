@@ -97,7 +97,7 @@ rule classify_full_corpus:
     output:
          "data/full_corpus_predictions/classification/predictions.csv",
     params:
-        out_dir="data/full_corpus_predicted_classification",
+        out_dir="data/full_corpus_predictions/classification",
     shell:
         """
         python3 src/class_predict.py \
@@ -208,7 +208,7 @@ rule ner_full_corpus:
     output:
          "data/full_corpus_predictions/ner/predictions.csv",
     params:
-        out_dir="data/full_corpus_predicted/ner",
+        out_dir="data/full_corpus_predictions/ner",
     shell:
         """
         python3 src/ner_predict.py \
