@@ -232,8 +232,7 @@ def test_convert_predictions() -> None:
 
     expected = [
         NamedEntity('Inside', 'I-COM', 0.996),
-        NamedEntity('inside', 'I-FUL', 0.998),
-        NamedEntity('inside', 'I-FUL', 0.978),
+        NamedEntity('inside inside', 'I-FUL', 0.988),
         NamedEntity('(inside).', 'B-COM', 0.98)
     ]
 
@@ -486,7 +485,10 @@ def test_reformat_output() -> None:
             'full_prob'
         ])
 
-    assert_frame_equal(reformat_output(in_df), out_df, check_names=False)
+    assert_frame_equal(reformat_output(in_df),
+                       out_df,
+                       check_names=False,
+                       check_dtype=False)
 
 
 # ---------------------------------------------------------------------------
