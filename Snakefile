@@ -200,11 +200,11 @@ rule find_best_ner:
         """
 
 
-# Predict NER on full corpus
+# Predict NER on predicted biodata resource papers
 rule ner_full_corpus:
     input:
         classifier=dynamic(config["ner_train_outdir"] + "/best/{best_ner}/best_checkpt.pt"),
-        infile=config["full_corpus"],
+        infile="data/full_corpus_predictions/predicted_positives.csv",
     output:
          "data/full_corpus_predictions/ner/predictions.csv",
     params:
