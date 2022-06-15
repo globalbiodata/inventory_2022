@@ -507,7 +507,7 @@ def main() -> None:
     predictions = reformat_output(
         deduplicate(predict(model, tokenizer, input_df, device)))
 
-    predictions.to_csv(out_file, index=False, sep='\t')
+    predictions.to_csv(out_file, index=False)
 
     print(f'Done. Saved predictions to {out_file}.')
 

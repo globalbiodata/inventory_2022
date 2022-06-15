@@ -210,7 +210,7 @@ def main() -> None:
 
     out_name = get_outname(out_dir, args.file.name)
 
-    df.to_csv(out_name, index=False, sep='\t')
+    df.to_csv(out_name, index=False)
 
     print(f'Done. Wrote output to {out_name}.')
 

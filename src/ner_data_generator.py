@@ -560,9 +560,9 @@ def main() -> None:
         lambda f: os.path.join(out_dir, f),
         ['train_ner.csv', 'val_ner.csv', 'test_ner.csv'])
 
-    raw_train.to_csv(raw_train_out, index=False, sep='\t')
-    raw_val.to_csv(raw_val_out, index=False, sep='\t')
-    raw_test.to_csv(raw_test_out, index=False, sep='\t')
+    raw_train.to_csv(raw_train_out, index=False)
+    raw_val.to_csv(raw_val_out, index=False)
+    raw_test.to_csv(raw_test_out, index=False)
 
     train_out, val_out, test_out = map(
         lambda f: os.path.join(out_dir, f),
