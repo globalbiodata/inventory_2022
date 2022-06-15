@@ -116,7 +116,7 @@ rule filter_positives:
     shell:
         """
         head -n 1 > {output}
-        grep 'biodata-resource' >> {output}
+        grep 'biodata-resource' {input} >> {output}
         """
 
 
