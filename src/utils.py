@@ -295,6 +295,9 @@ def add_period(text: str) -> str:
     `text` with final punctuation
     """
 
+    if not text:
+        return ''
+
     return text if text[-1] in '.?!' else text + '.'
 
 
@@ -302,6 +305,7 @@ def add_period(text: str) -> str:
 def test_add_period() -> None:
     """ Test add_poeriod() """
 
+    assert add_period('') == ''
     assert add_period('A statement.') == 'A statement.'
     assert add_period('A question?') == 'A question?'
     assert add_period('An exclamation!') == 'An exclamation!'
