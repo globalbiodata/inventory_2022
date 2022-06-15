@@ -154,9 +154,11 @@ def convert_predictions(seq_preds: SeqPrediction) -> List[NamedEntity]:
             prob_count = len(probs)
         elif any(label[0] == 'I' for label in labels) and substring != ' ':
             if not began_entity:
+                began_entity = True
                 label = list(
                     compress(labels, [label[0] == 'I' for label in labels]))[0]
                 entities.append(NamedEntity(substring, label, mean(probs)))
+                prob_count = len(probs)
             else:
                 last_entity = entities[-1]
                 prob = (last_entity.prob * prob_count +
