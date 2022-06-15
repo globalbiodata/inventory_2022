@@ -78,8 +78,8 @@ rule find_best_classifier:
             model=model_df.index,
         ),
     output:
-        config["classif_train_outdir"] + "/best/*/best_checkpt.pt",
-        config["classif_train_outdir"] + "/best/*/combined_stats.csv",
+        dynamic(config["classif_train_outdir"] + "/best/{best_classifier}/best_checkpt.pt"),
+        dynamic(config["classif_train_outdir"] + "/best/{best_classifier}/combined_stats.csv"),
     params:
         out_dir=config["classif_train_outdir"] + "/best",
     shell:
@@ -92,7 +92,7 @@ rule find_best_classifier:
 # Predict classification of entire corpus
 rule classify_full_corpus:
     input:
-        classifier=config["classif_train_outdir"] + "/best/*/best_checkpt.pt",
+        classifier=dynamic(config["classif_train_outdir"] + "/best/{best_classifier}/best_checkpt.pt"),
         infile=config["full_corpus"],
     output:
          "data/full_corpus_predictions/classification/predictions.csv",
@@ -188,8 +188,8 @@ rule find_best_ner:
             model=model_df.index,
         ),
     output:
-        config["ner_train_outdir"] + "/best/*/best_checkpt.pt",
-        config["ner_train_outdir"] + "/best/*/combined_stats.csv",
+        dynamic(config["ner_train_outdir"] + "/best/{best_ner}/best_checkpt.pt"),
+        dynamic(config["ner_train_outdir"] + "/best/{best_ner}/combined_stats.csv"),
     params:
         out_dir=config["ner_train_outdir"] + "/best",
     shell:
@@ -203,7 +203,7 @@ rule find_best_ner:
 # Predict NER on full corpus
 rule ner_full_corpus:
     input:
-        classifier=config["ner_train_outdir"] + "/best/*/best_checkpt.pt",
+        classifier=dynamic(config["ner_train_outdir"] + "/best/{best_ner}/best_checkpt.pt"),
         infile=config["full_corpus"],
     output:
          "data/full_corpus_predictions/ner/predictions.csv",
