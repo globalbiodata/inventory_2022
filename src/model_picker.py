@@ -126,6 +126,7 @@ def main() -> None:
         if max(df['val_f1']) > best_f1:
             checkpoint_dir = get_checkpoint_dir(filename)
             best_model, _ = make_filenames(checkpoint_dir)
+            best_model_name = model_name
             best_f1 = max(df['val_f1'])
 
         df['model'] = model_name
@@ -133,7 +134,7 @@ def main() -> None:
 
     out_df.reset_index(inplace=True, drop=True)
 
-    out_dir = os.path.join(args.out_dir, model_name)
+    out_dir = os.path.join(args.out_dir, best_model_name)
 
     model_outfile = os.path.join(out_dir, 'best_checkpt.pt')
     stats_outfile = os.path.join(out_dir, 'combined_stats.csv')
