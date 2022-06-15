@@ -251,6 +251,27 @@ def test_strip_xml() -> None:
 
 
 # ---------------------------------------------------------------------------
+def strip_newlines(text: str) -> str:
+    """
+    Remove all newline characters from string
+    
+    Parameters:
+    `text`: String
+    
+    Return: string without newlines
+    """
+
+    return re.sub('\n', '', text)
+
+
+# ---------------------------------------------------------------------------
+def test_strip_newlines() -> None:
+    """ Test strip_newlines() """
+
+    assert strip_newlines('Hello, \nworld!') == 'Hello, world!'
+
+
+# ---------------------------------------------------------------------------
 def concat_title_abstract(df: pd.DataFrame) -> pd.DataFrame:
     """
     Concatenate abstract and title columns
@@ -315,7 +336,7 @@ def test_add_period() -> None:
 # ---------------------------------------------------------------------------
 def preprocess_data(file: TextIO) -> pd.DataFrame:
     """
-    Strip XML tags and concatenate title and abstract columns
+    Strip XML tags and newlines and concatenate title and abstract columns
 
     Parameters:
     `file`: Input file handle
@@ -334,6 +355,7 @@ def preprocess_data(file: TextIO) -> pd.DataFrame:
 
     for col in ['title', 'abstract']:
         df[col] = df[col].apply(strip_xml)
+        df[col] = df[col].apply(strip_newlines)
 
     df = concat_title_abstract(df)
 
