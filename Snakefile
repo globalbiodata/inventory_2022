@@ -10,7 +10,7 @@ rule all:
     input:
         "data/full_corpus_predictions/predicted_positives.csv",
         "data/full_corpus_predictions/ner/predictions.csv",
-        "data/full_corpus_predictions/urls/predictions.csv"
+        "data/full_corpus_predictions/urls/predictions.csv",
 
 
 # Split curated classification set into train, val, and test
@@ -23,10 +23,12 @@ rule split_classif_data:
         config["classif_splits_dir"] + "/test_paper_classif.csv",
     params:
         out_dir=config["classif_splits_dir"],
+        splits=config["split_ratios"],
     shell:
         """
         python3 src/class_data_generator.py \
             -o {params.out_dir} \
+            --splits {params.splits} \
             -r \
             {input}
         """
@@ -41,7 +43,7 @@ rule train_classif:
         config["classif_train_outdir"] + "/{model}/checkpt.pt",
         config["classif_train_outdir"] + "/{model}/train_stats.csv",
     params:
-        out_dir=config["classif_train_outdir"] +"/{model}",
+        out_dir=config["classif_train_outdir"] + "/{model}",
         epochs=config["classif_epochs"],
         hf_model=lambda w: model_df.loc[w.model, "hf_name"],
         batch_size=lambda w: model_df.loc[w.model, "batch_size"],
@@ -78,8 +80,13 @@ rule find_best_classifier:
             model=model_df.index,
         ),
     output:
-        dynamic(config["classif_train_outdir"] + "/best/{best_classifier}/best_checkpt.pt"),
-        dynamic(config["classif_train_outdir"] + "/best/{best_classifier}/combined_stats.csv"),
+        dynamic(
+            config["classif_train_outdir"] + "/best/{best_classifier}/best_checkpt.pt"
+        ),
+        dynamic(
+            config["classif_train_outdir"]
+            + "/best/{best_classifier}/combined_stats.csv"
+        ),
     params:
         out_dir=config["classif_train_outdir"] + "/best",
     shell:
@@ -89,13 +96,16 @@ rule find_best_classifier:
             {input}
         """
 
+
 # Predict classification of entire corpus
 rule classify_full_corpus:
     input:
-        classifier=dynamic(config["classif_train_outdir"] + "/best/{best_classifier}/best_checkpt.pt"),
+        classifier=dynamic(
+            config["classif_train_outdir"] + "/best/{best_classifier}/best_checkpt.pt"
+        ),
         infile=config["full_corpus"],
     output:
-         "data/full_corpus_predictions/classification/predictions.csv",
+        "data/full_corpus_predictions/classification/predictions.csv",
     params:
         out_dir="data/full_corpus_predictions/classification",
     shell:
@@ -132,10 +142,12 @@ rule split_ner_data:
         config["ner_splits_dir"] + "/test_ner.pkl",
     params:
         out_dir=config["ner_splits_dir"],
+        splits=config["split_ratios"],
     shell:
         """
         python3 src/ner_data_generator.py \
             -o {params.out_dir} \
+            --splits {params.splits} \
             -r \
             {input}
         """
@@ -202,10 +214,12 @@ rule find_best_ner:
 # Predict NER on predicted biodata resource papers
 rule ner_full_corpus:
     input:
-        classifier=dynamic(config["ner_train_outdir"] + "/best/{best_ner}/best_checkpt.pt"),
+        classifier=dynamic(
+            config["ner_train_outdir"] + "/best/{best_ner}/best_checkpt.pt"
+        ),
         infile="data/full_corpus_predictions/predicted_positives.csv",
     output:
-         "data/full_corpus_predictions/ner/predictions.csv",
+        "data/full_corpus_predictions/ner/predictions.csv",
     params:
         out_dir="data/full_corpus_predictions/ner",
     shell:
@@ -215,6 +229,7 @@ rule ner_full_corpus:
             -c {input.classifier} \
             -i {input.infile}
         """
+
 
 # Extract out URLS
 rule get_urls:

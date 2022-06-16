@@ -16,6 +16,8 @@ best_ner_dir: 'out/best_ner'
 ner_benchmark_dir: 'out/benchmarks/ner'
 ner_log_dir: 'out/logs/ner'
 
+split_ratios: '0.8 0.1 0.1'
+
 
 # Input files
 classif_data: 'data/manual_classifications.csv'
