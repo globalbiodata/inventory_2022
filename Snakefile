@@ -11,6 +11,9 @@ rule all:
         "data/full_corpus_predictions/predicted_positives.csv",
         "data/full_corpus_predictions/ner/predictions.csv",
         "data/full_corpus_predictions/urls/predictions.csv",
+        config["classif_train_outdir"]
+        + "/best/{best_classifier}/test_set_evaluation/metrics.csv",
+        config["ner_train_outdir"] + "/best/{best_ner}/test_set_evaluation/metrics.csv",
 
 
 # Split curated classification set into train, val, and test
@@ -94,6 +97,26 @@ rule find_best_classifier:
         python3 src/model_picker.py \
             -o {params.out_dir} \
             {input}
+        """
+
+
+# Evaluate model on test set
+rule evaluate_best_classifier:
+    input:
+        infile=config["classif_splits_dir"] + "/test_paper_classif.csv",
+        model=config["classif_train_outdir"] + "/best/{best_classifier}/best_checkpt.pt",
+    output:
+        config["classif_train_outdir"]
+        + "/best/{best_classifier}/test_set_evaluation/metrics.csv",
+    params:
+        otudir=config["classif_train_outdir"]
+        + "/best/{best_classifier}/test_set_evaluation",
+    shell:
+        """
+        python3 src/class_final_eval.py \
+            -o {params.outdir} \
+            -t {params.infile} \
+            -c {params.model}
         """
 
 
@@ -208,6 +231,24 @@ rule find_best_ner:
         python3 src/model_picker.py \
             -o {params.out_dir} \
             {input}
+        """
+
+
+# Evaluate model on test set
+rule evaluate_best_ner:
+    input:
+        infile=config["ner_splits_dir"] + "/test_ner.pkl",
+        model=config["ner_train_outdir"] + "/best/{best_ner}/best_checkpt.pt",
+    output:
+        config["ner_train_outdir"] + "/best/{best_ner}/test_set_evaluation/metrics.csv",
+    params:
+        otudir=config["ner_train_outdir"] + "/best/{best_ner}/test_set_evaluation",
+    shell:
+        """
+        python3 src/ner_final_eval.py \
+            -o {params.outdir} \
+            -t {params.infile} \
+            -c {params.model}
         """
 
 
