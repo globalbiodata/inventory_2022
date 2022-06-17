@@ -98,9 +98,9 @@ def get_args():
 
     args = parser.parse_args()
 
-    return Args(args.test_file, args.checkpoint, args.out_dir, args.checkpoint,
-                args.predictive_field, args.descriptive_labels, args.max_len,
-                args.batch_size)
+    return Args(args.test_file, args.checkpoint, args.out_dir,
+                args.predictive_field, args.descriptive_labels,
+                args.labels_field, args.max_len, args.batch_size)
 
 
 # ---------------------------------------------------------------------------
