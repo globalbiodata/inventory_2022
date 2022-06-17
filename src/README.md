@@ -79,6 +79,15 @@ Two outputs are created in `--outdir`:
 * `{best_model_name}/best_checkpt.pt`: Checkpoint of best model (copied from its original location)
 * `{best_model_name}/combined_stats.csv`: File with training stats for each epoch of every model compared
 
+# Model evaluation
+
+`class_final_eval.py` and `ner_final_eval.py`
+
+Final evaluation of the chosen models is performed using `class_final_eval.py` and `ner_final_eval.py` on the witheld test sets. Precision, recall, *F*1 and loss are computed.
+
+One output file is created in `--out-dir`:
+* `{outdir}/metrics.csv`
+
 # Prediction
 
 `class_predict.py` and `ner_predict.py`
