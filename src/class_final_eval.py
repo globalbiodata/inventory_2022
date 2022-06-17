@@ -47,29 +47,32 @@ def get_args():
                         '--test_file',
                         metavar='FILE',
                         type=argparse.FileType('rt'),
+                        required=True,
                         help='Test data file')
     inputs.add_argument('-c',
                         '--checkpoint',
-                        metavar='',
+                        metavar='PT',
                         type=argparse.FileType('rb'),
+                        required=True,
                         help='Trained model checkpoint')
     inputs.add_argument('-o',
                         '--out-dir',
                         metavar='DIR',
                         type=str,
                         default='out/',
-                        help='Directory to output prediction and metrics')
+                        required=True,
+                        help='Directory to output metrics')
 
     data_info.add_argument('-pred',
                            '--predictive-field',
-                           metavar='',
+                           metavar='PRED',
                            type=str,
                            default='title_abstract',
                            help='Data column to use for prediction',
                            choices=['title', 'abstract', 'title_abstract'])
     data_info.add_argument('-labs',
                            '--labels-field',
-                           metavar='',
+                           metavar='LABS',
                            type=str,
                            default='curation_score',
                            help='Data column with classification labels')
