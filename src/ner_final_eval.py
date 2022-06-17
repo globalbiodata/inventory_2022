@@ -6,7 +6,7 @@ Authors: Kenneth Schackart
 
 import argparse
 import os
-from typing import BinaryIO, NamedTuple, TextIO
+from typing import BinaryIO, NamedTuple
 
 from torch.utils.data.dataloader import DataLoader
 
@@ -18,7 +18,7 @@ from utils import (CustomHelpFormatter, save_metrics, get_ner_metrics,
 # ---------------------------------------------------------------------------
 class Args(NamedTuple):
     """ Command-line arguments """
-    test_file: TextIO
+    test_file: str
     checkpoint: BinaryIO
     out_dir: str
 
@@ -33,10 +33,10 @@ def get_args():
 
     parser.add_argument('-t',
                         '--test_file',
-                        metavar='FILE',
-                        type=argparse.FileType('rt'),
+                        metavar='PKL',
+                        type=str,
                         required=True,
-                        help='Test data file')
+                        help='Test data file (.pkl)')
     parser.add_argument('-c',
                         '--checkpoint',
                         metavar='PT',
@@ -71,7 +71,7 @@ def get_test_dataloader(args: Args, model_name: str) -> DataLoader:
 
     params = RunParams(model_name, 8)
 
-    dataloader = get_dataloader(args.test_file.name, params)
+    dataloader = get_dataloader(args.test_file, params)
 
     return dataloader
 
