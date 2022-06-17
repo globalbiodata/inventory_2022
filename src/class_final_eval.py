@@ -25,6 +25,7 @@ class Args(NamedTuple):
     checkpoint: BinaryIO
     out_dir: str
     predictive_field: str
+    descriptive_labels: List[str]
     labels_field: str
     max_len: int
     batch_size: int
@@ -73,6 +74,13 @@ def get_args():
                            type=str,
                            default='curation_score',
                            help='Data column with classification labels')
+    data_info.add_argument('-desc',
+                           '--descriptive-labels',
+                           metavar='LAB',
+                           type=str,
+                           nargs=2,
+                           default=['not-bio-resource', 'bio-resource'],
+                           help='Descriptions of the classification labels')
 
     model_params.add_argument('-max',
                               '--max-len',
@@ -91,7 +99,8 @@ def get_args():
     args = parser.parse_args()
 
     return Args(args.test_file, args.checkpoint, args.out_dir, args.checkpoint,
-                args.predictive_field, args.max_len, args.batch_size)
+                args.predictive_field, args.descriptive_labels, args.max_len,
+                args.batch_size)
 
 
 # ---------------------------------------------------------------------------
