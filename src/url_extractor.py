@@ -28,8 +28,7 @@ def get_args() -> Args:
     """ Parse command-line arguments """
 
     parser = argparse.ArgumentParser(
-        description=
-        'Extract URLs from text. File must have a column named "text".',
+        description='Extract URLs from "text" column of file.',
         formatter_class=CustomHelpFormatter)
 
     parser.add_argument('file',
