@@ -8,7 +8,6 @@ import argparse
 import os
 from typing import Any, BinaryIO, List, NamedTuple, TextIO, Tuple, cast
 
-import pandas as pd
 import torch
 from datasets import load_metric
 from torch.utils.data.dataloader import DataLoader
@@ -154,33 +153,6 @@ def get_test_dataloader(args: Args, model_name: str) -> DataLoader:
 
 
 # ---------------------------------------------------------------------------
-def predict(model, dataloader: DataLoader, device: torch.device) -> List[int]:
-    """
-    Use model to predict article classifications
-
-    Parameters:
-    `model`: Pretrained predictive model
-    `dataloader`: `DataLoader` with preprocessed data
-    `device`: The `torch.device` to use
-
-    Return:
-    List of predicted labels
-    """
-
-    all_predictions = []
-    model.eval()
-    for batch in dataloader:
-        batch = {k: v.to(device) for k, v in batch.items()}
-        with torch.no_grad():
-            outputs = model(**batch)
-        logits = outputs.logits
-        predictions = torch.argmax(logits, dim=-1).cpu().numpy()
-        all_predictions.extend(predictions)
-
-    return all_predictions
-
-
-# ---------------------------------------------------------------------------
 def get_metrics(model: Any, dataloader: DataLoader,
                 device: torch.device) -> Metrics:
     """
@@ -249,8 +221,7 @@ def main() -> None:
     if not os.path.isdir(out_dir):
         os.makedirs(out_dir)
 
-    pred_out_file = os.path.join(args.out_dir, 'predictions.csv')
-    metrics_out_file = os.path.join(args.out_dir, 'metrics.csv')
+    out_file = os.path.join(args.out_dir, 'metrics.csv')
 
     device = get_torch_device()
 
@@ -258,18 +229,11 @@ def main() -> None:
 
     dataloader = get_test_dataloader(args, model_name)
 
-    predicted_labels = predict(model, dataloader, device)
-    df = pd.read_csv(open(args.test_file.name, encoding='ISO-8859-1'))
-    df['predicted_label'] = predicted_labels
-
     test_metrics = get_metrics(model, dataloader, device)
 
-    df = df.replace(r'\n', ' ', regex=True)
-    df.to_csv(pred_out_file, index=False)
+    save_metrics(test_metrics, out_file)
 
-    save_metrics(test_metrics, metrics_out_file)
-
-    print(f'Done. Wrote 2 files to {out_dir}.')
+    print(f'Done. Wrote output to {out_dir}.')
 
 
 # ---------------------------------------------------------------------------
