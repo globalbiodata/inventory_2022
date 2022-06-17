@@ -6,22 +6,21 @@ Authors: Ana-Maria Istrate and Kenneth Schackart
 
 import argparse
 import os
-from typing import Any, List, NamedTuple, TextIO, Tuple
+from typing import List, NamedTuple, TextIO, BinaryIO
 
 import pandas as pd
 import torch
 from datasets import ClassLabel
 from torch.utils.data.dataloader import DataLoader
-from transformers import AutoModelForSequenceClassification as classifier
 
 from class_data_handler import DataFields, RunParams, get_dataloader
-from utils import CustomHelpFormatter, get_torch_device
+from utils import CustomHelpFormatter, get_torch_device, get_classif_model
 
 
 # ---------------------------------------------------------------------------
 class Args(NamedTuple):
     """ Command-line arguments """
-    checkpoint: TextIO
+    checkpoint: BinaryIO
     infile: TextIO
     out_dir: str
     predictive_field: str
@@ -121,29 +120,6 @@ def get_dataloaders(args: Args, model_name: str) -> DataLoader:
 
 
 # ---------------------------------------------------------------------------
-def get_model(checkpoint_fh: TextIO, device: torch.device) -> Tuple[Any, str]:
-    """
-    Instatiate predictive model from checkpoint
-
-    Params:
-    `checkpoint_fh`: Model checkpoint filehandle
-    `device`: The `torch.device` to use
-
-    Return:
-    Model instance from checkpoint, and model name
-    """
-
-    checkpoint = torch.load(checkpoint_fh, map_location=device)
-    model_name = checkpoint['model_name']
-    model = classifier.from_pretrained(model_name, num_labels=2)
-    model.load_state_dict(checkpoint['model_state_dict'])
-    model.to(device)
-    model.eval()
-
-    return model, model_name
-
-
-# ---------------------------------------------------------------------------
 def predict(model, dataloader: DataLoader, class_labels: ClassLabel,
             device: torch.device) -> List[str]:
     """
@@ -187,7 +163,7 @@ def main() -> None:
 
     device = get_torch_device()
 
-    model, model_name = get_model(args.checkpoint, device)
+    model, model_name = get_classif_model(args.checkpoint, device)
 
     dataloader = get_dataloaders(args, model_name)
 

@@ -9,18 +9,17 @@ import os
 import string
 from itertools import compress
 from statistics import mean
-from typing import Any, Dict, List, NamedTuple, TextIO, Tuple, cast
+from typing import BinaryIO, Dict, List, NamedTuple, TextIO, cast
 
 import pandas as pd
 import torch
 from pandas.testing import assert_frame_equal
-from transformers import AutoModelForTokenClassification, AutoTokenizer
 from transformers.modeling_outputs import TokenClassifierOutput
 from transformers.tokenization_utils import PreTrainedTokenizer
 from transformers.tokenization_utils_base import CharSpan
 
-from utils import (ID2NER_TAG, NER_TAG2ID, CustomHelpFormatter,
-                   get_torch_device, preprocess_data)
+from utils import (ID2NER_TAG, CustomHelpFormatter, get_torch_device,
+                   preprocess_data, get_ner_model)
 
 pd.options.mode.chained_assignment = None
 
@@ -28,7 +27,7 @@ pd.options.mode.chained_assignment = None
 # ---------------------------------------------------------------------------
 class Args(NamedTuple):
     """ Command-line arguments """
-    checkpoint: TextIO
+    checkpoint: BinaryIO
     infile: TextIO
     out_dir: str
 
@@ -95,33 +94,6 @@ def get_args() -> Args:
     args = parser.parse_args()
 
     return Args(args.checkpoint, args.input_file, args.out_dir)
-
-
-# ---------------------------------------------------------------------------
-def get_model(checkpoint_fh: TextIO,
-              device: torch.device) -> Tuple[Any, PreTrainedTokenizer]:
-    """
-    Instatiate predictive model from checkpoint
-
-    Parameters:
-    `checkpoint_fh`: Model checkpoint filehandle
-    `device`: The `torch.device` to use
-
-    Return:
-    Model instance from checkpoint, tokenizer
-    """
-
-    checkpoint = torch.load(checkpoint_fh, map_location=device)
-    model_name = checkpoint['model_name']
-    model = AutoModelForTokenClassification.from_pretrained(
-        model_name, id2label=ID2NER_TAG, label2id=NER_TAG2ID)
-    model.load_state_dict(checkpoint['model_state_dict'])
-    model.to(device)
-    model.eval()
-
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-
-    return model, tokenizer
 
 
 # ---------------------------------------------------------------------------
@@ -506,7 +478,7 @@ def main() -> None:
 
     device = get_torch_device()
 
-    model, tokenizer = get_model(args.checkpoint, device)
+    model, _, tokenizer = get_ner_model(args.checkpoint, device)
 
     predictions = reformat_output(
         deduplicate(predict(model, tokenizer, input_df, device)))

@@ -8,15 +8,23 @@ import io
 import os
 import re
 import sys
-from typing import Any, List, NamedTuple, TextIO, Tuple
+from typing import (Any, BinaryIO, List, NamedTuple, Optional, TextIO, Tuple,
+                    cast)
 
 import pandas as pd
 import pytest
 import torch
+from datasets import load_metric
+from numpy import array
 from pandas.testing import assert_frame_equal
 from sklearn.model_selection import train_test_split
+from torch.functional import Tensor
 from torch.utils.data.dataloader import DataLoader
 from transformers import AdamW
+from transformers import AutoModelForSequenceClassification as classifier
+from transformers import AutoModelForTokenClassification as ner_classifier
+from transformers import AutoTokenizer
+from transformers.tokenization_utils import PreTrainedTokenizer
 
 # ---------------------------------------------------------------------------
 # Mapping from NER tag to ID
@@ -110,6 +118,11 @@ class Metrics(NamedTuple):
 
 
 # ---------------------------------------------------------------------------
+# Type Aliases
+TaggedBatch = List[List[str]]
+
+
+# ---------------------------------------------------------------------------
 def set_random_seed(seed: int):
     """
     Set random seed for deterministic outcome of ML-trained models
@@ -132,6 +145,59 @@ def get_torch_device() -> torch.device:
 
     return torch.device('cuda') if torch.cuda.is_available() else torch.device(
         'cpu')
+
+
+# ---------------------------------------------------------------------------
+def get_classif_model(checkpoint_fh: BinaryIO,
+                      device: torch.device) -> Tuple[Any, str]:
+    """
+    Instatiate predictive model from checkpoint
+
+    Params:
+    `checkpoint_fh`: Model checkpoint filehandle
+    `device`: The `torch.device` to use
+
+    Return:
+    Model instance from checkpoint, and model name
+    """
+
+    checkpoint = torch.load(checkpoint_fh, map_location=device)
+    model_name = checkpoint['model_name']
+    model = classifier.from_pretrained(model_name, num_labels=2)
+    model.load_state_dict(checkpoint['model_state_dict'])
+    model.to(device)
+    model.eval()
+
+    return model, model_name
+
+
+# ---------------------------------------------------------------------------
+def get_ner_model(
+        checkpoint_fh: BinaryIO,
+        device: torch.device) -> Tuple[Any, str, PreTrainedTokenizer]:
+    """
+    Instatiate predictive NER model from checkpoint
+
+    Params:
+    `checkpoint_fh`: Model checkpoint filehandle
+    `device`: The `torch.device` to use
+
+    Return:
+    Model instance from checkpoint, model name, and tokenizer
+    """
+
+    checkpoint = torch.load(checkpoint_fh, map_location=device)
+    model_name = checkpoint['model_name']
+    model = ner_classifier.from_pretrained(model_name,
+                                           id2label=ID2NER_TAG,
+                                           label2id=NER_TAG2ID)
+    model.load_state_dict(checkpoint['model_state_dict'])
+    model.to(device)
+    model.eval()
+
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+
+    return model, model_name, tokenizer
 
 
 # ---------------------------------------------------------------------------
@@ -254,10 +320,10 @@ def test_strip_xml() -> None:
 def strip_newlines(text: str) -> str:
     """
     Remove all newline characters from string
-    
+
     Parameters:
     `text`: String
-    
+
     Return: string without newlines
     """
 
@@ -384,6 +450,159 @@ def test_preprocess_data() -> None:
 
 
 # ---------------------------------------------------------------------------
+def convert_to_tags(batch_predictions: array,
+                    batch_labels: array) -> Tuple[TaggedBatch, TaggedBatch]:
+    """
+    Convert numeric labels to string tags
+
+    Parameters:
+    `batch_predictions`: Predicted numeric labels of batch of sequences
+    `batch_labels`: True numeric labels of batch of sequences
+
+    Return: Lists of tagged sequences of tokens
+    from predictions and true labels
+    """
+
+    true_labels = [[
+        ID2NER_TAG[token_label] for token_label in seq_labels
+        if token_label != -100
+    ] for seq_labels in batch_labels]
+    pred_labels = [[
+        ID2NER_TAG[token_pred]
+        for (token_pred, token_label) in zip(seq_preds, seq_labels)
+        if token_label != -100
+    ] for seq_preds, seq_labels in zip(batch_predictions, batch_labels)]
+
+    return pred_labels, true_labels
+
+
+# ---------------------------------------------------------------------------
+def test_convert_to_tags() -> None:
+    """ Test convert_to_tags """
+
+    # Inputs
+    predictions = array([[0, 0, 1, 2, 2, 0, 3, 4, 0],
+                         [0, 0, 0, 1, 0, 0, 0, 0, 0]])
+    labels = array([[-100, 0, 1, 2, 2, 0, 3, 4, -100],
+                    [-100, 0, 0, 3, -100, -100, -100, -100, -100]])
+
+    # Expected outputs
+    exp_pred = [['O', 'B-COM', 'I-COM', 'I-COM', 'O', 'B-FUL', 'I-FUL'],
+                ['O', 'O', 'B-COM']]
+    exp_labels = [['O', 'B-COM', 'I-COM', 'I-COM', 'O', 'B-FUL', 'I-FUL'],
+                  ['O', 'O', 'B-FUL']]
+
+    res_pred, res_labels = convert_to_tags(predictions, labels)
+
+    assert exp_pred == res_pred
+    assert exp_labels == res_labels
+
+
+# ---------------------------------------------------------------------------
+def get_classif_metrics(model: Any, dataloader: DataLoader,
+                        device: torch.device) -> Metrics:
+    """
+    Compute classifier model performance metrics
+
+    Parameters:
+    `model`: Classification model
+    `dataloader`: DataLoader containing tokenized text entries and
+    corresponding labels
+    `device`: Torch device
+
+    Return:
+    A `Metrics` NamedTuple
+    """
+    calc_precision = load_metric('precision')
+    calc_recall = load_metric('recall')
+    calc_f1 = load_metric('f1')
+    total_loss = 0.
+    num_seen_datapoints = 0
+    for batch in dataloader:
+        batch = {k: v.to(device) for k, v in batch.items()}
+        with torch.no_grad():
+            outputs = model(**batch)
+        num_seen_datapoints += len(batch['input_ids'])
+        predictions = torch.argmax(outputs.logits, dim=-1)
+        calc_precision.add_batch(predictions=predictions,
+                                 references=batch['labels'])
+        calc_recall.add_batch(predictions=predictions,
+                              references=batch['labels'])
+        calc_f1.add_batch(predictions=predictions, references=batch['labels'])
+        total_loss += outputs.loss.item()
+    total_loss /= num_seen_datapoints
+
+    precision = cast(dict, calc_precision.compute())
+    recall = cast(dict, calc_recall.compute())
+    f1 = cast(dict, calc_f1.compute())
+
+    return Metrics(precision['precision'], recall['recall'], f1['f1'],
+                   total_loss)
+
+
+# ---------------------------------------------------------------------------
+def get_ner_metrics(model: Any, dataloader: DataLoader,
+                    device: torch.device) -> Metrics:
+    """
+    Compute model performance metrics for NER model
+
+    Parameters:
+    `model`: Classification model
+    `dataloader`: DataLoader containing tokenized text entries and
+    corresponding labels
+    `device`: Torch device
+
+    Return:
+    A `Metrics` NamedTuple
+    """
+    calc_seq_metrics = load_metric('seqeval')
+    total_loss = 0.
+    num_seen_datapoints = 0
+    for batch in dataloader:
+        batch = {k: v.to(device) for k, v in batch.items()}
+        with torch.no_grad():
+            outputs = model(**batch)
+        num_seen_datapoints += len(batch['input_ids'])
+        predictions = torch.argmax(outputs.logits, dim=-1)  # Diff from class
+        predictions = predictions.detach().cpu().clone().numpy()
+
+        labels = cast(Tensor, batch['labels'])
+        labels = labels.detach().cpu().clone().numpy()
+
+        pred_labels, true_labels = convert_to_tags(predictions, labels)
+
+        calc_seq_metrics.add_batch(predictions=pred_labels,
+                                   references=true_labels)
+
+        total_loss += outputs.loss.item()
+    total_loss /= num_seen_datapoints
+
+    precision, recall, f1 = extract_metrics(calc_seq_metrics.compute())
+
+    return Metrics(precision, recall, f1, total_loss)
+
+
+# ---------------------------------------------------------------------------
+def extract_metrics(metric_dict: Optional[dict]) -> List[float]:
+    """
+    Extract precision, recall, and F1
+
+    Parameters:
+    `metric_dict`: Dictionary of metrics
+
+    Return: List of precision, recall, and F1
+    """
+
+    if not metric_dict:
+        sys.exit('Unable to calculate metrics.')
+
+    return [
+        metric_dict[f'overall_{metric}']
+        for metric in ['precision', 'recall', 'f1']
+    ]
+
+
+# ---------------------------------------------------------------------------
 def make_filenames(out_dir: str) -> Tuple[str, str]:
     """
     Make output filename
@@ -435,3 +654,20 @@ def save_train_stats(df: pd.DataFrame, filename: str) -> None:
     """
 
     df.to_csv(filename, index=False)
+
+
+# ---------------------------------------------------------------------------
+def save_metrics(metrics: Metrics, filename: str) -> None:
+    """
+    Save test metrics to csv file
+
+    Parameters:
+    `metrics`: A `Metrics` NamedTuple
+    """
+
+    with open(filename, 'wt') as fh:
+        print('precision,recall,f1,loss', file=fh)
+        print(f'{metrics.precision},{metrics.recall},',
+              f'{metrics.f1},{metrics.loss}',
+              sep='',
+              file=fh)

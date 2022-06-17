@@ -7,19 +7,19 @@ Authors: Ana-Maria Istrate and Kenneth Schackart
 import argparse
 import copy
 import os
-from typing import Any, List, NamedTuple, TextIO, Tuple, cast
+from typing import Any, List, NamedTuple, TextIO, Tuple
 
 import pandas as pd
 import torch
-from datasets import load_metric
 from torch.utils.data.dataloader import DataLoader
 from tqdm.auto import tqdm
 from transformers import (AdamW, AutoModelForSequenceClassification,
                           get_scheduler)
 
 from class_data_handler import DataFields, RunParams, get_dataloader
-from utils import (CustomHelpFormatter, Metrics, Settings, make_filenames,
-                   save_model, save_train_stats, set_random_seed)
+from utils import (CustomHelpFormatter, Metrics, Settings, get_classif_metrics,
+                   make_filenames, save_model, save_train_stats,
+                   set_random_seed)
 
 
 # ---------------------------------------------------------------------------
@@ -184,10 +184,10 @@ def train(settings: Settings) -> Tuple[Any, pd.DataFrame]:
         train_loss = train_epoch(settings, progress_bar)
 
         model.eval()
-        train_metrics = get_metrics(model, settings.train_dataloader,
-                                    settings.device)
-        val_metrics = get_metrics(model, settings.val_dataloader,
-                                  settings.device)
+        train_metrics = get_classif_metrics(model, settings.train_dataloader,
+                                            settings.device)
+        val_metrics = get_classif_metrics(model, settings.val_dataloader,
+                                          settings.device)
 
         if val_metrics.f1 > best_val.f1:
             best_val = val_metrics
@@ -262,48 +262,6 @@ def train_epoch(settings: Settings, progress_bar: tqdm) -> float:
         settings.optimizer.zero_grad()
         progress_bar.update(1)
     return train_loss / num_train
-
-
-# ---------------------------------------------------------------------------
-def get_metrics(model: Any, dataloader: DataLoader,
-                device: torch.device) -> Metrics:
-    """
-    Compute model performance metrics
-
-    Parameters:
-    `model`: Classification model
-    `dataloader`: DataLoader containing tokenized text entries and
-    corresponding labels
-    `device`: Torch device
-
-    Return:
-    A `Metrics` NamedTuple
-    """
-    calc_precision = load_metric('precision')
-    calc_recall = load_metric('recall')
-    calc_f1 = load_metric('f1')
-    total_loss = 0.
-    num_seen_datapoints = 0
-    for batch in dataloader:
-        batch = {k: v.to(device) for k, v in batch.items()}
-        with torch.no_grad():
-            outputs = model(**batch)
-        num_seen_datapoints += len(batch['input_ids'])
-        predictions = torch.argmax(outputs.logits, dim=-1)
-        calc_precision.add_batch(predictions=predictions,
-                                 references=batch['labels'])
-        calc_recall.add_batch(predictions=predictions,
-                              references=batch['labels'])
-        calc_f1.add_batch(predictions=predictions, references=batch['labels'])
-        total_loss += outputs.loss.item()
-    total_loss /= num_seen_datapoints
-
-    precision = cast(dict, calc_precision.compute())
-    recall = cast(dict, calc_recall.compute())
-    f1 = cast(dict, calc_f1.compute())
-
-    return Metrics(precision['precision'], recall['recall'], f1['f1'],
-                   total_loss)
 
 
 # ---------------------------------------------------------------------------

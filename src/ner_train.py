@@ -7,14 +7,10 @@ Authors: Ana-Maria Istrate and Kenneth Schackart
 import argparse
 import copy
 import os
-import sys
-from typing import Any, List, NamedTuple, Optional, Tuple, cast
+from typing import Any, NamedTuple, Optional, Tuple, cast
 
 import pandas as pd
 import torch
-from datasets import load_metric
-from numpy import array
-from torch.functional import Tensor
 from torch.optim import AdamW
 from torch.utils.data.dataloader import DataLoader
 from tqdm.auto import tqdm
@@ -23,12 +19,8 @@ from transformers import (AutoModelForTokenClassification, get_scheduler,
 
 from ner_data_handler import RunParams, get_dataloader
 from utils import (ID2NER_TAG, NER_TAG2ID, CustomHelpFormatter, Metrics,
-                   Settings, make_filenames, save_model, save_train_stats,
-                   set_random_seed)
-
-# ---------------------------------------------------------------------------
-# Type Aliases
-TaggedBatch = List[List[str]]
+                   Settings, get_ner_metrics, make_filenames, save_model,
+                   save_train_stats, set_random_seed)
 
 
 # ---------------------------------------------------------------------------
@@ -225,10 +217,10 @@ def train(settings: Settings) -> Tuple[Any, pd.DataFrame]:
         train_loss = train_epoch(settings, progress_bar)
 
         model.eval()
-        train_metrics = get_metrics(model, settings.train_dataloader,
-                                    settings.device)
-        val_metrics = get_metrics(model, settings.val_dataloader,
-                                  settings.device)
+        train_metrics = get_ner_metrics(model, settings.train_dataloader,
+                                        settings.device)
+        val_metrics = get_ner_metrics(model, settings.val_dataloader,
+                                      settings.device)
 
         if val_metrics.f1 > best_val.f1:
             best_val = val_metrics
@@ -303,117 +295,6 @@ def train_epoch(settings: Settings, progress_bar: tqdm) -> float:
         settings.optimizer.zero_grad()
         progress_bar.update(1)
     return train_loss / num_train
-
-
-# ---------------------------------------------------------------------------
-def get_metrics(model: Any, dataloader: DataLoader,
-                device: torch.device) -> Metrics:
-    """
-    Compute model performance metrics
-
-    Parameters:
-    `model`: Classification model
-    `dataloader`: DataLoader containing tokenized text entries and
-    corresponding labels
-    `device`: Torch device
-
-    Return:
-    A `Metrics` NamedTuple
-    """
-    calc_seq_metrics = load_metric('seqeval')
-    total_loss = 0.
-    num_seen_datapoints = 0
-    for batch in dataloader:
-        batch = {k: v.to(device) for k, v in batch.items()}
-        with torch.no_grad():
-            outputs = model(**batch)
-        num_seen_datapoints += len(batch['input_ids'])
-        predictions = torch.argmax(outputs.logits, dim=-1)  # Diff from class
-        predictions = predictions.detach().cpu().clone().numpy()
-
-        labels = cast(Tensor, batch['labels'])
-        labels = labels.detach().cpu().clone().numpy()
-
-        pred_labels, true_labels = convert_to_tags(predictions, labels)
-
-        calc_seq_metrics.add_batch(predictions=pred_labels,
-                                   references=true_labels)
-
-        total_loss += outputs.loss.item()
-    total_loss /= num_seen_datapoints
-
-    precision, recall, f1 = extract_metrics(calc_seq_metrics.compute())
-
-    return Metrics(precision, recall, f1, total_loss)
-
-
-# ---------------------------------------------------------------------------
-def extract_metrics(metric_dict: Optional[dict]) -> List[float]:
-    """
-    Extract precision, recall, and F1
-
-    Parameters:
-    `metric_dict`: Dictionary of metrics
-
-    Return: List of precision, recall, and F1
-    """
-
-    if not metric_dict:
-        sys.exit('Unable to calculate metrics.')
-
-    return [
-        metric_dict[f'overall_{metric}']
-        for metric in ['precision', 'recall', 'f1']
-    ]
-
-
-# ---------------------------------------------------------------------------
-def convert_to_tags(batch_predictions: array,
-                    batch_labels: array) -> Tuple[TaggedBatch, TaggedBatch]:
-    """
-    Convert numeric labels to string tags
-
-    Parameters:
-    `batch_predictions`: Predicted numeric labels of batch of sequences
-    `batch_labels`: True numeric labels of batch of sequences
-
-    Return: Lists of tagged sequences of tokens
-    from predictions and true labels
-    """
-
-    true_labels = [[
-        ID2NER_TAG[token_label] for token_label in seq_labels
-        if token_label != -100
-    ] for seq_labels in batch_labels]
-    pred_labels = [[
-        ID2NER_TAG[token_pred]
-        for (token_pred, token_label) in zip(seq_preds, seq_labels)
-        if token_label != -100
-    ] for seq_preds, seq_labels in zip(batch_predictions, batch_labels)]
-
-    return pred_labels, true_labels
-
-
-# ---------------------------------------------------------------------------
-def test_convert_to_tags() -> None:
-    """ Test convert_to_tags """
-
-    # Inputs
-    predictions = array([[0, 0, 1, 2, 2, 0, 3, 4, 0],
-                         [0, 0, 0, 1, 0, 0, 0, 0, 0]])
-    labels = array([[-100, 0, 1, 2, 2, 0, 3, 4, -100],
-                    [-100, 0, 0, 3, -100, -100, -100, -100, -100]])
-
-    # Expected outputs
-    exp_pred = [['O', 'B-COM', 'I-COM', 'I-COM', 'O', 'B-FUL', 'I-FUL'],
-                ['O', 'O', 'B-COM']]
-    exp_labels = [['O', 'B-COM', 'I-COM', 'I-COM', 'O', 'B-FUL', 'I-FUL'],
-                  ['O', 'O', 'B-FUL']]
-
-    res_pred, res_labels = convert_to_tags(predictions, labels)
-
-    assert exp_pred == res_pred
-    assert exp_labels == res_labels
 
 
 # ---------------------------------------------------------------------------
