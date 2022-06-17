@@ -36,7 +36,7 @@ def get_args():
     """ Parse command-line arguments """
 
     parser = argparse.ArgumentParser(
-        description='Train BERT model for article classification',
+        description='Evaluate model on held-out test set',
         formatter_class=CustomHelpFormatter)
 
     inputs = parser.add_argument_group('Inputs and Outputs')
