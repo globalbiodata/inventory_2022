@@ -26,7 +26,6 @@ class Args(NamedTuple):
     out_dir: str
     predictive_field: str
     labels_field: str
-    descriptive_labels: List[str]
     max_len: int
     batch_size: int
 
@@ -36,7 +35,7 @@ def get_args():
     """ Parse command-line arguments """
 
     parser = argparse.ArgumentParser(
-        description='Train BERT model for article classification',
+        description='Evaluate model on held-out test set',
         formatter_class=CustomHelpFormatter)
 
     inputs = parser.add_argument_group('Inputs and Outputs')
@@ -48,13 +47,11 @@ def get_args():
                         '--test_file',
                         metavar='FILE',
                         type=argparse.FileType('rt'),
-                        required=True,
                         help='Test data file')
     inputs.add_argument('-c',
                         '--checkpoint',
                         metavar='',
                         type=argparse.FileType('rb'),
-                        required=True,
                         help='Trained model checkpoint')
     inputs.add_argument('-o',
                         '--out-dir',
@@ -94,8 +91,7 @@ def get_args():
     args = parser.parse_args()
 
     return Args(args.test_file, args.checkpoint, args.out_dir, args.checkpoint,
-                args.predictive_field, args.descriptive_label, args.max_len,
-                args.batch_size)
+                args.predictive_field, args.max_len, args.batch_size)
 
 
 # ---------------------------------------------------------------------------
