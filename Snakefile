@@ -109,7 +109,7 @@ rule evaluate_best_classifier:
     output:
         config["classif_train_outdir"] + "/best/test_set_evaluation/metrics.csv",
     params:
-        outdir=config["classif_train_outdir"] + "/besttest_set_evaluation",
+        outdir=config["classif_train_outdir"] + "/best/test_set_evaluation",
     shell:
         """
         python3 src/class_final_eval.py \
