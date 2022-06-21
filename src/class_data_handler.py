@@ -22,8 +22,8 @@ class DataFields(NamedTuple):
     Fields in data used for training and classification
 
     `predictive`: Column used for prediction
-    `labels`: Column containing labels (optional)
     `descriptive_labels`: Descriptions of the classification labels
+    `labels`: Column containing labels (optional)
     """
     predictive: str
     descriptive_labels: List[str]
@@ -57,7 +57,7 @@ def get_dataloader(file: TextIO, fields: DataFields,
     `fields`: Fields in data used for training and classification
     `run_params`: Model and run parameters
 
-    Returns:
+    Return:
     A `DataLoader` with preprocessed data
     """
 
@@ -80,7 +80,7 @@ def generate_dataloader(df: pd.DataFrame, filename: str, fields: DataFields,
     `fields`: Fields in data used for training and classification
     `params`: Model and run parameters
 
-    Returns:
+    Return:
     A `DataLoader` of preprocessed data
     """
 
@@ -114,10 +114,10 @@ def get_text_labels(df: pd.DataFrame, fields: DataFields) -> Tuple[List, List]:
     Get lists of predictive text and (optionally) labels
 
     Parameters:
-    `df`: Dataframe containing `fields.predictive` and
-    (optionally) `fields.labels`
+    `df`: Dataframe containing `fields.predictive`
+    `fields`: Specification of column names
 
-    Returns:
+    Return:
     A tuple of lists: predictive text, labels
     """
 
@@ -163,7 +163,7 @@ def tokenize_text(text: List, labels: List, class_labels: ClassLabel,
     `tokenizer`: Pretrained tokenizer
     `max_len`: Max length used in tokenization
 
-    Returns:
+    Return:
     A tokenized and possibly labeled `Dataset`
     """
 

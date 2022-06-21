@@ -5,30 +5,32 @@ project_env: './env'
 ## Classification
 classif_splits_dir: 'data/classif_splits'
 classif_train_outdir: 'out/classif_train_out'
+best_classif_dir: 'out/best_classifier'
 classif_benchmark_dir: 'out/benchmarks/classif'
 classif_log_dir: 'out/logs/classif'
 
 ## NER
 ner_splits_dir: 'data/ner_splits'
-ner_checkpoint_dir: 'out/ner_checkpoints'
+ner_train_outdir: 'out/ner_train_out'
+best_ner_dir: 'out/best_ner'
+ner_benchmark_dir: 'out/benchmarks/ner'
+ner_log_dir: 'out/logs/ner'
+
+split_ratios: '0.8 0.1 0.1'
 
 
 # Input files
 classif_data: 'data/manual_classifications.csv'
 ner_data: 'data/manual_ner_extraction.csv'
+full_corpus: 'data/full_corpus.csv'
 
-# Parameters
-# Models
-models:
-  ['scibert']
-  # ['bert', 'biobert', 'scibert', 'pubmedbert', 'pubmedbert_pmc',
-  #   'bluebert', 'bluebert_mimic3', 'sapbert', 'sapbert_mean_token',
-  #   'bioelectra', 'bioelectra_pmc', 'electramed', 'biomed_roberta',
-  #   'biomed_roberta_chemprot', 'biomed_roberta_rct_500'
-  #   ]
+# File with configuration settings for the models
+models: 'config/models_info.tsv'
+
 
 # Number of epochs
 classif_epochs: 10
+ner_epochs: 10
 
 # Number of threads, each gets 5 Gb
 train_threads: 12

@@ -19,9 +19,6 @@ from pandas.testing import assert_frame_equal
 from utils import (CustomHelpFormatter, concat_title_abstract, split_df,
                    strip_xml)
 
-# nltk.download('punkt')
-# RND_SEED = 241
-
 
 # ---------------------------------------------------------------------------
 class Args(NamedTuple):
@@ -60,12 +57,11 @@ def get_args() -> Args:
     parser = argparse.ArgumentParser(description='Split curated NER data.',
                                      formatter_class=CustomHelpFormatter)
 
-    parser.add_argument(
-        'infile',
-        metavar='FILE',
-        type=argparse.FileType('rt', encoding='ISO-8859-1'),
-        default='data/manual_ner_extraction.csv',
-        help='Manually curated input file')
+    parser.add_argument('infile',
+                        metavar='FILE',
+                        type=argparse.FileType('rt', encoding='ISO-8859-1'),
+                        default='data/manual_ner_extraction.csv',
+                        help='Manually curated input file')
     parser.add_argument('-o',
                         '--outdir',
                         metavar='',
@@ -96,6 +92,7 @@ def check_input(df: pd.DataFrame) -> None:
     """
     Check the input data columns
 
+    Parameters:
     `df`: Input dataframe
     """
 
@@ -112,6 +109,7 @@ def filter_data(df: pd.DataFrame) -> pd.DataFrame:
     """
     Filter input data for completeness and relevant columns
 
+    Parameters:
     `df`: Input data dataframe
 
     Return: Filtered dataframe
@@ -151,6 +149,7 @@ def clean_data(df: pd.DataFrame) -> pd.DataFrame:
     """
     Strip XML tags, replace NAs, deduplicate
 
+    Parameters:
     `df`: Input data dataframe
 
     Return: Cleaned dataframe
@@ -190,6 +189,7 @@ def combine_rows(df: pd.DataFrame) -> pd.DataFrame:
     """
     Combine rows of same id into single row
 
+    Parameters:
     `df`: Dataframe with potentially multiple rows per id
 
     Return: Dataframe with single row per id
@@ -240,6 +240,7 @@ def restructure_df(df: pd.DataFrame) -> pd.DataFrame:
     Create a row for each word in article title and abstract
     Add sentence and word index columns
 
+    Parameters:
     `df`: Dataframe for single article with id, title_abstract, common_name
         and full_name columns
 
@@ -296,6 +297,7 @@ def assign_tags(words: pd.Series, full_names: List[str],
     """
     Assign BIO tags to tokens in sequence
 
+    Parameters:
     `words`: Series of tokens stripped of punctuation
     `full_name`: Resource long name
     `common_name`: Resource common name
@@ -366,6 +368,7 @@ def tag_article_tokens(df: pd.DataFrame) -> pd.DataFrame:
     """
     Apply BIO tagging to single article dataframe
 
+    Parameters:
     `df`: Dataframe for single article with id, title_abstract, common_name
         and full_name columns
 
@@ -414,6 +417,7 @@ def BIO_scheme_transform(df: pd.DataFrame) -> pd.DataFrame:
     """
     Perform BIO tagging for all articles in dataset
 
+    Parameters:
     `df`: Dataframe with one row per article including extracted resource
     common name and full name
 
@@ -468,6 +472,7 @@ def group_tagged_df(df: pd.DataFrame) -> pd.DataFrame:
     """
     Group dataframe by pmid and sentence index
 
+    Parameters:
     `df`: Dataframe to be grouped
     """
     df_grouped = df.groupby(['pmid', 'sent_idx']).agg(list).reset_index()
@@ -522,6 +527,7 @@ def save_df(df: pd.DataFrame, filename: str) -> None:
     """
     Save dataframe to pickle
 
+    Parameters:
     `df`: Dataframe to be pickled
     `filename`: Output filename
     """
@@ -554,7 +560,7 @@ def main() -> None:
         lambda f: os.path.join(out_dir, f),
         ['train_ner.csv', 'val_ner.csv', 'test_ner.csv'])
 
-    raw_train.to_csv(raw_train_out, index=False, encoding='utf-8')
+    raw_train.to_csv(raw_train_out, index=False)
     raw_val.to_csv(raw_val_out, index=False)
     raw_test.to_csv(raw_test_out, index=False)
 

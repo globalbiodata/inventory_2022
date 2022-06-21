@@ -9,18 +9,17 @@ import os
 import string
 from itertools import compress
 from statistics import mean
-from typing import Dict, List, NamedTuple, TextIO, cast
+from typing import BinaryIO, Dict, List, NamedTuple, TextIO, cast
 
 import pandas as pd
 import torch
 from pandas.testing import assert_frame_equal
-from transformers import AutoModelForTokenClassification, AutoTokenizer
 from transformers.modeling_outputs import TokenClassifierOutput
 from transformers.tokenization_utils import PreTrainedTokenizer
 from transformers.tokenization_utils_base import CharSpan
 
-from utils import (ID2NER_TAG, MODEL_TO_HUGGINGFACE_VERSION, NER_TAG2ID,
-                   CustomHelpFormatter, get_torch_device, preprocess_data)
+from utils import (ID2NER_TAG, CustomHelpFormatter, get_torch_device,
+                   preprocess_data, get_ner_model)
 
 pd.options.mode.chained_assignment = None
 
@@ -28,10 +27,9 @@ pd.options.mode.chained_assignment = None
 # ---------------------------------------------------------------------------
 class Args(NamedTuple):
     """ Command-line arguments """
-    checkpoint: TextIO
+    checkpoint: BinaryIO
     infile: TextIO
     out_dir: str
-    model_name: str
 
 
 # ---------------------------------------------------------------------------
@@ -71,86 +69,44 @@ def get_args() -> Args:
     """ Parse command-line arguments """
 
     parser = argparse.ArgumentParser(
-        description='Predict article classifications using trained BERT model',
+        description='Predict named entities using trained BERT model',
         formatter_class=CustomHelpFormatter)
 
-    inputs = parser.add_argument_group('Inputs and Outputs')
-    model_params = parser.add_argument_group('Model Parameters')
-    # runtime_params = parser.add_argument_group('Runtime Parameters')
-
-    inputs.add_argument('-c',
+    parser.add_argument('-c',
                         '--checkpoint',
                         metavar='CHKPT',
                         type=argparse.FileType('rb'),
                         required=True,
                         help='Trained model checkpoint')
-    inputs.add_argument('-i',
+    parser.add_argument('-i',
                         '--input-file',
                         metavar='FILE',
-                        type=argparse.FileType('rt'),
+                        type=argparse.FileType('rt', encoding='ISO-8859-1'),
                         required=True,
                         help='Input file for prediction')
-    inputs.add_argument('-o',
+    parser.add_argument('-o',
                         '--out-dir',
                         metavar='DIR',
                         type=str,
                         default='out/',
                         help='Directory to output predictions')
 
-    model_params.add_argument(
-        '-m',
-        '--model-name',
-        metavar='MODEL',
-        type=str,
-        default='scibert',
-        help='Name of model',
-        choices=[
-            'bert', 'biobert', 'bioelectra', 'bioelectra_pmc',
-            'biomed_roberta', 'biomed_roberta_chemprot',
-            'biomed_roberta_rct_500', 'bluebert', 'bluebert_mimic3',
-            'electramed', 'pubmedbert', 'pubmedbert_pmc', 'sapbert',
-            'sapbert_mean_token', 'scibert'
-        ])
-
     args = parser.parse_args()
 
-    return Args(args.checkpoint, args.input_file, args.out_dir,
-                args.model_name)
-
-
-# ---------------------------------------------------------------------------
-def get_model(model_name: str, checkpoint_fh: TextIO, device: torch.device):
-    """
-    Instatiate predictive model from checkpoint
-
-    Params:
-    `model_name`: Huggingface model name
-    `checkpoint_fh`: Model checkpoint filehandle
-    `device`: The `torch.device` to use
-
-    Return:
-    Model instance from checkpoint and tokenizer
-    """
-
-    model = AutoModelForTokenClassification.from_pretrained(
-        model_name, id2label=ID2NER_TAG, label2id=NER_TAG2ID)
-    checkpoint = torch.load(checkpoint_fh, map_location=device)
-    model.load_state_dict(checkpoint['model_state_dict'])
-    model.to(device)
-    model.eval()
-
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-
-    return model, tokenizer
+    return Args(args.checkpoint, args.input_file, args.out_dir)
 
 
 # ---------------------------------------------------------------------------
 def convert_predictions(seq_preds: SeqPrediction) -> List[NamedEntity]:
     """
     Convert raw predictions to meaningful predictions
+
+    Parameters:
+    seq_preds: `SeqPrediction` output from model
+
+    Return: List of `NamedEntity`s
     """
 
-    seq = seq_preds.seq
     entities: List[NamedEntity] = []
     began_entity = False
 
@@ -158,10 +114,10 @@ def convert_predictions(seq_preds: SeqPrediction) -> List[NamedEntity]:
         mask = [word_id == loc_id for word_id in seq_preds.word_ids]
         labels = set(compress(seq_preds.preds, mask))
         probs = list(compress(seq_preds.probs, mask))
-        substring = seq[span.start:span.end + 1]
+        substring = seq_preds.seq[span.start:span.end + 1]
         if loc_id > 0:
             if seq_preds.word_locs[loc_id - 1].end == span.start:
-                substring = seq[span.start + 1:span.end + 1]
+                substring = seq_preds.seq[span.start + 1:span.end + 1]
         if any(label[0] == 'B' for label in labels):
             began_entity = True
             label = list(
@@ -170,9 +126,11 @@ def convert_predictions(seq_preds: SeqPrediction) -> List[NamedEntity]:
             prob_count = len(probs)
         elif any(label[0] == 'I' for label in labels) and substring != ' ':
             if not began_entity:
+                began_entity = True
                 label = list(
                     compress(labels, [label[0] == 'I' for label in labels]))[0]
                 entities.append(NamedEntity(substring, label, mean(probs)))
+                prob_count = len(probs)
             else:
                 last_entity = entities[-1]
                 prob = (last_entity.prob * prob_count +
@@ -213,7 +171,7 @@ def test_convert_predictions() -> None:
         'I-FUL', 'I-FUL', 'I-FUL', 'I-FUL', 'I-FUL'
     ]
     probs = [
-        0.9914268, 0.9947973, 0.9970765, 0.9951375, 0.98841196, 0.9884289,
+        0.9914268, 0.9947973, 0.9970761, 0.9951375, 0.98841196, 0.9884289,
         0.99392915, 0.9951815, 0.9865631, 0.99616784, 0.99818134, 0.9980192,
         0.90898293
     ]
@@ -221,7 +179,7 @@ def test_convert_predictions() -> None:
     seq_preds = SeqPrediction(seq, word_ids, word_locs, preds, probs)
 
     expected = [
-        NamedEntity('ALCOdb:', 'B-COM', 0.994609525),
+        NamedEntity('ALCOdb:', 'B-COM', 0.9944334),
         NamedEntity('Gene Coexpression Database for Microalgae.', 'B-FUL',
                     0.98376288)
     ]
@@ -246,8 +204,7 @@ def test_convert_predictions() -> None:
 
     expected = [
         NamedEntity('Inside', 'I-COM', 0.996),
-        NamedEntity('inside', 'I-FUL', 0.998),
-        NamedEntity('inside', 'I-FUL', 0.978),
+        NamedEntity('inside inside', 'I-FUL', 0.988),
         NamedEntity('(inside).', 'B-COM', 0.98)
     ]
 
@@ -260,12 +217,13 @@ def predict_sequence(model, device: torch.device, seq: str,
     """
     Run token prediction on sequence
 
+    Parameters:
     `model`: Trained token classification model
     `device`: Device to use
     `seq`: Input string/sequence
     `tokenizer`: Pretrained tokenizer
 
-    Return list of named entities
+    Return: List of `NamedEntity`s
     """
 
     with torch.no_grad():
@@ -298,12 +256,14 @@ def predict(model, tokenizer: PreTrainedTokenizer, inputs: pd.DataFrame,
     """
     Perform NER prediction on rows of input dataframe
 
+    Parameters:
     `model`: Trained token classification model
     `tokenizer`: Pretrained tokenizer
     `inputs`: Input dataframe
     `device`: Device to use
 
-    return
+    Return: Dataframe containining one row per named entity including id, text,
+    mention, lable, and probability columns
     """
 
     pred_df = pd.DataFrame(columns=['ID', 'text', 'mention', 'label', 'prob'])
@@ -337,7 +297,10 @@ def deduplicate(df: pd.DataFrame) -> pd.DataFrame:
     Deduplicate predicted entities, keeping only highest probability for each
     predicted named entity
 
+    Parameters:
     df: Predicted entities dataframe
+
+    Return: Deduplicated dataframe
     """
 
     unique_df = pd.DataFrame(columns=[*df.columns, 'count'])
@@ -351,6 +314,7 @@ def deduplicate(df: pd.DataFrame) -> pd.DataFrame:
         unique_df = pd.concat([unique_df, mention.head(1)])
 
     unique_df['uncased_mention'] = unique_df['mention'].str.lower()
+    out_df = pd.DataFrame(columns=unique_df.columns)
 
     # Remove duplicates that differ only in case
     # Choose which to keep by prioritizing number of occurences then prob
@@ -407,17 +371,18 @@ def reformat_output(df: pd.DataFrame) -> pd.DataFrame:
     """
     Reformat output datframe to wide format
 
+    Parameters:
     `df`: Dataframe output by deduplicate()
 
-    Return
+    Return:
     Wide-format datframe
     """
 
     df['prob'] = df['prob'].astype(str)
 
     # Add two dummy rows so that both COM and FUL are present as labels
-    df.loc[len(df)] = ['-1', '', '', 'COM', '0']
-    df.loc[len(df)] = ['-1', '', '', 'FUL', '0']
+    df.loc[len(df)] = ['-1', 'foo bar', 'foo', 'COM', '0']
+    df.loc[len(df)] = ['-1', 'foo bar', 'bar', 'FUL', '0']
     df = df[df['mention'] != '']
 
     # For each article, aggregate multiple occurences
@@ -492,7 +457,10 @@ def test_reformat_output() -> None:
             'full_prob'
         ])
 
-    assert_frame_equal(reformat_output(in_df), out_df, check_names=False)
+    assert_frame_equal(reformat_output(in_df),
+                       out_df,
+                       check_names=False,
+                       check_dtype=False)
 
 
 # ---------------------------------------------------------------------------
@@ -508,18 +476,16 @@ def main() -> None:
 
     out_file = os.path.join(args.out_dir, 'predictions.csv')
 
-    model_name = MODEL_TO_HUGGINGFACE_VERSION[args.model_name]
-
     device = get_torch_device()
 
-    model, tokenizer = get_model(model_name, args.checkpoint, device)
+    model, _, tokenizer = get_ner_model(args.checkpoint, device)
 
     predictions = reformat_output(
         deduplicate(predict(model, tokenizer, input_df, device)))
 
     predictions.to_csv(out_file, index=False)
 
-    print(f'Done. Wrote output to {out_file}.')
+    print(f'Done. Saved predictions to {out_file}.')
 
 
 # ---------------------------------------------------------------------------

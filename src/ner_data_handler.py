@@ -5,7 +5,7 @@ Authors: Ana-Maria Istrate and Kenneth Schackart
 
 import random
 from functools import partial
-from typing import cast, List, NamedTuple, Optional
+from typing import List, NamedTuple, Optional, cast
 
 from datasets import load_dataset
 from datasets.arrow_dataset import Batch
@@ -41,14 +41,15 @@ def get_dataloader(file: str, run_params: RunParams) -> DataLoader:
     `file`: Input file name
     `run_params`: Model and run parameters
 
-    Returns:
+    Return:
     A `DataLoader` with preprocessed data
     """
 
     dataset = load_dataset('pandas', data_files={'set': file})
     dataset = cast(DatasetDict, dataset)  # Cast for type checker
 
-    tokenizer = AutoTokenizer.from_pretrained(run_params.model_name)
+    tokenizer = AutoTokenizer.from_pretrained(run_params.model_name,
+                                              add_prefix_space=True)
     collator = DataCollatorForTokenClassification(tokenizer=tokenizer)
 
     tokenize_align_labels_with_tokenizer = partial(tokenize_align_labels,
@@ -78,6 +79,7 @@ def tokenize_align_labels(dataset: Batch,
     Tokenize sequences of `words` and align numeric tags to tokens
     based on provided `ner_tags`
 
+    Parameters:
     `dataset`: Batch of a `Dataset`
     `tokenizer`: Tokenizer for sequence tokenization
 
@@ -106,6 +108,7 @@ def align_labels_with_tokens(labels: List[int],
     """
     Apply labels to all word indices from the tokenized sequence
 
+    Parameters:
     `labels`: NER labels for the original words in sequence
     `word_ids`: Word indices of tokenized sequence
     `cls_token`: Value to assign for CLS tokens

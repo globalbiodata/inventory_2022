@@ -7,19 +7,18 @@ Authors: Ana-Maria Istrate and Kenneth Schackart
 import argparse
 import copy
 import os
-from typing import Any, List, NamedTuple, TextIO, Tuple, cast
+from typing import Any, List, NamedTuple, TextIO, Tuple
 
 import pandas as pd
 import torch
-from datasets import load_metric
 from torch.utils.data.dataloader import DataLoader
 from tqdm.auto import tqdm
 from transformers import (AdamW, AutoModelForSequenceClassification,
                           get_scheduler)
 
 from class_data_handler import DataFields, RunParams, get_dataloader
-from utils import (MODEL_TO_HUGGINGFACE_VERSION, CustomHelpFormatter, Metrics,
-                   Settings, make_filenames, save_model, save_train_stats,
+from utils import (CustomHelpFormatter, Metrics, Settings, get_classif_metrics,
+                   make_filenames, save_model, save_train_stats,
                    set_random_seed)
 
 
@@ -96,20 +95,12 @@ def get_args():
                            default=['not-bio-resource', 'bio-resource'],
                            help='Descriptions of the classification labels')
 
-    model_params.add_argument(
-        '-m',
-        '--model-name',
-        metavar='MODEL',
-        type=str,
-        default='scibert',
-        help='Name of model',
-        choices=[
-            'bert', 'biobert', 'bioelectra', 'bioelectra_pmc',
-            'biomed_roberta', 'biomed_roberta_chemprot',
-            'biomed_roberta_rct_500', 'bluebert', 'bluebert_mimic3',
-            'electramed', 'pubmedbert', 'pubmedbert_pmc', 'sapbert',
-            'sapbert_mean_token', 'scibert'
-        ])
+    model_params.add_argument('-m',
+                              '--model-name',
+                              metavar='MODEL',
+                              type=str,
+                              required=True,
+                              help='Name of model')
     model_params.add_argument('-max',
                               '--max-len',
                               metavar='INT',
@@ -173,6 +164,8 @@ def train(settings: Settings) -> Tuple[Any, pd.DataFrame]:
 
     Parameters:
     `settings`: Model settings (NamedTuple)
+
+    Return: Tuple of best model, and training stats dataframe
     """
 
     model = settings.model
@@ -191,10 +184,10 @@ def train(settings: Settings) -> Tuple[Any, pd.DataFrame]:
         train_loss = train_epoch(settings, progress_bar)
 
         model.eval()
-        train_metrics = get_metrics(model, settings.train_dataloader,
-                                    settings.device)
-        val_metrics = get_metrics(model, settings.val_dataloader,
-                                  settings.device)
+        train_metrics = get_classif_metrics(model, settings.train_dataloader,
+                                            settings.device)
+        val_metrics = get_classif_metrics(model, settings.val_dataloader,
+                                          settings.device)
 
         if val_metrics.f1 > best_val.f1:
             best_val = val_metrics
@@ -203,8 +196,8 @@ def train(settings: Settings) -> Tuple[Any, pd.DataFrame]:
 
         # Stop training once validation F1 goes down
         # Overfitting has begun
-        if val_metrics.f1 < best_val.f1 and epoch > 0:
-            break
+        # if val_metrics.f1 < best_val.f1 and epoch > 0:
+        #     break
 
         epoch_row = pd.DataFrame(
             {
@@ -252,7 +245,7 @@ def train_epoch(settings: Settings, progress_bar: tqdm) -> float:
     `settings`: Model settings (NamedTuple)
     `progress_bar`: tqdm instance for tracking progress
 
-    Return: Train loss per observation
+    Return: Average train loss per observation
     """
     train_loss = 0
     num_train = 0
@@ -272,51 +265,18 @@ def train_epoch(settings: Settings, progress_bar: tqdm) -> float:
 
 
 # ---------------------------------------------------------------------------
-def get_metrics(model: Any, dataloader: DataLoader,
-                device: torch.device) -> Metrics:
-    """
-    Compute model performance metrics
-
-    Parameters:
-    `model`: Classification model
-    `dataloader`: DataLoader containing tokenized text entries and
-    corresponding labels
-    `device`: Torch device
-
-    Returns:
-    A `Metrics` NamedTuple
-    """
-    calc_precision = load_metric('precision')
-    calc_recall = load_metric('recall')
-    calc_f1 = load_metric('f1')
-    total_loss = 0.
-    num_seen_datapoints = 0
-    for batch in dataloader:
-        batch = {k: v.to(device) for k, v in batch.items()}
-        with torch.no_grad():
-            outputs = model(**batch)
-        num_seen_datapoints += len(batch['input_ids'])
-        predictions = torch.argmax(outputs.logits, dim=-1)
-        calc_precision.add_batch(predictions=predictions,
-                                 references=batch['labels'])
-        calc_recall.add_batch(predictions=predictions,
-                              references=batch['labels'])
-        calc_f1.add_batch(predictions=predictions, references=batch['labels'])
-        total_loss += outputs.loss.item()
-    total_loss /= num_seen_datapoints
-
-    precision = cast(dict, calc_precision.compute())
-    recall = cast(dict, calc_recall.compute())
-    f1 = cast(dict, calc_f1.compute())
-
-    return Metrics(precision['precision'], recall['recall'], f1['f1'],
-                   total_loss)
-
-
-# ---------------------------------------------------------------------------
 def get_dataloaders(args: Args,
                     model_name: str) -> Tuple[DataLoader, DataLoader]:
-    """ Generate the dataloaders """
+    """
+    Generate the dataloaders
+
+    Parameters:
+    `args`: Command-line arguments
+    `model_name`: Huggingface model name
+
+    Return:
+    A Tuple of trianing, validation `DataLoader`s
+    """
 
     print('Generating dataloaders ...')
     print('=' * 30)
@@ -344,7 +304,18 @@ def get_dataloaders(args: Args,
 # ---------------------------------------------------------------------------
 def initialize_model(model_name: str, args: Args, train_dataloader: DataLoader,
                      val_dataloader: DataLoader) -> Settings:
-    """ Initialize the model and get settings  """
+    """
+    Instatiate predictive model from HFHub and get settings
+
+    Params:
+    `model_name`: Pretrained model name
+    `args`: Command-line arguments
+    `trin_dataloader`: Training `DataLoader`
+    `val_dataloader`: Validation `DataLoader`
+
+    Return:
+    `Settings` including pretrained model
+    """
 
     print(f'Initializing {model_name} model ...')
     print('=' * 30)
@@ -379,7 +350,7 @@ def main() -> None:
     if not os.path.isdir(out_dir):
         os.makedirs(out_dir)
 
-    model_name = MODEL_TO_HUGGINGFACE_VERSION[args.model_name]
+    model_name = args.model_name
 
     train_dataloader, val_dataloader = get_dataloaders(args, model_name)
 
@@ -392,10 +363,10 @@ def main() -> None:
     print('=' * 30)
 
     model, train_stats_df = train(settings)
+    train_stats_df['model_name'] = model_name
 
-    checkpt_filename, train_stats_filename = make_filenames(
-        out_dir, args.model_name)
-    save_model(model, checkpt_filename)
+    checkpt_filename, train_stats_filename = make_filenames(out_dir)
+    save_model(model, model_name, checkpt_filename)
     save_train_stats(train_stats_df, train_stats_filename)
 
     print('Done. Saved best checkpoint to', checkpt_filename)

@@ -6,7 +6,6 @@ Authors: Kenneth Schackart
 
 import argparse
 import os
-import re
 import shutil
 from typing import List, NamedTuple
 
@@ -56,13 +55,15 @@ def get_model_name(filename: str) -> str:
     """
     Get model name from input file name
 
+    e.g. 'out/scibert/checkpoint.pt' -> 'scibert'
+
     Parameters:
     `filename`: Input filename containing model name
+
+    Return: Model (short)name
     """
 
-    base, _ = os.path.splitext(os.path.basename(filename))
-
-    model_name = re.sub('_train_stats', '', base)
+    model_name = filename.split('/')[-2]
 
     return model_name
 
@@ -72,11 +73,11 @@ def test_get_model_name() -> None:
     """ Test get_model_name """
 
     model_name = 'scibert'
-    _, filename = make_filenames('out', model_name)
+    _, filename = make_filenames('out/' + model_name)
     assert get_model_name(filename) == model_name
 
     model_name = 'biomed_roberta'
-    _, filename = make_filenames('out', model_name)
+    _, filename = make_filenames('out/' + model_name)
     assert get_model_name(filename) == model_name
 
 
@@ -87,6 +88,9 @@ def get_checkpoint_dir(filename: str) -> str:
 
     Parameters:
     `filename`: Input filename
+
+    Return:
+    Checkpoint directory name
     """
 
     return os.path.split(filename)[0]
@@ -96,8 +100,8 @@ def get_checkpoint_dir(filename: str) -> str:
 def test_get_checkpoint_dir() -> None:
     """ Test get_checkpoint_dir """
 
-    chkpt_dir = 'out/classif_checkpoints'
-    _, filename = make_filenames(chkpt_dir, 'scibert')
+    chkpt_dir = 'out/classif_checkpoints/scibert'
+    _, filename = make_filenames(chkpt_dir)
 
     assert get_checkpoint_dir(filename) == chkpt_dir
 
@@ -116,26 +120,34 @@ def main() -> None:
     best_model = ''
     for filename in args.files:
         model_name = get_model_name(filename)
-        checkpoint_dir = get_checkpoint_dir(filename)
+
         df = pd.read_csv(filename)
 
         if max(df['val_f1']) > best_f1:
-            best_model, _ = make_filenames(checkpoint_dir, model_name)
+            checkpoint_dir = get_checkpoint_dir(filename)
+            best_model, _ = make_filenames(checkpoint_dir)
+            best_model_name = model_name
+            best_f1 = max(df['val_f1'])
 
         df['model'] = model_name
         out_df = pd.concat([out_df, df])
 
     out_df.reset_index(inplace=True, drop=True)
 
-    model_outfile = os.path.join(args.out_dir, 'best_checkpt.pt')
-    stats_outfile = os.path.join(args.out_dir, 'combined_stats.csv')
+    out_dir = os.path.join(args.out_dir, best_model_name)
+
+    model_outfile = os.path.join(out_dir, 'best_checkpt.pt')
+    stats_outfile = os.path.join(out_dir, 'combined_stats.csv')
+
+    if not os.path.isdir(out_dir):
+        os.makedirs(out_dir)
 
     out_df.to_csv(stats_outfile, index=False)
     shutil.copyfileobj(open(best_model, 'rb'), open(model_outfile, 'wb'))
 
     print(f'Checkpoint of best model is {best_model}')
     print('Done. Wrote combined stats file and best model checkpoint',
-          f'to {args.out_dir}')
+          f'to {out_dir}')
 
 
 # ---------------------------------------------------------------------------

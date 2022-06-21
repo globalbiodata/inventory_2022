@@ -1,40 +1,39 @@
 #!/usr/bin/env python3
 """
-Purpose: Use trained BERT model for article classification
-Authors: Ana-Maria Istrate and Kenneth Schackart
+Purpose: Conduct evaluation on held-out test split
+Authors: Kenneth Schackart
 """
 
 import argparse
 import os
-from typing import List, NamedTuple, TextIO, BinaryIO
+from typing import BinaryIO, List, NamedTuple, TextIO
 
-import pandas as pd
-import torch
-from datasets import ClassLabel
 from torch.utils.data.dataloader import DataLoader
 
 from class_data_handler import DataFields, RunParams, get_dataloader
-from utils import CustomHelpFormatter, get_torch_device, get_classif_model
+from utils import (CustomHelpFormatter, get_classif_metrics, get_classif_model,
+                   get_torch_device, save_metrics)
 
 
 # ---------------------------------------------------------------------------
 class Args(NamedTuple):
     """ Command-line arguments """
+    test_file: TextIO
     checkpoint: BinaryIO
-    infile: TextIO
     out_dir: str
     predictive_field: str
     descriptive_labels: List[str]
+    labels_field: str
     max_len: int
     batch_size: int
 
 
 # ---------------------------------------------------------------------------
-def get_args() -> Args:
+def get_args():
     """ Parse command-line arguments """
 
     parser = argparse.ArgumentParser(
-        description='Predict article classifications using trained BERT model',
+        description='Evaluate model on held-out test set',
         formatter_class=CustomHelpFormatter)
 
     inputs = parser.add_argument_group('Inputs and Outputs')
@@ -42,24 +41,25 @@ def get_args() -> Args:
     model_params = parser.add_argument_group('Model Parameters')
     runtime_params = parser.add_argument_group('Runtime Parameters')
 
+    inputs.add_argument('-t',
+                        '--test_file',
+                        metavar='FILE',
+                        type=argparse.FileType('rt'),
+                        required=True,
+                        help='Test data file')
     inputs.add_argument('-c',
                         '--checkpoint',
-                        metavar='CHKPT',
+                        metavar='PT',
                         type=argparse.FileType('rb'),
                         required=True,
                         help='Trained model checkpoint')
-    inputs.add_argument('-i',
-                        '--input-file',
-                        metavar='FILE',
-                        type=argparse.FileType('rt', encoding='ISO-8859-1'),
-                        default='data/val.csv',
-                        help='Input file for prediction')
     inputs.add_argument('-o',
                         '--out-dir',
                         metavar='DIR',
                         type=str,
                         default='out/',
-                        help='Directory to output predictions')
+                        required=True,
+                        help='Directory to output metrics')
 
     data_info.add_argument('-pred',
                            '--predictive-field',
@@ -68,6 +68,12 @@ def get_args() -> Args:
                            default='title_abstract',
                            help='Data column to use for prediction',
                            choices=['title', 'abstract', 'title_abstract'])
+    data_info.add_argument('-labs',
+                           '--labels-field',
+                           metavar='LABS',
+                           type=str,
+                           default='curation_score',
+                           help='Data column with classification labels')
     data_info.add_argument('-desc',
                            '--descriptive-labels',
                            metavar='LAB',
@@ -92,62 +98,35 @@ def get_args() -> Args:
 
     args = parser.parse_args()
 
-    return Args(args.checkpoint, args.input_file, args.out_dir,
-                args.predictive_field, args.descriptive_labels, args.max_len,
-                args.batch_size)
+    return Args(args.test_file, args.checkpoint, args.out_dir,
+                args.predictive_field, args.descriptive_labels,
+                args.labels_field, args.max_len, args.batch_size)
 
 
 # ---------------------------------------------------------------------------
-def get_dataloaders(args: Args, model_name: str) -> DataLoader:
+def get_test_dataloader(args: Args, model_name: str) -> DataLoader:
     """
     Generate the dataloaders
 
     Parameters:
     `args`: Command-line arguments
-    `model_name`: Huggingface model name
+    `model_name`: HuggingFace model name
 
     Return:
-    A `DataLoader` of preprocessed data
+    Test `DataLoader`
     """
 
-    data_fields = DataFields(args.predictive_field, args.descriptive_labels)
+    data_fields = DataFields(
+        args.predictive_field,
+        args.descriptive_labels,
+        args.labels_field,
+    )
 
     dataloader_params = RunParams(model_name, args.batch_size, args.max_len)
 
-    dataloader = get_dataloader(args.infile, data_fields, dataloader_params)
+    dataloader = get_dataloader(args.test_file, data_fields, dataloader_params)
 
     return dataloader
-
-
-# ---------------------------------------------------------------------------
-def predict(model, dataloader: DataLoader, class_labels: ClassLabel,
-            device: torch.device) -> List[str]:
-    """
-    Use model to predict article classifications
-
-    Parameters:
-    `model`: Pretrained predictive model
-    `dataloader`: `DataLoader` with preprocessed data
-    `class_labels`: Class labels to apply in prediction
-    `device`: The `torch.device` to use
-
-    Return:
-    List of predicted labels
-    """
-
-    all_predictions = []
-    model.eval()
-    for batch in dataloader:
-        batch = {k: v.to(device) for k, v in batch.items()}
-        with torch.no_grad():
-            outputs = model(**batch)
-        logits = outputs.logits
-        predictions = torch.argmax(logits, dim=-1).cpu().numpy()
-        all_predictions.extend(predictions)
-
-    predicted_labels = [class_labels.int2str(int(x)) for x in all_predictions]
-
-    return predicted_labels
 
 
 # ---------------------------------------------------------------------------
@@ -155,29 +134,24 @@ def main() -> None:
     """ Main function """
 
     args = get_args()
+    out_dir = args.out_dir
 
-    if not os.path.isdir(args.out_dir):
-        os.makedirs(args.out_dir)
+    if not os.path.isdir(out_dir):
+        os.makedirs(out_dir)
 
-    out_file = os.path.join(args.out_dir, 'predictions.csv')
+    out_file = os.path.join(args.out_dir, 'metrics.csv')
 
     device = get_torch_device()
 
     model, model_name = get_classif_model(args.checkpoint, device)
 
-    dataloader = get_dataloaders(args, model_name)
+    dataloader = get_test_dataloader(args, model_name)
 
-    class_labels = ClassLabel(num_classes=2, names=args.descriptive_labels)
+    test_metrics = get_classif_metrics(model, dataloader, device)
 
-    # Predict labels
-    df = pd.read_csv(open(args.infile.name, encoding='ISO-8859-1'))
-    predicted_labels = predict(model, dataloader, class_labels, device)
-    df['predicted_label'] = predicted_labels
+    save_metrics(test_metrics, out_file)
 
-    # Save labels to file
-    df = df.replace(r'\n', ' ', regex=True)
-    df.to_csv(out_file, index=False)
-    print('Done. Saved predictions to', out_file)
+    print(f'Done. Wrote output to {out_dir}.')
 
 
 # ---------------------------------------------------------------------------

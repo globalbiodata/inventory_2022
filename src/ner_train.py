@@ -7,27 +7,20 @@ Authors: Ana-Maria Istrate and Kenneth Schackart
 import argparse
 import copy
 import os
-import sys
-from typing import Any, List, NamedTuple, Optional, Tuple, cast
+from typing import Any, NamedTuple, Optional, Tuple, cast
 
 import pandas as pd
 import torch
-from datasets import load_metric
-from torch.functional import Tensor
 from torch.optim import AdamW
 from torch.utils.data.dataloader import DataLoader
 from tqdm.auto import tqdm
-from transformers import AutoModelForTokenClassification, get_scheduler
+from transformers import (AutoModelForTokenClassification, get_scheduler,
+                          optimization)
 
 from ner_data_handler import RunParams, get_dataloader
-from utils import (ARGS_MAP, ID2NER_TAG, NER_TAG2ID, CustomHelpFormatter,
-                   Metrics, Settings, make_filenames, save_model,
+from utils import (ID2NER_TAG, NER_TAG2ID, CustomHelpFormatter, Metrics,
+                   Settings, get_ner_metrics, make_filenames, save_model,
                    save_train_stats, set_random_seed)
-
-# ---------------------------------------------------------------------------
-# Type Aliases
-LabeledBatch = List[List[int]]
-TaggedBatch = List[List[str]]
 
 
 # ---------------------------------------------------------------------------
@@ -39,7 +32,6 @@ class Args(NamedTuple):
     model_name: str
     learning_rate: float
     weight_decay: float
-    use_default_values: bool
     num_training: int
     num_epochs: int
     batch_size: int
@@ -79,20 +71,12 @@ def get_args() -> Args:
                         default='out/',
                         help='Directory to output checkpt and loss plot')
 
-    model_params.add_argument(
-        '-m',
-        '--model_name',
-        metavar='',
-        type=str,
-        default='biomed_roberta',
-        help='Name of model',
-        choices=[
-            'bert', 'biobert', 'bioelectra', 'bioelectra_pmc',
-            'biomed_roberta', 'biomed_roberta_chemprot',
-            'biomed_roberta_rct_500', 'bluebert', 'bluebert_mimic3',
-            'electramed', 'pubmedbert', 'pubmedbert_pmc', 'sapbert',
-            'sapbert_mean_token', 'scibert'
-        ])
+    model_params.add_argument('-m',
+                              '--model_name',
+                              metavar='',
+                              type=str,
+                              required=True,
+                              help='Name of HuggingFace model')
     model_params.add_argument('-rate',
                               '--learning-rate',
                               metavar='NUM',
@@ -105,12 +89,6 @@ def get_args() -> Args:
                               type=float,
                               default=0.01,
                               help='Weight decay for learning rate')
-    model_params.add_argument('-def',
-                              '--use-default-values',
-                              metavar='',
-                              type=bool,
-                              default=True,
-                              help='Use default values in ner_utils.py')
 
     runtime_params.add_argument(
         '-nt',
@@ -142,45 +120,18 @@ def get_args() -> Args:
 
     args = parser.parse_args()
 
-    args = Args(args.train_file, args.val_file, args.out_dir, args.model_name,
-                args.learning_rate, args.weight_decay, args.use_default_values,
-                args.num_training, args.num_epochs, args.batch_size,
-                args.lr_scheduler, None, args.seed)
-
-    if args.use_default_values:
-        args = get_default_args(args)
-
-    return args
+    return Args(args.train_file, args.val_file, args.out_dir, args.model_name,
+                args.learning_rate, args.weight_decay, args.num_training,
+                args.num_epochs, args.batch_size, args.lr_scheduler, None,
+                args.seed)
 
 
 # ---------------------------------------------------------------------------
-def get_default_args(args: Args) -> Args:
-    """
-    Get default options based on model
-
-    `args`: Command-line arguments
-
-    Return: Updated arguments
-    """
-
-    model_name = args.model_name
-    model_checkpoint = ARGS_MAP[model_name][0]
-    batch_size = ARGS_MAP[model_name][1]
-    learning_rate = ARGS_MAP[model_name][2]
-    weight_decay = ARGS_MAP[model_name][3]
-    use_scheduler = ARGS_MAP[model_name][4]
-
-    return Args(args.train_file, args.val_file, args.out_dir, model_name,
-                learning_rate, weight_decay, True, args.num_training,
-                args.num_epochs, batch_size, use_scheduler, model_checkpoint,
-                True)
-
-
-# ---------------------------------------------------------------------------
-def get_dataloaders(args, model_name: str) -> Tuple[DataLoader, DataLoader]:
+def get_dataloaders(args) -> Tuple[DataLoader, DataLoader]:
     """
     Generate training and validation dataloaders
 
+    Parameters:
     `args`: Command-line arguments
 
     Return: training dataloader, validation dataloader
@@ -189,7 +140,7 @@ def get_dataloaders(args, model_name: str) -> Tuple[DataLoader, DataLoader]:
     print('Generating training and validation dataloaders ...')
     print('=' * 30)
 
-    params = RunParams(model_name, args.batch_size, args.num_training)
+    params = RunParams(args.model_name, args.batch_size, args.num_training)
     train_dataloader = get_dataloader(args.train_file, params)
     val_dataloader = get_dataloader(args.val_file, params)
 
@@ -200,30 +151,31 @@ def get_dataloaders(args, model_name: str) -> Tuple[DataLoader, DataLoader]:
 
 
 # ---------------------------------------------------------------------------
-def initialize_model(model_name: str, args: Args, train_dataloader: DataLoader,
+def initialize_model(args: Args, train_dataloader: DataLoader,
                      val_dataloader: DataLoader) -> Settings:
     """
     Initialize the model and get settings
 
-    `model_name`: Trained model name
     `args`: Command-line arguments
     `train_dataloader`: Training dataloader
     `val_dataloader`: Validation dataloader
 
-    Return: training settings including model
+    Return: Training settings including model
     """
 
-    print('Initializing', model_name, 'model ...')
+    print('Initializing', args.model_name, 'model ...')
     print('=' * 30)
 
     model = AutoModelForTokenClassification.from_pretrained(
-        model_name, id2label=ID2NER_TAG, label2id=NER_TAG2ID)
+        args.model_name, id2label=ID2NER_TAG, label2id=NER_TAG2ID)
     device = torch.device(
         'cuda') if torch.cuda.is_available() else torch.device('cpu')
     model.to(device)
-    optimizer = AdamW(model.parameters(),
-                      lr=args.learning_rate,
-                      weight_decay=args.weight_decay)
+    optimizer = cast(
+        optimization.AdamW,
+        AdamW(model.parameters(),
+              lr=args.learning_rate,
+              weight_decay=args.weight_decay))
     num_training_steps = args.num_epochs * len(train_dataloader)
 
     if args.lr_scheduler:
@@ -245,6 +197,8 @@ def train(settings: Settings) -> Tuple[Any, pd.DataFrame]:
 
     Parameters:
     `settings`: Model settings (NamedTuple)
+
+    Return: Tuple of best model, and training stats dataframe
     """
 
     model = settings.model
@@ -263,10 +217,10 @@ def train(settings: Settings) -> Tuple[Any, pd.DataFrame]:
         train_loss = train_epoch(settings, progress_bar)
 
         model.eval()
-        train_metrics = get_metrics(model, settings.train_dataloader,
-                                    settings.device)
-        val_metrics = get_metrics(model, settings.val_dataloader,
-                                  settings.device)
+        train_metrics = get_ner_metrics(model, settings.train_dataloader,
+                                        settings.device)
+        val_metrics = get_ner_metrics(model, settings.val_dataloader,
+                                      settings.device)
 
         if val_metrics.f1 > best_val.f1:
             best_val = val_metrics
@@ -275,8 +229,8 @@ def train(settings: Settings) -> Tuple[Any, pd.DataFrame]:
 
         # Stop training once validation F1 goes down
         # Overfitting has begun
-        if val_metrics.f1 < best_val.f1 and epoch > 0:
-            break
+        # if val_metrics.f1 < best_val.f1 and epoch > 0:
+        #     break
 
         epoch_row = pd.DataFrame(
             {
@@ -324,7 +278,7 @@ def train_epoch(settings: Settings, progress_bar: tqdm) -> float:
     `settings`: Model settings (NamedTuple)
     `progress_bar`: tqdm instance for tracking progress
 
-    Return: Train loss per observation
+    Return: Average train loss per observation
     """
     train_loss = 0
     num_train = 0
@@ -344,137 +298,31 @@ def train_epoch(settings: Settings, progress_bar: tqdm) -> float:
 
 
 # ---------------------------------------------------------------------------
-def get_metrics(model: Any, dataloader: DataLoader,
-                device: torch.device) -> Metrics:
-    """
-    Compute model performance metrics
-
-    Parameters:
-    `model`: Classification model
-    `dataloader`: DataLoader containing tokenized text entries and
-    corresponding labels
-    `device`: Torch device
-
-    Returns:
-    A `Metrics` NamedTuple
-    """
-    # calc_precision = load_metric('precision')
-    # calc_recall = load_metric('recall')
-    # calc_f1 = load_metric('f1')
-    calc_seq_metrics = load_metric('seqeval')
-    total_loss = 0.
-    num_seen_datapoints = 0
-    for batch in dataloader:
-        batch = {k: v.to(device) for k, v in batch.items()}
-        with torch.no_grad():
-            outputs = model(**batch)
-        num_seen_datapoints += len(batch['input_ids'])
-        predictions = torch.argmax(outputs.logits, dim=-1)  # Diff from class
-        predictions = predictions.detach().cpu().clone().numpy()
-
-        labels = cast(Tensor, batch['labels'])
-        labels = labels.detach().cpu().clone().numpy()
-
-        pred_labels, true_labels = convert_to_tags(predictions, labels)
-
-        calc_seq_metrics.add_batch(predictions=pred_labels,
-                                   references=true_labels)
-
-        total_loss += outputs.loss.item()
-    total_loss /= num_seen_datapoints
-
-    precision, recall, f1 = extract_metrics(calc_seq_metrics.compute())
-
-    return Metrics(precision, recall, f1, total_loss)
-
-
-# ---------------------------------------------------------------------------
-def extract_metrics(metric_dict: Optional[dict]) -> List[float]:
-    """ Extract precision, recall, and F1 """
-
-    if not metric_dict:
-        sys.exit('Unable to calculate metrics.')
-
-    return [
-        metric_dict[f'overall_{metric}']
-        for metric in ['precision', 'recall', 'f1']
-    ]
-
-
-# ---------------------------------------------------------------------------
-def convert_to_tags(
-        batch_predictions: LabeledBatch,
-        batch_labels: LabeledBatch) -> Tuple[TaggedBatch, TaggedBatch]:
-    """
-    Convert numeric labels to string tags
-
-    `batch_predictions`: Predicted numeric labels of batch of sequences
-    `batch_labels`: True numeric labels of batch of sequences
-
-    Return: Lists of tagged sequences of tokens
-    from predictions and true labels
-    """
-
-    true_labels = [[
-        ID2NER_TAG[token_label] for token_label in seq_labels
-        if token_label != -100
-    ] for seq_labels in batch_labels]
-    pred_labels = [[
-        ID2NER_TAG[token_pred]
-        for (token_pred, token_label) in zip(seq_preds, seq_labels)
-        if token_label != -100
-    ] for seq_preds, seq_labels in zip(batch_predictions, batch_labels)]
-
-    return pred_labels, true_labels
-
-
-# ---------------------------------------------------------------------------
-def test_convert_to_tags() -> None:
-    """ Test convert_to_tags """
-
-    # Inputs
-    predictions = [[0, 0, 1, 2, 2, 0, 3, 4, 0], [0, 0, 0, 1, 0]]
-    labels = [[-100, 0, 1, 2, 2, 0, 3, 4, -100], [-100, 0, 0, 3, -100]]
-
-    # Expected outputs
-    exp_pred = [['O', 'B-COM', 'I-COM', 'I-COM', 'O', 'B-FUL', 'I-FUL'],
-                ['O', 'O', 'B-COM']]
-    exp_labels = [['O', 'B-COM', 'I-COM', 'I-COM', 'O', 'B-FUL', 'I-FUL'],
-                  ['O', 'O', 'B-FUL']]
-
-    res_pred, res_labels = convert_to_tags(predictions, labels)
-
-    assert exp_pred == res_pred
-    assert exp_labels == res_labels
-
-
-# ---------------------------------------------------------------------------
 def main() -> None:
     """ Main function """
 
     args = get_args()
     out_dir = args.out_dir
 
-    if not os.path.exists(out_dir):
+    if not os.path.isdir(out_dir):
         os.mkdir(out_dir)
 
-    model_name = ARGS_MAP[args.model_name][0]
-    train_dataloader, val_dataloader = get_dataloaders(args, model_name)
+    model_name = args.model_name
+    train_dataloader, val_dataloader = get_dataloaders(args)
 
     if args.seed:
         set_random_seed(45)
-    settings = initialize_model(model_name, args, train_dataloader,
-                                val_dataloader)
+    settings = initialize_model(args, train_dataloader, val_dataloader)
 
     print('Starting model training...')
     print('=' * 30)
 
     model, train_stats_df = train(settings)
+    train_stats_df['model_name'] = model_name
 
-    checkpt_filename, train_stats_filename = make_filenames(
-        out_dir, args.model_name)
+    checkpt_filename, train_stats_filename = make_filenames(out_dir)
 
-    save_model(model, checkpt_filename)
+    save_model(model, model_name, checkpt_filename)
     save_train_stats(train_stats_df, train_stats_filename)
 
     print('Done. Saved best checkpoint to', checkpt_filename)

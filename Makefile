@@ -12,7 +12,10 @@ test:
 	src/ner_data_handler.py \
 	src/ner_train.py \
 	src/ner_predict.py \
-	src/model_picker.py
+	src/model_picker.py \
+	src/class_final_eval.py \
+	src/ner_final_eval.py \
+	src/url_extractor.py \
 	
 
 dryrun:

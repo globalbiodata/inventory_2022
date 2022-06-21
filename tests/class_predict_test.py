@@ -55,13 +55,6 @@ def test_bad_checkpoint() -> None:
 
 
 # ---------------------------------------------------------------------------
-def test_bad_model() -> None:
-    """ Dies on bad model choice """
-
-    tu.bad_model(PRG)
-
-
-# ---------------------------------------------------------------------------
 def test_bad_predictor() -> None:
     """ Dies on bad predictor choice """
 
