@@ -2,6 +2,11 @@
 
 This directory contains the source code used in this project. The process for both article classification and NER are very similar, so those steps for each process are described together.
 
+These scripts are modules, and are not to be executed:
+* `class_data_handler.py`
+* `ner_data_handler.py`
+* `utils.py`
+
 The following are executable Python scripts:
 * `class_data_generator.py`
 * `class_predict.py`
@@ -15,11 +20,6 @@ The following are executable Python scripts:
 * `query_epmc.py`
 * `utils.py`
 
-These scripts are modules, and are not to be executed:
-* `class_data_handler.py`
-* `ner_data_handler.py`
-* `utils.py`
-
 ## Accessing Help
 
 Each of the executable scripts listed above will respond to the `-h` or `--help` flag by providing a usage statement.
@@ -29,7 +29,7 @@ For example:
 $ url_extractor.py --help
 usage: url_extractor.py [-h] [-o DIR] FILE
 
-Extract URLs from text. File must have a column named "text".
+Extract URLs from "text" column of file.
 
 positional arguments:
   FILE               Input file (csv)
