@@ -93,7 +93,7 @@ def make_filenames(outdir: str) -> Tuple[str, str]:
     Return: Tuple of csv and txt filenames
     '''
 
-    csv_out = os.path.join(outdir, 'new_query_results.csv')
+    csv_out = os.path.join(outdir, 'query_results.csv')
     txt_out = os.path.join(outdir, 'last_query_date.txt')
 
     return csv_out, txt_out
@@ -104,7 +104,8 @@ def test_make_filenames() -> None:
     """ Test make_filenames() """
 
     assert make_filenames('data/new_query') == (
-        'data/new_query/new_query.csv', 'data/new_query/last_query_date.txt')
+        'data/new_query/query_results.csv',
+        'data/new_query/last_query_date.txt')
 
 
 # ---------------------------------------------------------------------------
