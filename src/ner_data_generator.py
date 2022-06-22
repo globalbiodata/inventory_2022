@@ -63,7 +63,7 @@ def get_args() -> Args:
                         default='data/manual_ner_extraction.csv',
                         help='Manually curated input file')
     parser.add_argument('-o',
-                        '--outdir',
+                        '--out-dir',
                         metavar='',
                         type=str,
                         default='data/',

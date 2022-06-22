@@ -45,7 +45,7 @@ def get_args() -> Args:
                         default='data/manual_classifications.csv',
                         help='Manually classified input file')
     parser.add_argument('-o',
-                        '--outdir',
+                        '--out-dir',
                         metavar='',
                         type=str,
                         default='data/',
