@@ -20,7 +20,8 @@ from utils import CustomHelpFormatter
 class Args(NamedTuple):
     """ Command-line arguments """
     query: str
-    last_date: str
+    from_date: str
+    to_date: str
     out_dir: str
 
 
@@ -37,12 +38,18 @@ def get_args() -> Args:
                         metavar='QUERY',
                         type=str,
                         help='EuropePMC query to run (file or string)')
-    parser.add_argument('-d',
-                        '--date',
+    parser.add_argument('-f',
+                        '--from-date',
                         metavar='DATE',
                         type=str,
                         default='2011',
-                        help='Date of last run YYYY-MM-DD (file or string)')
+                        help='Articles published after (file or string)')
+    parser.add_argument('-t',
+                        '--to-date',
+                        metavar='DATE',
+                        type=str,
+                        default=None,
+                        help='Articles published before (default: today)')
     parser.add_argument('-o',
                         '--out-dir',
                         metavar='DIR',
@@ -65,13 +72,14 @@ def get_args() -> Args:
             )?          # Finish making month optional
             $           # Followed by nothing else
             ''', re.X)
-    if not re.match(date_pattern, args.date):
-        parser.error(f'Last date "{args.date}" must be one of:\n'
-                     '\t\t\tYYYY\n'
-                     '\t\t\tYYYY-MM\n'
-                     '\t\t\tYYYY-MM-DD')
+    for date in [args.from_date, args.to_date]:
+        if not re.match(date_pattern, args.date):
+            parser.error(f'Last date "{date}" must be one of:\n'
+                         '\t\t\tYYYY\n'
+                         '\t\t\tYYYY-MM\n'
+                         '\t\t\tYYYY-MM-DD')
 
-    return Args(args.query, args.date, args.out_dir)
+    return Args(args.query, args.from_date, args.to_date, args.out_dir)
 
 
 # ---------------------------------------------------------------------------
@@ -122,18 +130,19 @@ def clean_results(results: dict) -> pd.DataFrame:
 
 
 # ---------------------------------------------------------------------------
-def run_query(query: str, last_date: str, today: str) -> pd.DataFrame:
+def run_query(query: str, from_date: str, to_date: str) -> pd.DataFrame:
     """
     Run query on EuropePMC API
     
     Parameters:
     `query`: Query to use
-    `last_date`: Oldest date to use in query
+    `from_date`: Articles published after this date
+    `to_date`: Articles published after this date
     
     Return: `DataFrame` of returned titles and abstracts
     """
 
-    query = query.format(last_date, today)
+    query = query.format(from_date, to_date)
 
     prefix = 'https://www.ebi.ac.uk/europepmc/webservices/rest/search?query='
     suffix = '&resultType=core&fromSearchPost=false&format=json'
@@ -160,12 +169,15 @@ def main() -> None:
 
     out_df, date_out = make_filenames(out_dir)
 
-    today = datetime.today().strftime(r'%Y-%m-%d')
+    if not args.to_date:
+        to_date = datetime.today().strftime(r'%Y-%m-%d')
+    else:
+        to_date = args.to_date
 
-    results = run_query(args.query, args.last_date, today)
+    results = run_query(args.query, args.from_date, to_date)
 
     results.to_csv(out_df, index=False)
-    print(today, file=open(date_out, 'wt'))
+    print(to_date, file=open(date_out, 'wt'))
 
     print(f'Done. Wrote 2 files to {out_dir}.')
 
