@@ -96,7 +96,10 @@ graph TD
 ├── Makefile         # Make targets for easy running of steps
 ├── README.md
 ├── requirements.txt
-└── Snakefile        # Snakemake workflow
+├── running_pipeline.ipynb
+├── train_predict.smk
+├── update_inventory.smk
+└── updating_inventory.ipynb
 ```
 
 # Installation
@@ -146,8 +149,42 @@ make test
 
 To see what steps would be run in the workflow, a dry run can be run:
 ```
-make dryrun
+make dryrun_reproduction
 ```
+
+## Reproducing original results
+
+To run the pipeline from a notebook in Colab, follow the steps in [running_pipeline.ipynb](running_pipeline.ipynb).
+
+Alternatively, to run the pipeline from the command-line, run:
+```
+make train_and_predict
+```
+
+## Updating the inventory
+
+To run the pipeline from a notebook in Colab, follow the steps in [updating_inventory.ipynb](updating_inventory.ipynb). To run from the command line, follow these steps.
+
+First, make sure that the trained classifier and NER models are present at `out/classif_train_out/best/*/best_checkpt.pt` and `out/ner_train_out/best/*/best_checkpt.pt`.
+
+If you do not have trained models, and do not want to perform training, they can be downloaded with:
+```
+# Add code here for getting models!
+```
+
+Next, **make sure that output from previous updates have been saved elsewhere, as the old results must be deleted**.
+
+To remove the outputs of previous run:
+```
+rm data/new_query_results.csv
+rm -rf data/new_paper_predictions/
+```
+
+Then the pipeline for updating results can be run:
+```
+make update_inventory
+```
+
 
 # Authorship
 
