@@ -45,7 +45,7 @@ def get_args() -> Args:
                         default='data/manual_classifications.csv',
                         help='Manually classified input file')
     parser.add_argument('-o',
-                        '--outdir',
+                        '--out-dir',
                         metavar='',
                         type=str,
                         default='data/',
@@ -66,7 +66,7 @@ def get_args() -> Args:
     if not sum(args.splits) == 1.0:
         parser.error(f'--splits {args.splits} must sum to 1')
 
-    return Args(args.infile, args.outdir, args.splits, args.seed)
+    return Args(args.infile, args.out_dir, args.splits, args.seed)
 
 
 # ---------------------------------------------------------------------------

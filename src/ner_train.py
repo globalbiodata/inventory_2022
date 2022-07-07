@@ -53,13 +53,13 @@ def get_args() -> Args:
     runtime_params = parser.add_argument_group('Runtime Parameters')
 
     inputs.add_argument('-t',
-                        '--train_file',
+                        '--train-file',
                         metavar='FILE',
                         type=str,
                         default='data/ner_train.pkl',
                         help='Training data file (.pkl)')
     inputs.add_argument('-v',
-                        '--val_file',
+                        '--val-file',
                         metavar='FILE',
                         type=str,
                         default='data/ner_val.pkl',
@@ -72,7 +72,7 @@ def get_args() -> Args:
                         help='Directory to output checkpt and loss plot')
 
     model_params.add_argument('-m',
-                              '--model_name',
+                              '--model-name',
                               metavar='',
                               type=str,
                               required=True,
@@ -84,7 +84,7 @@ def get_args() -> Args:
                               default=3e-5,
                               help='Learning rate')
     model_params.add_argument('-decay',
-                              '--weight_decay',
+                              '--weight-decay',
                               metavar='NUM',
                               type=float,
                               default=0.01,

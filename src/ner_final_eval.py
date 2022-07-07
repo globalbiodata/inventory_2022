@@ -32,7 +32,7 @@ def get_args():
         formatter_class=CustomHelpFormatter)
 
     parser.add_argument('-t',
-                        '--test_file',
+                        '--test-file',
                         metavar='PKL',
                         type=str,
                         required=True,

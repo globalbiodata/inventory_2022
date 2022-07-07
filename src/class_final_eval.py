@@ -42,7 +42,7 @@ def get_args():
     runtime_params = parser.add_argument_group('Runtime Parameters')
 
     inputs.add_argument('-t',
-                        '--test_file',
+                        '--test-file',
                         metavar='FILE',
                         type=argparse.FileType('rt'),
                         required=True,
