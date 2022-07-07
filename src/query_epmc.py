@@ -86,10 +86,10 @@ def get_args() -> Args:
 def make_filenames(outdir: str) -> Tuple[str, str]:
     '''
     Make filenames for output csv file and last date text file
-    
+
     Parameters:
     `outdir`: Output directory
-    
+
     Return: Tuple of csv and txt filenames
     '''
 
@@ -112,17 +112,17 @@ def test_make_filenames() -> None:
 def clean_results(results: dict) -> pd.DataFrame:
     """
     Retrieve the PMIDs, titles, and abstracts from results of query
-    
+
     Parameters:
     `results`: JSON-encoded response (nested dictionary)
-    
+
     Return: Dataframe of results
     """
 
     pmids = []
     titles = []
     abstracts = []
-    for paper in results.get('resultList').get('result'):
+    for paper in results.get('resultList').get('result'):  # type: ignore
         pmids.append(paper.get('pmid'))
         titles.append(paper.get('title'))
         abstracts.append(paper.get('abstractText'))
@@ -134,12 +134,12 @@ def clean_results(results: dict) -> pd.DataFrame:
 def run_query(query: str, from_date: str, to_date: str) -> pd.DataFrame:
     """
     Run query on EuropePMC API
-    
+
     Parameters:
     `query`: Query to use
     `from_date`: Articles published after this date
     `to_date`: Articles published after this date
-    
+
     Return: `DataFrame` of returned titles and abstracts
     """
 
@@ -150,7 +150,7 @@ def run_query(query: str, from_date: str, to_date: str) -> pd.DataFrame:
     url = prefix + query + suffix
 
     results = requests.get(url)
-    if not results.status_code == requests.codes.ok:
+    if results.status_code != requests.codes.ok:  # pylint: disable=no-member
         results.raise_for_status()
 
     results_json = cast(dict, results.json())
