@@ -5,14 +5,14 @@ project_env: './env'
 ## Classification
 classif_splits_dir: 'data/classif_splits'
 classif_train_outdir: 'out/classif_train_out'
-best_classif_dir: 'out/best_classifier'
+best_classif_dir: 'out/classif_train_out/best'
 classif_benchmark_dir: 'out/benchmarks/classif'
 classif_log_dir: 'out/logs/classif'
 
 ## NER
 ner_splits_dir: 'data/ner_splits'
 ner_train_outdir: 'out/ner_train_out'
-best_ner_dir: 'out/best_ner'
+best_ner_dir: 'out/ner_train_out/best'
 ner_benchmark_dir: 'out/benchmarks/ner'
 ner_log_dir: 'out/logs/ner'
 
@@ -27,6 +27,10 @@ full_corpus: 'data/full_corpus.csv'
 # File with configuration settings for the models
 models: 'config/models_info.tsv'
 
+# Dates used for initial query
+initial_query_start: 2011
+initial_query_end: 2021
+query_string: 'config/query.txt'
 
 # Number of epochs
 classif_epochs: 10
