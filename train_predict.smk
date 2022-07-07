@@ -15,6 +15,28 @@ rule all:
         config["ner_train_outdir"] + "/best/test_set_evaluation/metrics.csv",
 
 
+# Run EruopePMC query
+rule query_epmc:
+    output:
+        query=config["full_corpus"],
+        last_date="data/last_query_date.txt",
+    params:
+        out_dir="data",
+        begin_date=config["initial_query_start"],
+        end_date=config["initial_query_end"],
+        query=config["query_string"],
+    shell:
+        """
+        python3 src/query_epmc.py \
+            -o {params.out_dir} \
+            --from-date {params.begin_date} \
+            --to-date {params.end_date} \
+            {params.query}
+
+        mv {params.out_dir}/new_query_results.csv {output.query}
+        """
+
+
 # Split curated classification set into train, val, and test
 rule split_classif_data:
     input:
@@ -144,7 +166,7 @@ rule filter_positives:
     input:
         "data/full_corpus_predictions/classification/predictions.csv",
     output:
-        "data/full_corpus_predictions/predicted_positives.csv",
+        "data/full_corpus_predictions/classification/predicted_positives.csv",
     shell:
         """
         grep -v 'not-bio-resource' {input} >> {output}
@@ -257,7 +279,7 @@ rule ner_full_corpus:
         classifier=dynamic(
             config["ner_train_outdir"] + "/best/{best_ner}/best_checkpt.pt"
         ),
-        infile="data/full_corpus_predictions/predicted_positives.csv",
+        infile="data/full_corpus_predictions/classification/predicted_positives.csv",
     output:
         "data/full_corpus_predictions/ner/predictions.csv",
     params:
