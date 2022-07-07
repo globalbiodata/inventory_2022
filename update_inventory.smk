@@ -9,7 +9,7 @@ best_ner_pattern = config["best_ner_dir"] + "/{model}/best_checkpt.pt"
 
 rule all:
     input:
-        "data/full_corpus_predictions/urls/predictions.csv",
+        "data/new_paper_predictions/urls/predictions.csv",
 
 
 # Run EuropePMC query with new dates
@@ -65,11 +65,11 @@ rule filter_positives:
 rule ner_full_corpus:
     input:
         classifier=expand(best_ner_pattern, model=NER),
-        infile="data/full_corpus_predictions/classification/predicted_positives.csv",
+        infile="data/new_paper_predictions/classification/predicted_positives.csv",
     output:
-        "data/full_corpus_predictions/ner/predictions.csv",
+        "data/new_paper_predictions/ner/predictions.csv",
     params:
-        out_dir="data/full_corpus_predictions/ner",
+        out_dir="data/new_paper_predictions/ner",
     shell:
         """
         python3 src/ner_predict.py \
@@ -82,11 +82,11 @@ rule ner_full_corpus:
 # Extract out URLS
 rule get_urls:
     input:
-        "data/full_corpus_predictions/ner/predictions.csv",
+        "data/new_paper_predictions/ner/predictions.csv",
     output:
-        "data/full_corpus_predictions/urls/predictions.csv",
+        "data/new_paper_predictions/urls/predictions.csv",
     params:
-        out_dir="data/full_corpus_predictions/urls",
+        out_dir="data/new_paper_predictions/urls",
     shell:
         """
         python3 src/url_extractor.py \
