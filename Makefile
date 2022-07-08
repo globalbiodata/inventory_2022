@@ -1,7 +1,7 @@
 .PHONY: dryrun, setup, test, train_and_predict, update_inventory
 
-dryrun:
-	snakemake -s snake_train_predict -np --configfile config/config.yml
+dryrun_reproduction:
+	snakemake -s train_predict.smk -np --configfile config/config.yml
 
 setup:
 	pip install -r requirements.txt
@@ -26,7 +26,7 @@ test:
 	src/url_extractor.py \
 
 train_and_predict:
-	snakemake -s snake_train_predict --configfile config/config.yml -c1
+	snakemake -s train_predict.smk --configfile config/config.yml -c1
 
 update_inventory:
-	snakemake -s snake_update_inventory --configfile config/config.yml -c1
+	snakemake -s update_inventory.smk --configfile config/config.yml -c1
