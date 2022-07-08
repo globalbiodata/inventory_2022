@@ -1,0 +1,247 @@
+---
+title: "Biodata Resource Inventory Data Analysis"
+output: html_notebook
+---
+
+#  {.tabset}
+
+## Overview
+
+This notebook is for the analysis resulting from conducting the first global biodata resource inventory. Raw figures from publication are created from this notebook, however, some post-processing is expected (*e.g* using Adobe Illustrator)
+
+The following files are used as input:
+
+* `out/classif_train_out/combined_train_stats.csv`
+* `out/ner_train_out/ner_train_stats.csv`
+
+```{r package_imports, include = FALSE}
+library(dplyr)
+library(ggplot2)
+library(magrittr)
+library(readr)
+library(RColorBrewer)
+library(tidyr)
+
+# Set ggplot2 theme for whole R session
+theme_set(theme_light() +
+            theme(plot.title = element_text(hjust = 0.5),
+                  plot.subtitle = element_text(hjust = 0.5)))
+```
+
+```{r file_imports, include = FALSE}
+raw_classif_stats <-
+  read_csv("../out/classif_train_out/classif_combined_stats.csv",
+           show_col_types = FALSE)
+
+raw_ner_stats <-
+  read_csv("../out/ner_train_out/ner_combined_stats.csv",
+           show_col_types = FALSE)
+```
+
+
+```{r data_cleaning_functions, include = FALSE}
+pivot_metrics <- function(df) {
+  df %>%
+    pivot_longer(c(contains("train"), contains("val")),
+                 names_to = "metric",
+                 values_to = "value") %>%
+    separate(metric, c("dataset", "metric"), "_") %>%
+    pivot_wider(names_from = "metric", values_from = "value") %>% 
+    mutate(dataset = case_when(
+      dataset == "val" ~ "Validation",
+      dataset == "train" ~ "Train"
+    )) 
+}
+
+relabel_models <- function(df) {
+  df %>% 
+    mutate(model = case_when(
+      model == "bert" ~ "BERT",
+      model == "biobert" ~ "BioBERT",
+      model == "bioelectra" ~ "BioELECTRA",
+      model == "bioelectra_pmc" ~ "BioELECTRA PMC",
+      model == "biomed_roberta" ~ "BioMed-RoBERTa",
+      model == "biomed_roberta_chemprot" ~ "BioMed-RoBERTa-CP",
+      model == "biomed_roberta_rct500" ~ "BioMed-RoBERTa-RCT",
+      model == "bluebert" ~ "BlueBERT",
+      model == "bluebert_mimic3" ~ "BlueBERT-MIMIC-III",
+      model == "electramed" ~ "ELECTRAMed",
+      model == "bluebert" ~ "BlueBERT",
+      model == "pubmedbert" ~ "PubMedBERT",
+      model == "pubmedbert_fulltext" ~ "PubMedBERT-Full",
+      model == "sapbert" ~ "SapBERT",
+      model == "sapbert_mean_token" ~ "SapBERT-Mean",
+      model == "scibert" ~ "SciBERT"
+    ))
+}
+```
+
+## Training Statistics {.tabset}
+
+
+### Classification
+
+During model training, performance metrics were recorded for each epoch on both the training and validation sets.
+
+For the paper classification task, those metrics are:
+
+$precision=\frac{TP}{TP+FP}$
+
+$sensitivity=recall=\frac{TP}{TP+FN}$
+
+$F1=\frac{2*precision*recall}{precision+recall}$
+
+
+```{r rearrange_classif_stats, echo = FALSE}
+classif_stats <- raw_classif_stats %>%
+  pivot_metrics() %>% 
+  relabel_models()
+```
+
+#### Precision
+
+```{r plot_classif_precision, echo=FALSE}
+classif_stats %>%
+  ggplot(aes(x = epoch, y = precision, color = dataset)) +
+  facet_wrap(~ model) +
+  geom_point() +
+  geom_line(alpha = 0.7) +
+  scale_color_brewer(palette = "Dark2") +
+  labs(x = "Epoch",
+       y = "Precision",
+       color = "Dataset")
+```
+
+#### Sensitivity (Recall)
+
+```{r plot_classif_sensitivity, echo=FALSE}
+classif_stats %>%
+  ggplot(aes(x = epoch, y = recall, color = dataset)) +
+  facet_wrap(~ model) +
+  geom_point() +
+  geom_line(alpha = 0.7) +
+  scale_color_brewer(palette = "Dark2") +
+  labs(x = "Epoch",
+       y = "Sensitivity (Recall)",
+       color = "Dataset")
+```
+
+#### *F*-1
+
+```{r plot_classif_F1, echo=FALSE}
+classif_stats %>%
+  ggplot(aes(x = epoch, y = f1, color = dataset)) +
+  facet_wrap(~ model) +
+  geom_point() +
+  geom_line(alpha = 0.7) +
+  scale_color_brewer(palette = "Dark2") +
+  labs(x = "Epoch",
+       y = "F1",
+       color = "Dataset")
+```
+
+#### Loss
+
+Aside from performance metrics, we can look at *loss* over the training period. A very small loss on the training set means that the model is already modeling the training set very well. High loss on the validation set implies that the model is not modeling the validation set so well.
+
+```{r plot_classif_loss, echo=FALSE}
+classif_stats %>%
+  ggplot(aes(x = epoch, y = loss, color = dataset)) +
+  facet_wrap(~ model) +
+  geom_point() +
+  geom_line(alpha = 0.7) +
+  scale_color_brewer(palette = "Dark2") +
+  labs(x = "Epoch",
+       y = "Loss",
+       color = "Dataset")
+```
+
+#### Best Model
+
+So far, the best model has been chosen based on the highest *F*-1 score. I will make this an optional parameter, so we can prioritize precision. Regardless, we had a tie for those 2 metrics. I will add a secondary consideration of minimal validation loss, in which case PubMedBERT-Full wins.
+
+```{r best_ner_mode, echo = FALSE}
+classif_stats %>% 
+  filter(dataset == "Validation") %>% 
+  filter(f1 == max(f1)) %>% 
+  select(model, epoch, f1, precision, recall, f1, loss)
+```
+
+### NER
+
+During model training, performance metrics were recorded for each epoch on both the training and validation sets.
+
+
+```{r rearrange_ner_stats, echo = FALSE}
+ner_stats <- raw_ner_stats %>%
+  pivot_metrics() %>% 
+  relabel_models()
+```
+
+#### Precision
+
+```{r plot_ner_precision, echo=FALSE}
+ner_stats %>%
+  ggplot(aes(x = epoch, y = precision, color = dataset)) +
+  facet_wrap(~ model) +
+  geom_point() +
+  geom_line(alpha = 0.7) +
+  scale_color_brewer(palette = "Dark2") +
+  labs(x = "Epoch",
+       y = "Precision",
+       color = "Dataset")
+```
+
+#### Sensitivity (Recall)
+
+```{r plot_ner_sensitivity, echo=FALSE}
+ner_stats %>%
+  ggplot(aes(x = epoch, y = recall, color = dataset)) +
+  facet_wrap(~ model) +
+  geom_point() +
+  geom_line(alpha = 0.7) +
+  scale_color_brewer(palette = "Dark2") +
+  labs(x = "Epoch",
+       y = "Sensitivity (Recall)",
+       color = "Dataset")
+```
+
+#### *F*-1
+
+```{r plot_ner_F1, echo=FALSE}
+ner_stats %>%
+  ggplot(aes(x = epoch, y = f1, color = dataset)) +
+  facet_wrap(~ model) +
+  geom_point() +
+  geom_line(alpha = 0.7) +
+  scale_color_brewer(palette = "Dark2") +
+  labs(x = "Epoch",
+       y = "F1",
+       color = "Dataset")
+```
+
+#### Loss
+
+Aside from performance metrics, we can look at *loss* over the training period. A very small loss on the training set means that the model is already modeling the training set very well. High loss on the validation set implies that the model is not modeling the validation set so well.
+
+```{r plot_ner_loss, echo=FALSE}
+ner_stats %>%
+  ggplot(aes(x = epoch, y = loss, color = dataset)) +
+  facet_wrap(~ model) +
+  geom_point() +
+  geom_line(alpha = 0.7) +
+  scale_color_brewer(palette = "Dark2") +
+  labs(x = "Epoch",
+       y = "Loss",
+       color = "Dataset")
+```
+
+#### Best Model
+
+
+```{r best_ner_model, echo = FALSE}
+ner_stats %>% 
+  filter(dataset == "Validation") %>% 
+  filter(f1 == max(f1)) %>% 
+  select(model, epoch, f1, precision, recall, f1, loss)
+```
