@@ -40,5 +40,5 @@ More information about these parameters can be found on [Hugging Face 🤗](http
 
 ## `query.txt`
 
-This text file contains a single string, which is the search query sent to EuropePMC. The publication date range should contain placeholders `{1}` and `{2}`, for the from- and to-dates respectively. If placeholders are not used, the date arguments of `src/query_epmc.py` are ignored.
+This text file contains a single string, which is the search query sent to EuropePMC. The publication date range should contain placeholders `{0}` and `{1}`, for the from- and to-dates respectively. If placeholders are not used, the date arguments of `src/query_epmc.py` are ignored.
 
