@@ -169,7 +169,7 @@ rule filter_positives:
         "data/full_corpus_predictions/classification/predicted_positives.csv",
     shell:
         """
-        grep -v 'not-bio-resource' {input} >> {output}
+        grep -v 'not-bio-resource' {input} > {output}
         """
 
 
