@@ -1,6 +1,8 @@
 # inventory_2022 (Work in Progress)
 
-Public repository for the biodata resource inventory performed in 2022.
+This is a public repository of the code used for the Biodata Resource Inventory performed in 2022. This project is an effort by the [Global Biodata Coalition](https://globalbiodata.org/) to conduct a comprehensive inventory of the global infrastructure of biological data resources. A large portion of this effort is dedicated to being able to preiodically update the inventory using the methods developed here.
+
+To meet these goals, natural language processing (NLP) methods are applied to journal articles obtained from EuropePMC. First, articles are classified based on their titles and abstracts, to predict if they describe biodata resources. Then, of those articles that are predicted to describe biodata resources, named entity recognition (NER) is employed to predict the resource's name. Further metadata is gathered from the various fields obtained by querying EuropePMC. To aid in reproducibility and reuse, Snakemake pipelines were developed for automation of training, prediction, and updating the inventory.
 
 # Workflow overview
 
@@ -17,8 +19,8 @@ graph TD
     neg --> classtrain[(Classifier training set)]
     pos --> classtrain
     pos --> ner(Manual named entity extraction)
-    ner -- Name --> nertrain[(NER training set)]
-    ner -- Description --> nertrain
+    ner -- Common Name --> nertrain[(NER training set)]
+    ner -- Full Name --> nertrain
 ```
 
 ## Classifier Training
@@ -77,8 +79,7 @@ graph TD
     pos --> ner{{NER Model}}
     pos --> regex(regex)
     pos --> scrape(scraping)
-    ner -- name --> attr[Resource Information]
-    ner -- description --> attr
+    ner -- names --> attr[Resource Information]
     regex -- URL --> attr
     scrape -- authors, country --> attr
 ```
@@ -106,7 +107,38 @@ graph TD
 
 There are several ways to install the dependencies for this workflow.
 
-## Anaconda (recommended)
+## Pip
+
+If installing with pip, ensure you have Python version 3.8. Older or newer versions may not work.
+
+```
+$ python3 --version
+Python 3.8.12
+```
+
+Then you can install Python dependencies using pip.
+
+A make command is available for installing dependencies.
+
+```
+$ make setup
+```
+
+Alternatively, to install them manually:
+
+```
+$ pip install -r requirements.txt
+```
+
+Then download punkt:
+
+```
+$ python3
+>>> import nltk
+>>> nltk.download('punkt')
+```
+
+## Anaconda
 
 To create the environment in your `$HOME` directory, run:
 ```
@@ -120,19 +152,12 @@ $ conda env create -f config/environment.yml -p ./env
 $ conda activate ./env
 ```
 
-## Pip
-
-If installing with pip, ensure you have Python version 3.8. Older or newer versions may not work.
+Then download punkt:
 
 ```
-$ python3 --version
-Python 3.8.12
-```
-
-Then you can install Python dependencies using pip
-
-```
-$ pip install -r requirements.txt
+$ python3
+>>> import nltk
+>>> nltk.download('punkt')
 ```
 
 # Running Tests
@@ -140,7 +165,7 @@ $ pip install -r requirements.txt
 A full test suite is included to help ensure that everything is running as expected. To run the full test suite, run:
 
 ```
-make test
+$ make test
 ```
 
 # Running the workflow
@@ -149,7 +174,7 @@ make test
 
 To see what steps would be run in the workflow, a dry run can be run:
 ```
-make dryrun_reproduction
+$ make dryrun_reproduction
 ```
 
 ## Reproducing original results
@@ -158,10 +183,21 @@ To run the pipeline from a notebook in Colab, follow the steps in [running_pipel
 
 Alternatively, to run the pipeline from the command-line, run:
 ```
-make train_and_predict
+$ make train_and_predict
 ```
 
+If Make is unavailable, run
+```
+$ snakemake -s train_predict.smk --configfile config/config.yml -c1
+```
+
+The above commands run the Snakemake pipeline. If you wish to run the steps manually, see [src/README.md](src/README.md).
+
 ## Updating the inventory
+
+Before running the automated pipelines, if there is not a file `data/last_query_date.txt`, it must first be created. In that file place the date at which you want the query to begin (should align with date of last query).
+
+*Note*: There should only be one file matching each pattern `out/classif_train_out/best/*/best_checkpt.pt` and `out/ner_train_out/best/*/best_checkpt.pt`
 
 To run the pipeline from a notebook in Colab, follow the steps in [updating_inventory.ipynb](updating_inventory.ipynb). To run from the command line, follow these steps.
 
@@ -176,14 +212,31 @@ Next, **make sure that output from previous updates have been saved elsewhere, a
 
 To remove the outputs of previous run:
 ```
-rm data/new_query_results.csv
-rm -rf data/new_paper_predictions/
+$ rm data/new_query_results.csv
+$ rm -rf data/new_paper_predictions/
 ```
 
 Then the pipeline for updating results can be run:
 ```
-make update_inventory
+$ make update_inventory
 ```
+
+If Make is unavailable, run
+```
+$ snakemake -s update_inventory.smk --configfile config/config.yml -c1
+```
+
+The above commands run the Snakemake pipeline. If you wish to run the steps manually, see [src/README.md](src/README.md).
+
+## Adjusting configurations
+
+The Snakemake pipelines are built such that they capture the workflow logic, while all configurations are stored separately. This makes it possible to adjust the workflows without changing source code or the Snakemake pipelines.
+
+Most of the configurations are stored in [config/config.yml](config/config.yml) such as train/validation/split ratios and output directories.
+
+Configurations regarding model training parameters are stored in [config/models_info.tsv](config/models_info.tsv), such as number of epochs, and convenient model names as well as official HuggingFace model names.
+
+The EuropePMC query string is stored in [config/query.txt](config/query.txt).
 
 
 # Authorship
