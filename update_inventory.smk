@@ -32,7 +32,7 @@ rule query_epmc:
 
 
 # Perform classification of new query results
-rule classify_papaers:
+rule classify_papers:
     input:
         infile="data/new_query_results.csv",
         classifier=expand(best_classifier_pattern, model=CLASSIFIER),
