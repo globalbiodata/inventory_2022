@@ -1,6 +1,6 @@
 # inventory_2022 (Work in Progress)
 
-This is a public repository of the code used for the Biodata Resource Inventory performed in 2022. This project is an effort by the [Global Biodata Coalition](https://globalbiodata.org/) to conduct a comprehensive inventory of the global infrastructure of biological data resources. A large portion of this effort is dedicated to being able to preiodically update the inventory using the methods developed here.
+This is a public repository of the code used for the Biodata Resource Inventory performed in 2022. This project is an effort by the [Global Biodata Coalition](https://globalbiodata.org/) to conduct a comprehensive inventory of the global infrastructure of biological data resources. A large portion of this effort is dedicated to being able to periodically update the inventory using the methods developed here.
 
 To meet these goals, natural language processing (NLP) methods are applied to journal articles obtained from EuropePMC. First, articles are classified based on their titles and abstracts, to predict if they describe biodata resources. Then, of those articles that are predicted to describe biodata resources, named entity recognition (NER) is employed to predict the resource's name. Further metadata is gathered from the various fields obtained by querying EuropePMC. To aid in reproducibility and reuse, Snakemake pipelines were developed for automation of training, prediction, and updating the inventory.
 
