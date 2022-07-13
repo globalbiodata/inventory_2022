@@ -191,7 +191,7 @@ If Make is unavailable, run
 $ snakemake -s train_predict.smk --configfile config/config.yml -c1
 ```
 
-The above commands run the Snakemake pipeline. If you wish to run the steps manually, see [src/README.md](src/README.md).
+The above commands run the Snakemake pipeline. If you wish to run the steps manually, see [src/README.md](src/README.md#training-and-prediction).
 
 ## Updating the inventory
 
@@ -226,7 +226,7 @@ If Make is unavailable, run
 $ snakemake -s update_inventory.smk --configfile config/config.yml -c1
 ```
 
-The above commands run the Snakemake pipeline. If you wish to run the steps manually, see [src/README.md](src/README.md).
+The above commands run the Snakemake pipeline. If you wish to run the steps manually, see [src/README.md](src/README.md#updating-the-inventory).
 
 ## Adjusting configurations
 

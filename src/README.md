@@ -80,7 +80,7 @@ These scripts load a pretrained `--model` from HuggingFace, and perform fine-tun
 
 The `-m|--model-name` must be a valid HuggingFace model name, such as those in the "hf_name" column  of [the model configuration file](../config/models_info.tsv).
 
-Several training parameters can be changed, such as learning rate, weight decay, batch size, and number of epochs. A learning rate scheduler can be optionally used. See [../config/README.csv](../config/README.md) for more information on these parameters.
+Several training parameters can be changed, such as learning rate, weight decay, batch size, and number of epochs. A learning rate scheduler can be optionally used. See [../config/README.csv](../config/README.md#modelsinfotsv) for more information on these parameters.
 
 If it is desired to run training on only a certain number of samples, the `-nt|--num-training` argument can be used.
 
