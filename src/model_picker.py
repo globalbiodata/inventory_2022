@@ -18,6 +18,7 @@ from utils import CustomHelpFormatter, make_filenames
 class Args(NamedTuple):
     """ Command-line arguments """
     files: List[str]
+    metric: str
     out_dir: str
 
 
@@ -26,7 +27,7 @@ def get_args() -> Args:
     """ Parse command-line arguments """
 
     parser = argparse.ArgumentParser(
-        description='Choose model based on highest validation F1 score',
+        description='Choose model based on highest validation metric',
         formatter_class=CustomHelpFormatter)
 
     parser.add_argument('files',
@@ -34,6 +35,13 @@ def get_args() -> Args:
                         metavar='FILE',
                         type=str,
                         help='Training stat files of models to be compared')
+    parser.add_argument('-m',
+                        '--metric',
+                        metavar='METRIC',
+                        choices=['f1', 'precision', 'recall'],
+                        default='f1',
+                        type=str,
+                        help='Metric to use for choosing best model')
     parser.add_argument('-o',
                         '--out-dir',
                         metavar='DIR',
@@ -47,7 +55,7 @@ def get_args() -> Args:
         if not os.path.isfile(file):
             parser.error(f'Input file "{file}" does not exist.')
 
-    return Args(args.files, args.out_dir)
+    return Args(args.files, args.metric, args.out_dir)
 
 
 # ---------------------------------------------------------------------------
@@ -115,19 +123,30 @@ def main() -> None:
     if not os.path.isdir(args.out_dir):
         os.makedirs(args.out_dir)
 
+    metric = 'val_' + args.metric
+
     out_df = pd.DataFrame()
-    best_f1 = 0.
+    best_metric = 0.
+    best_loss = 1.
     best_model = ''
     for filename in args.files:
         model_name = get_model_name(filename)
 
         df = pd.read_csv(filename)
 
-        if max(df['val_f1']) > best_f1:
+        df = df.sort_values(by=[metric, 'val_loss'], ascending=False)
+
+        best_epoch_metrics = df.iloc[0]
+        better_metric = best_epoch_metrics[metric] > best_metric
+        equal_metric = best_epoch_metrics[metric] == best_metric
+        better_loss = best_epoch_metrics['val_loss'] < best_loss
+
+        if better_metric or (equal_metric and better_loss):
             checkpoint_dir = get_checkpoint_dir(filename)
             best_model, _ = make_filenames(checkpoint_dir)
             best_model_name = model_name
-            best_f1 = max(df['val_f1'])
+            best_metric = best_epoch_metrics[metric]
+            best_loss = best_epoch_metrics['val_loss']
 
         df['model'] = model_name
         out_df = pd.concat([out_df, df])
