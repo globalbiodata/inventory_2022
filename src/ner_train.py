@@ -206,7 +206,7 @@ def train(settings: Settings, crit_metric: str) -> Tuple[Any, pd.DataFrame]:
 
     Parameters:
     `settings`: Model settings (NamedTuple)
-    `crit_metric`: Metric used for selecting best epoch 
+    `crit_metric`: Metric used for selecting best epoch
 
     Return: Tuple of best model, and training stats dataframe
     """
