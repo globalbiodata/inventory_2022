@@ -68,6 +68,7 @@ rule train_classif:
         config["classif_train_outdir"] + "/{model}/train_stats.csv",
     params:
         out_dir=config["classif_train_outdir"] + "/{model}",
+        metric=config["class_criteria_metric"],
         epochs=config["classif_epochs"],
         hf_model=lambda w: model_df.loc[w.model, "hf_name"],
         batch_size=lambda w: model_df.loc[w.model, "batch_size"],
@@ -81,6 +82,7 @@ rule train_classif:
     shell:
         """
         (python3 src/class_train.py \
+            -c {params.metric} \
             -m {params.hf_model} \
             -ne {params.epochs} \
             -t {input.train} \
@@ -113,10 +115,12 @@ rule find_best_classifier:
         ),
     params:
         out_dir=config["classif_train_outdir"] + "/best",
+        metric=config["class_criteria_metric"],
     shell:
         """
         python3 src/model_picker.py \
             -o {params.out_dir} \
+            -m {params.metric} \
             {input}
         """
 
@@ -207,6 +211,7 @@ rule train_ner:
         config["ner_train_outdir"] + "/{model}/train_stats.csv",
     params:
         out_dir=config["ner_train_outdir"] + "/{model}",
+        metric=config["ner_criteria_metric"],
         epochs=config["ner_epochs"],
         hf_model=lambda w: model_df.loc[w.model, "hf_name"],
         batch_size=lambda w: model_df.loc[w.model, "batch_size"],
@@ -220,6 +225,7 @@ rule train_ner:
     shell:
         """
         (python3 src/ner_train.py \
+            -c {params.metric} \
             -m {params.hf_model} \
             -ne {params.epochs} \
             -t {input.train} \
@@ -247,10 +253,12 @@ rule find_best_ner:
         dynamic(config["ner_train_outdir"] + "/best/{best_ner}/combined_stats.csv"),
     params:
         out_dir=config["ner_train_outdir"] + "/best",
+        metric=config["ner_criteria_metric"],
     shell:
         """
         python3 src/model_picker.py \
             -o {params.out_dir} \
+            -m {params.metric} \
             {input}
         """
 

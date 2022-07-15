@@ -29,6 +29,7 @@ class Args(NamedTuple):
     train_file: str
     val_file: str
     out_dir: str
+    metric: str
     model_name: str
     learning_rate: float
     weight_decay: float
@@ -71,6 +72,14 @@ def get_args() -> Args:
                         default='out/',
                         help='Directory to output checkpt and loss plot')
 
+    model_params.add_argument(
+        '-c',
+        '--metric',
+        metavar='METRIC',
+        choices=['f1', 'precision', 'recall'],
+        default='f1',
+        type=str,
+        help='Metric to use for choosing best model epoch')
     model_params.add_argument('-m',
                               '--model-name',
                               metavar='',
@@ -120,10 +129,10 @@ def get_args() -> Args:
 
     args = parser.parse_args()
 
-    return Args(args.train_file, args.val_file, args.out_dir, args.model_name,
-                args.learning_rate, args.weight_decay, args.num_training,
-                args.num_epochs, args.batch_size, args.lr_scheduler, None,
-                args.seed)
+    return Args(args.train_file, args.val_file, args.out_dir, args.metric,
+                args.model_name, args.learning_rate, args.weight_decay,
+                args.num_training, args.num_epochs, args.batch_size,
+                args.lr_scheduler, None, args.seed)
 
 
 # ---------------------------------------------------------------------------
@@ -191,12 +200,13 @@ def initialize_model(args: Args, train_dataloader: DataLoader,
 
 
 # ---------------------------------------------------------------------------
-def train(settings: Settings) -> Tuple[Any, pd.DataFrame]:
+def train(settings: Settings, crit_metric: str) -> Tuple[Any, pd.DataFrame]:
     """
     Train the classifier
 
     Parameters:
     `settings`: Model settings (NamedTuple)
+    `crit_metric`: Metric used for selecting best epoch 
 
     Return: Tuple of best model, and training stats dataframe
     """
@@ -222,7 +232,7 @@ def train(settings: Settings) -> Tuple[Any, pd.DataFrame]:
         val_metrics = get_ner_metrics(model, settings.val_dataloader,
                                       settings.device)
 
-        if val_metrics.f1 > best_val.f1:
+        if getattr(val_metrics, crit_metric) > getattr(best_val, crit_metric):
             best_val = val_metrics
             best_train = train_metrics
             best_model = copy.deepcopy(model)
@@ -317,7 +327,7 @@ def main() -> None:
     print('Starting model training...')
     print('=' * 30)
 
-    model, train_stats_df = train(settings)
+    model, train_stats_df = train(settings, args.metric)
     train_stats_df['model_name'] = model_name
 
     checkpt_filename, train_stats_filename = make_filenames(out_dir)

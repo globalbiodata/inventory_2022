@@ -32,6 +32,10 @@ initial_query_start: 2011
 initial_query_end: 2021
 query_string: 'config/query.txt'
 
+# Metrics used for choosing best model/epoch
+class_criteria_metric: 'precision'
+ner_criteria_metric: 'precision'
+
 # Number of epochs
 classif_epochs: 10
 ner_epochs: 10
