@@ -23,6 +23,22 @@ class Args(NamedTuple):
 
 
 # ---------------------------------------------------------------------------
+class BestModel(NamedTuple):
+    """
+    Attributes of best model
+
+    `model_name`: Name of model
+    `model_checkpt`: Checkpoint location
+    `metric`: Value of metric used as criteria
+    `loss`: Loss value
+    """
+    name: str
+    checkpt: str
+    metric: float
+    loss: float
+
+
+# ---------------------------------------------------------------------------
 def get_args() -> Args:
     """ Parse command-line arguments """
 
@@ -115,45 +131,57 @@ def test_get_checkpoint_dir() -> None:
 
 
 # ---------------------------------------------------------------------------
+def compare_metrics(filename: str, df: pd.DataFrame, current_best: BestModel,
+                    metric: str) -> BestModel:
+    """
+    Compare training stats in df to current best model
+
+    Parameters:
+    `filename`: Current training stats file
+    `df`: Training stats dataframe
+    `current_best`: Attributes of current best model
+    `metric`: Metric to use as criteria
+
+    Return: Updated best model attributes
+    """
+
+    best_epoch = df.sort_values(by=[metric, 'val_loss'],
+                                ascending=False).iloc[0]
+    better_metric = best_epoch[metric] > current_best.metric
+    equal_metric = best_epoch[metric] == current_best.metric
+    better_loss = best_epoch['val_loss'] < current_best.loss
+
+    if better_metric or (equal_metric and better_loss):
+        checkpt, _ = make_filenames(get_checkpoint_dir(filename))
+        current_best = BestModel(get_model_name(filename), checkpt,
+                                 best_epoch[metric], best_epoch['val_loss'])
+
+    return current_best
+
+
+# ---------------------------------------------------------------------------
 def main() -> None:
     """ Main function """
 
     args = get_args()
 
-    if not os.path.isdir(args.out_dir):
-        os.makedirs(args.out_dir)
-
     metric = 'val_' + args.metric
 
     out_df = pd.DataFrame()
-    best_metric = 0.
-    best_loss = 1.
-    best_model = ''
+    best_model = BestModel('', '', 0., 1.)
     for filename in args.files:
         model_name = get_model_name(filename)
 
         df = pd.read_csv(filename)
 
-        df = df.sort_values(by=[metric, 'val_loss'], ascending=False)
-
-        best_epoch_metrics = df.iloc[0]
-        better_metric = best_epoch_metrics[metric] > best_metric
-        equal_metric = best_epoch_metrics[metric] == best_metric
-        better_loss = best_epoch_metrics['val_loss'] < best_loss
-
-        if better_metric or (equal_metric and better_loss):
-            checkpoint_dir = get_checkpoint_dir(filename)
-            best_model, _ = make_filenames(checkpoint_dir)
-            best_model_name = model_name
-            best_metric = best_epoch_metrics[metric]
-            best_loss = best_epoch_metrics['val_loss']
+        best_model = compare_metrics(filename, df, best_model, metric)
 
         df['model'] = model_name
         out_df = pd.concat([out_df, df])
 
     out_df.reset_index(inplace=True, drop=True)
 
-    out_dir = os.path.join(args.out_dir, best_model_name)
+    out_dir = os.path.join(args.out_dir, best_model.name)
 
     model_outfile = os.path.join(out_dir, 'best_checkpt.pt')
     stats_outfile = os.path.join(out_dir, 'combined_stats.csv')
@@ -162,9 +190,10 @@ def main() -> None:
         os.makedirs(out_dir)
 
     out_df.to_csv(stats_outfile, index=False)
-    shutil.copyfileobj(open(best_model, 'rb'), open(model_outfile, 'wb'))
+    shutil.copyfileobj(open(best_model.checkpt, 'rb'),
+                       open(model_outfile, 'wb'))
 
-    print(f'Checkpoint of best model is {best_model}')
+    print(f'Checkpoint of best model is {best_model.checkpt}')
     print('Done. Wrote combined stats file and best model checkpoint',
           f'to {out_dir}')
 
