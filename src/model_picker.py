@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Purpose: Choose model based on highest validation F1 score
+Purpose: Choose model based on highest metric of choice
 Authors: Kenneth Schackart
 """
 
@@ -29,13 +29,9 @@ class BestModel(NamedTuple):
 
     `model_name`: Name of model
     `model_checkpt`: Checkpoint location
-    `metric`: Value of metric used as criteria
-    `loss`: Loss value
     """
     name: str
     checkpt: str
-    metric: float
-    loss: float
 
 
 # ---------------------------------------------------------------------------
@@ -43,7 +39,7 @@ def get_args() -> Args:
     """ Parse command-line arguments """
 
     parser = argparse.ArgumentParser(
-        description='Choose model based on highest validation metric',
+        description='Choose model with highest validation metric of choice',
         formatter_class=CustomHelpFormatter)
 
     parser.add_argument('files',
@@ -131,32 +127,82 @@ def test_get_checkpoint_dir() -> None:
 
 
 # ---------------------------------------------------------------------------
-def compare_metrics(filename: str, df: pd.DataFrame, current_best: BestModel,
-                    metric: str) -> BestModel:
+def get_best_model(df: pd.DataFrame, metric: str) -> BestModel:
     """
-    Compare training stats in df to current best model
+    Determine best model from the training stats
 
     Parameters:
-    `filename`: Current training stats file
     `df`: Training stats dataframe
-    `current_best`: Attributes of current best model
     `metric`: Metric to use as criteria
 
-    Return: Updated best model attributes
+    Return: Best model attributes
     """
 
     best_epoch = df.sort_values(by=[metric, 'val_loss'],
-                                ascending=False).iloc[0]
-    better_metric = best_epoch[metric] > current_best.metric
-    equal_metric = best_epoch[metric] == current_best.metric
-    better_loss = best_epoch['val_loss'] < current_best.loss
+                                ascending=[False, True]).iloc[0]
 
-    if better_metric or (equal_metric and better_loss):
-        checkpt, _ = make_filenames(get_checkpoint_dir(filename))
-        current_best = BestModel(get_model_name(filename), checkpt,
-                                 best_epoch[metric], best_epoch['val_loss'])
+    best_model = BestModel(best_epoch['model'], best_epoch['checkpt'])
 
-    return current_best
+    return best_model
+
+
+# ---------------------------------------------------------------------------
+def test_get_best_model() -> None:
+    """ Test get_best_model() """
+
+    cols = [
+        'epoch', 'train_precision', 'train_recall', 'train_f1', 'train_loss',
+        'val_precision', 'val_recall', 'val_f1', 'val_loss', 'checkpt', 'model'
+    ]
+
+    in_df = pd.DataFrame([[
+        3, 1., 1., 1., 0., 0.926, 0.820, 0.920, 0.00803, 'scibert.pt',
+        'scibert'
+    ],
+                          [
+                              5, 1., 1., 1., 0., 0.926, 0.820, 0.870, 0.00703,
+                              'biobert.pt', 'biobert'
+                          ]],
+                         columns=cols)
+
+    # scibert has higher validation f1
+    assert get_best_model(in_df,
+                          'val_f1') == BestModel('scibert', 'scibert.pt')
+
+    # They have same precision, but biobert has lower val_loss on that epoch
+    assert get_best_model(in_df, 'val_precision') == BestModel(
+        'biobert', 'biobert.pt')
+
+
+# ---------------------------------------------------------------------------
+def write_outputs(best_model: BestModel, out_df: pd.DataFrame,
+                  out_dir: str) -> str:
+    """
+    Copy best model checkpoint to {out_dir}/{model_name} and write combined
+    training stats csv file
+
+    Parameters:
+    `best_model`: Attributes of best model
+    `out_df`: Combined training stats dataframe
+    `out_dir`: Output directory
+
+    Return: Full output directory
+    """
+
+    out_dir = os.path.join(out_dir, best_model.name)
+
+    if not os.path.isdir(out_dir):
+        os.makedirs(out_dir)
+
+    model_outfile = os.path.join(out_dir, 'best_checkpt.pt')
+    stats_outfile = os.path.join(out_dir, 'combined_stats.csv')
+
+    out_df.drop(['checkpt'], axis='columns', inplace=True)
+    out_df.to_csv(stats_outfile, index=False)
+    shutil.copyfileobj(open(best_model.checkpt, 'rb'),
+                       open(model_outfile, 'wb'))
+
+    return out_dir
 
 
 # ---------------------------------------------------------------------------
@@ -165,33 +211,18 @@ def main() -> None:
 
     args = get_args()
 
-    metric = 'val_' + args.metric
-
     out_df = pd.DataFrame()
-    best_model = BestModel('', '', 0., 1.)
     for filename in args.files:
-        model_name = get_model_name(filename)
-
         df = pd.read_csv(filename)
 
-        best_model = compare_metrics(filename, df, best_model, metric)
-
-        df['model'] = model_name
+        checkpt, _ = make_filenames(get_checkpoint_dir(filename))
+        df['checkpt'] = checkpt
+        df['model'] = get_model_name(filename)
         out_df = pd.concat([out_df, df])
 
-    out_df.reset_index(inplace=True, drop=True)
+    best_model = get_best_model(out_df, 'val_' + args.metric)
 
-    out_dir = os.path.join(args.out_dir, best_model.name)
-
-    model_outfile = os.path.join(out_dir, 'best_checkpt.pt')
-    stats_outfile = os.path.join(out_dir, 'combined_stats.csv')
-
-    if not os.path.isdir(out_dir):
-        os.makedirs(out_dir)
-
-    out_df.to_csv(stats_outfile, index=False)
-    shutil.copyfileobj(open(best_model.checkpt, 'rb'),
-                       open(model_outfile, 'wb'))
+    out_dir = write_outputs(best_model, out_df, args.out_dir)
 
     print(f'Checkpoint of best model is {best_model.checkpt}')
     print('Done. Wrote combined stats file and best model checkpoint',
