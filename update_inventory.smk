@@ -1,12 +1,3 @@
-# Find best classifier model name based on a file glob
-best_classifier_pattern = config["best_classifier_dir"] + "/{model}/best_checkpt.pt"
-(CLASSIFIER,) = glob_wildcards(best_classifier_pattern)
-
-# Find best NER model name based on a file glob
-best_ner_pattern = config["best_ner_dir"] + "/{model}/best_checkpt.pt"
-(NER,) = glob_wildcards(best_ner_pattern)
-
-
 rule all:
     input:
         "data/new_paper_predictions/urls/predictions.csv",
@@ -35,17 +26,18 @@ rule query_epmc:
 rule classify_papers:
     input:
         infile="data/new_query_results.csv",
-        classifier=expand(best_classifier_pattern, model=CLASSIFIER),
+        classifier=config["classif_train_outdir"] + "/best/best_checkpt.txt",
     output:
         "data/new_paper_predictions/classification/predictions.csv",
     params:
         out_dir="data/new_paper_predictions/classification",
     shell:
         """
+        cat {input.classifier} | \
         python3 src/class_predict.py \
             -o {params.out_dir} \
-            -c {input.classifier} \
-            -i {input.infile}
+            -i {input.infile} \
+            -c /dev/stdin
         """
 
 
@@ -64,7 +56,7 @@ rule filter_positives:
 # Predict NER on predicted biodata resource papers
 rule ner_full_corpus:
     input:
-        classifier=expand(best_ner_pattern, model=NER),
+        classifier=config["ner_train_outdir"] + "/best/best_checkpt.txt",
         infile="data/new_paper_predictions/classification/predicted_positives.csv",
     output:
         "data/new_paper_predictions/ner/predictions.csv",
@@ -72,10 +64,11 @@ rule ner_full_corpus:
         out_dir="data/new_paper_predictions/ner",
     shell:
         """
+        cat {input.classifier} | \
         python3 src/ner_predict.py \
             -o {params.out_dir} \
-            -c {input.classifier} \
-            -i {input.infile}
+            -i {input.infile} \
+            -c /dev/stdin
         """
 
 

@@ -200,7 +200,8 @@ def initialize_model(args: Args, train_dataloader: DataLoader,
 
 
 # ---------------------------------------------------------------------------
-def train(settings: Settings, crit_metric: str) -> Tuple[Any, pd.DataFrame]:
+def train(settings: Settings,
+          crit_metric: str) -> Tuple[Any, pd.DataFrame, Metrics, Metrics]:
     """
     Train the classifier
 
@@ -208,7 +209,8 @@ def train(settings: Settings, crit_metric: str) -> Tuple[Any, pd.DataFrame]:
     `settings`: Model settings (NamedTuple)
     `crit_metric`: Metric used for selecting best epoch
 
-    Return: Tuple of best model, and training stats dataframe
+    Return: Tuple of best model, training stats dataframe, train_metrics,
+    and validation_metrics
     """
 
     model = settings.model
@@ -276,7 +278,7 @@ def train(settings: Settings, crit_metric: str) -> Tuple[Any, pd.DataFrame]:
           f'Best Val Recall: {best_val.recall:.3f}\n'
           f'Best Val F1: {best_val.f1:.3f}\n')
 
-    return best_model, train_progress
+    return best_model, train_progress, best_val, best_train
 
 
 # ---------------------------------------------------------------------------
@@ -327,12 +329,13 @@ def main() -> None:
     print('Starting model training...')
     print('=' * 30)
 
-    model, train_stats_df = train(settings, args.metric)
+    model, train_stats_df, train_metrics, val_metrics = train(
+        settings, args.metric)
     train_stats_df['model_name'] = model_name
 
     checkpt_filename, train_stats_filename = make_filenames(out_dir)
 
-    save_model(model, model_name, checkpt_filename)
+    save_model(model, model_name, train_metrics, val_metrics, checkpt_filename)
     save_train_stats(train_stats_df, train_stats_filename)
 
     print('Done. Saved best checkpoint to', checkpt_filename)

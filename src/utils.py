@@ -626,20 +626,25 @@ def test_make_filenames() -> None:
 
 
 # ---------------------------------------------------------------------------
-def save_model(model: Any, model_name: str, filename: str) -> None:
+def save_model(model: Any, model_name: str, train_metrics: Metrics,
+               val_metrics: Metrics, filename: str) -> None:
     """
     Save model checkpoint, epoch, and F1 score to file
 
     Parameters:
     `model`: Model to save
     `model_name`: Model HuggingFace name
+    `train_metrics`: Metrics on training set of best epoch
+    `val_metrics`: Metrics on validation set of best epoch
     `filename`: Name of file for saving model
     """
 
     torch.save(
         {
             'model_state_dict': model.state_dict(),
-            'model_name': model_name
+            'model_name': model_name,
+            'train_metrics': train_metrics,
+            'val_metrics': val_metrics
         }, filename)
 
 

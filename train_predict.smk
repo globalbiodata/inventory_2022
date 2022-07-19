@@ -101,18 +101,12 @@ rule train_classif:
 rule find_best_classifier:
     input:
         expand(
-            "{d}/{model}/train_stats.csv",
+            "{d}/{model}/checkpt.pt",
             d=config["classif_train_outdir"],
             model=model_df.index,
         ),
     output:
-        dynamic(
-            config["classif_train_outdir"] + "/best/{best_classifier}/best_checkpt.pt"
-        ),
-        dynamic(
-            config["classif_train_outdir"]
-            + "/best/{best_classifier}/combined_stats.csv"
-        ),
+        onfig["classif_train_outdir"] + "/best/best_checkpt.txt",
     params:
         out_dir=config["classif_train_outdir"] + "/best",
         metric=config["class_criteria_metric"],
@@ -129,28 +123,25 @@ rule find_best_classifier:
 rule evaluate_best_classifier:
     input:
         infile=config["classif_splits_dir"] + "/test_paper_classif.csv",
-        model=dynamic(
-            config["classif_train_outdir"] + "/best/{best_classifier}/best_checkpt.pt"
-        ),
+        model=config["classif_train_outdir"] + "/best/best_checkpt.txt",
     output:
         config["classif_train_outdir"] + "/best/test_set_evaluation/metrics.csv",
     params:
         outdir=config["classif_train_outdir"] + "/best/test_set_evaluation",
     shell:
         """
+        cat {input.model} | \
         python3 src/class_final_eval.py \
             -o {params.outdir} \
             -t {input.infile} \
-            -c {input.model}
+            -c /dev/stdin
         """
 
 
 # Predict classification of entire corpus
 rule classify_full_corpus:
     input:
-        classifier=dynamic(
-            config["classif_train_outdir"] + "/best/{best_classifier}/best_checkpt.pt"
-        ),
+        model=config["classif_train_outdir"] + "/best/best_checkpt.txt",
         infile=config["full_corpus"],
     output:
         "data/full_corpus_predictions/classification/predictions.csv",
@@ -158,10 +149,11 @@ rule classify_full_corpus:
         out_dir="data/full_corpus_predictions/classification",
     shell:
         """
+        cat {input.model} | \
         python3 src/class_predict.py \
             -o {params.out_dir} \
-            -c {input.classifier} \
-            -i {input.infile}
+            -i {input.infile} \
+            -c /dev/stdin
         """
 
 
@@ -249,8 +241,7 @@ rule find_best_ner:
             model=model_df.index,
         ),
     output:
-        dynamic(config["ner_train_outdir"] + "/best/{best_ner}/best_checkpt.pt"),
-        dynamic(config["ner_train_outdir"] + "/best/{best_ner}/combined_stats.csv"),
+        config["ner_train_outdir"] + "/best/best_checkpt.txt",
     params:
         out_dir=config["ner_train_outdir"] + "/best",
         metric=config["ner_criteria_metric"],
@@ -267,26 +258,25 @@ rule find_best_ner:
 rule evaluate_best_ner:
     input:
         infile=config["ner_splits_dir"] + "/test_ner.pkl",
-        model=dynamic(config["ner_train_outdir"] + "/best/{best_ner}/best_checkpt.pt"),
+        model=config["ner_train_outdir"] + "/best/best_checkpt.txt",
     output:
         config["ner_train_outdir"] + "/best/test_set_evaluation/metrics.csv",
     params:
         outdir=config["ner_train_outdir"] + "/best/test_set_evaluation",
     shell:
         """
+        cat {input.model} | \
         python3 src/ner_final_eval.py \
             -o {params.outdir} \
             -t {input.infile} \
-            -c {input.model}
+            -c /dev/stdin
         """
 
 
 # Predict NER on predicted biodata resource papers
 rule ner_full_corpus:
     input:
-        classifier=dynamic(
-            config["ner_train_outdir"] + "/best/{best_ner}/best_checkpt.pt"
-        ),
+        model=config["ner_train_outdir"] + "/best/best_checkpt.txt",
         infile="data/full_corpus_predictions/classification/predicted_positives.csv",
     output:
         "data/full_corpus_predictions/ner/predictions.csv",
@@ -294,10 +284,11 @@ rule ner_full_corpus:
         out_dir="data/full_corpus_predictions/ner",
     shell:
         """
+        cat  {input.model} | \
         python3 src/ner_predict.py \
             -o {params.out_dir} \
-            -c {input.classifier} \
-            -i {input.infile}
+            -i {input.infile} \
+            -c /dev/stdin
         """
 
 

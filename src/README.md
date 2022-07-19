@@ -8,6 +8,7 @@ These scripts are modules, and are not to be executed:
 * `utils.py`
 
 The following are executable Python scripts:
+* `check_urls.py`
 * `class_data_generator.py`
 * `class_predict.py`
 * `class_train.py`
@@ -96,11 +97,10 @@ Once training is complete, two outputs are created in `--out-dir`:
 
 `model_picker.py`
 
-Once all models that are to be compared have finished training, `model_picker.py` takes all the `train_stats.csv` files as input in order to select the one with the highest validation *F*1 score.
+Once all models that are to be compared have finished training, `model_picker.py` takes all the model checkpoint files as input in order to select the one with the highest validation score. Which metric to use for choosing the best model is passed in as `-m|--metric`.
 
-Two outputs are created in `--out-dir`:
-* `{best_model_name}/best_checkpt.pt`: Checkpoint of best model (copied from its original location)
-* `{best_model_name}/combined_stats.csv`: File with training stats for each epoch of every model compared
+One output is created in `--out-dir`:
+* best_checkpt.txt`: Text file containing locations of best model checkpoint.
 
 # Model evaluation
 
@@ -124,6 +124,12 @@ Once classification and NER have been performed, other information can be gather
 ## URL extraction
 
 `url_extractor.py` is used to extract all unique URLs from the "text" (title + abstract). This is done using a regular expression.
+
+## Checking URLs
+
+`check_urls.py` checks if each URL gives a return code of '200' meaning good. If the URL returns any other code, or causes an exception, it is noted that the URL in the abstract is not available. 
+
+For those that did not give a 200 code, the script checks the [Internet Archive WaybackMachine](https://archive.org/help/wayback_api.php) to see if there exists an archived snapshot of the given URL. If so, this is marked as the checked URL.
 
 # Manual Workflow Examples
 
