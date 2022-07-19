@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Purpose: Get metadata from EuropePMC query and check URLs
+Purpose: Get metadata from EuropePMC query
 Authors: Kenneth Schackart
 """
 
@@ -140,6 +140,9 @@ def run_query(ids: pd.Series) -> pd.DataFrame:
     suffix = '&resultType=core&fromSearchPost=false&format=json'
     url = prefix + query + suffix
 
+    # Not using try-except because if there is an exception it is not
+    # because there is not an archived version, it means the API
+    # has changed.
     results = requests.get(url)
     if results.status_code != requests.codes.ok:  # pylint: disable=no-member
         results.raise_for_status()
@@ -189,41 +192,6 @@ def test_extract_countries() -> None:
     ])
 
     assert_series_equal(extract_countries(in_col), out_col)
-
-
-# ---------------------------------------------------------------------------
-def url_ok(url: str) -> bool:
-    """
-    Check that a URL returns status code 200
-    
-    Parameters:
-    `url`: URL string
-    
-    Return: True if URL is good, False otherwise
-    """
-
-    try:
-        r = requests.head(url)
-    except:
-        return False
-
-    return r.status_code == 200
-
-
-# ---------------------------------------------------------------------------
-def test_url_ok() -> None:
-    """ Test url_ok() """
-
-    # Hopefully, Google doesn't disappear, if it does use a different URL
-    assert url_ok('https://www.google.com')
-
-    # Bad URLs
-    # 301
-    assert not url_ok('http://google.com')
-    # 404
-    assert not url_ok('https://www.amazon.com/afbadfbnvbadfbaefbnaegn')
-    # Runtime exception
-    assert not url_ok('adflkbndijfbn')
 
 
 # ---------------------------------------------------------------------------
