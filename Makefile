@@ -11,6 +11,7 @@ test:
 	python3 -m pytest -v --flake8 --pylint --pylint-rcfile=config/.pylintrc --mypy \
 	tests/ \
 	src/utils.py \
+	src/check_urls.py \
 	src/class_data_generator.py \
 	src/class_data_handler.py \
 	src/class_train.py \
