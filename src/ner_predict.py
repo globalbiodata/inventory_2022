@@ -6,6 +6,7 @@ Authors: Ana-Maria Istrate and Kenneth Schackart
 
 import argparse
 import os
+import re
 import string
 from itertools import compress
 from statistics import mean
@@ -144,8 +145,12 @@ def convert_predictions(seq_preds: SeqPrediction) -> List[NamedEntity]:
     out_entities = []
 
     for entity in entities:
+        if len(entity.string.strip()) == 1 or re.findall(
+                'http', entity.string):
+            continue
+
         out_entities.append(
-            NamedEntity(entity.string.rstrip(), entity.label, entity.prob))
+            NamedEntity(entity.string.strip(), entity.label, entity.prob))
 
     return out_entities
 
@@ -207,6 +212,19 @@ def test_convert_predictions() -> None:
         NamedEntity('inside inside', 'I-FUL', 0.988),
         NamedEntity('(inside).', 'B-COM', 0.98)
     ]
+
+    assert convert_predictions(seq_preds) == expected
+
+    # Check that single letter and URL entitites are removed
+    seq = 'A (https://hello.py)'
+    word_ids = [0, 1]
+    word_locs = {0: CharSpan(0, 1), 1: CharSpan(2, 20)}
+    preds = ['B-COM', 'B-FUL']
+    probs = [0.996, 0.999]
+
+    seq_preds = SeqPrediction(seq, word_ids, word_locs, preds, probs)
+
+    expected = []
 
     assert convert_predictions(seq_preds) == expected
 
@@ -295,7 +313,7 @@ def predict(model, tokenizer: PreTrainedTokenizer, inputs: pd.DataFrame,
 def deduplicate(df: pd.DataFrame) -> pd.DataFrame:
     """
     Deduplicate predicted entities, keeping only highest probability for each
-    predicted named entity
+    predicted named entity. Duplicates will still exist for distinct papers.
 
     Parameters:
     df: Predicted entities dataframe
