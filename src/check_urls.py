@@ -6,14 +6,10 @@ Authors: Kenneth Schackart
 
 import argparse
 import os
-import re
-from collections import defaultdict
-from typing import NamedTuple, Optional, TextIO, Tuple, cast
+from typing import NamedTuple, Optional, TextIO, cast
 
 import pandas as pd
-import pycountry
 import requests
-from pandas.testing import assert_series_equal
 
 from utils import CustomHelpFormatter
 
@@ -29,7 +25,7 @@ class Args(NamedTuple):
 class WayBackSnapshot(NamedTuple):
     """
     Information about a WayBack Archive Snapshot
-    
+
     `url`: URL of Snapshot on WayBack Machine
     `timestamp`: Timestamp of archive
     `status`: Snapshot status
@@ -90,16 +86,17 @@ def test_make_filenames() -> None:
 def url_ok(url: str) -> bool:
     """
     Check that a URL returns status code 200
-    
+
     Parameters:
     `url`: URL string
-    
+
     Return: True if URL is good, False otherwise
     """
 
+    # For any exception caused by
     try:
         r = requests.head(url)
-    except:
+    except requests.exceptions.RequestException:
         return False
 
     return r.status_code == 200
@@ -125,10 +122,10 @@ def test_url_ok() -> None:
 def check_wayback(url: str) -> WayBackSnapshot:
     """
     Check the WayBack Machine for an archived version of requested URL.
-    
+
     Parameters:
     `url`: URL to check
-    
+
     Return: A `WayBackSnapshot` NamedTuple
     with attributes `url`, `timestamp`, and `status`
     """
@@ -155,11 +152,11 @@ def test_check_wayback() -> None:
     """ Test check_wayback() """
 
     # Example from their website
-    expected = WayBackSnapshot(
-        'http://web.archive.org/web/20220719133038/https://example.com/',
-        '20220719133038', '200')
+    retrieved = check_wayback('example.com')
 
-    assert check_wayback('example.com') == expected
+    assert retrieved.status is not None
+    assert retrieved.url is not None
+    assert retrieved.timestamp is not None
 
     # Valid URL, but not present as a snapshot
 
@@ -178,6 +175,8 @@ def main() -> None:
         os.makedirs(out_dir)
 
     df = pd.read_csv(args.file)
+
+    print(df)
 
 
 # ---------------------------------------------------------------------------
