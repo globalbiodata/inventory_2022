@@ -5,11 +5,16 @@ Authors: Kenneth Schackart
 """
 
 import argparse
+from functools import partial
+import multiprocessing as mp
 import os
-from typing import NamedTuple, Optional, TextIO, cast
+import time
+from typing import NamedTuple, Optional, TextIO, Union, cast
+from multiprocessing.pool import Pool
 
 import pandas as pd
 import requests
+from pandas.testing import assert_frame_equal
 
 from utils import CustomHelpFormatter
 
@@ -19,6 +24,9 @@ class Args(NamedTuple):
     """ Command-line arguments """
     file: TextIO
     out_dir: str
+    num_tries: int
+    wait: int
+    ncpu: Optional[int]
 
 
 # ---------------------------------------------------------------------------
@@ -40,27 +48,101 @@ def get_args() -> Args:
     """ Parse command-line arguments """
 
     parser = argparse.ArgumentParser(
-        description=('Get metadata from EuropePMC query'),
+        description=('Check extracted URL statuses'),
         formatter_class=CustomHelpFormatter)
 
     parser.add_argument('file',
                         metavar='FILE',
                         type=argparse.FileType('rt', encoding='ISO-8859-1'),
-                        help='CSV File with name and full_name columns')
+                        help='CSV File with extracted_url column')
     parser.add_argument('-o',
                         '--out-dir',
                         metavar='DIR',
                         type=str,
                         default='out/',
                         help='Output directory')
+    parser.add_argument('-n',
+                        '--num-tries',
+                        metavar='INT',
+                        type=int,
+                        default=3,
+                        help='Number of tried for checking URL')
+    parser.add_argument('-w',
+                        '--wait',
+                        metavar='TIME',
+                        type=int,
+                        default=500,
+                        help='Time (ms) to wait between tries')
+    parser.add_argument('-t',
+                        '--ncpu',
+                        metavar='CPU',
+                        type=int,
+                        help=('Number of CPUs for parallel '
+                              'processing (default: all)'))
 
     args = parser.parse_args()
 
-    return Args(args.file, args.out_dir)
+    return Args(args.file, args.out_dir, args.num_tries, args.wait, args.ncpu)
 
 
 # ---------------------------------------------------------------------------
-def make_filenames(out_dir: str, infile_name: str) -> str:
+def expand_url_col(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Expand the URL column, by creating a row per URL.
+    
+    `df`: Dataframe with extracted_url column
+    
+    Return: Dataframe with row per URL
+    """
+
+    df['extracted_url'] = df['extracted_url'].str.split(', ')
+
+    df = df.explode('extracted_url')
+
+    df.reset_index(drop=True, inplace=True)
+
+    return df
+
+
+# ---------------------------------------------------------------------------
+def test_expand_url_col() -> None:
+    """ Test expand_url_col() """
+
+    in_df = pd.DataFrame(
+        [[123, 'Some text', 'https://www.google.com, http://google.com'],
+         [789, 'Foo', 'https://www.amazon.com/afbadfbnvbadfbaefbnaegn']],
+        columns=['ID', 'text', 'extracted_url'])
+
+    out_df = pd.DataFrame(
+        [[123, 'Some text', 'https://www.google.com'],
+         [123, 'Some text', 'http://google.com'],
+         [789, 'Foo', 'https://www.amazon.com/afbadfbnvbadfbaefbnaegn']],
+        columns=['ID', 'text', 'extracted_url'])
+
+    assert_frame_equal(expand_url_col(in_df), out_df)
+
+
+# ---------------------------------------------------------------------------
+def get_pool(ncpu: Optional[int]) -> Pool:
+    """
+    Get Pool for multiprocessing.
+    
+    Parameters:
+    `ncpu`: Number of CPUs to use, if not specified detect number available
+    
+    Return:
+    `Pool` using `ncpu` or number of available CPUs
+    """
+
+    n_cpus = ncpu if ncpu else mp.cpu_count()
+
+    print(f'Running with {n_cpus} processes')
+
+    return mp.Pool(n_cpus)
+
+
+# ---------------------------------------------------------------------------
+def make_filename(out_dir: str, infile_name: str) -> str:
     '''
     Make filename for output reusing input file's basename
 
@@ -77,45 +159,86 @@ def make_filenames(out_dir: str, infile_name: str) -> str:
 def test_make_filenames() -> None:
     """ Test make_filenames() """
 
-    assert make_filenames(
+    assert make_filename(
         'out/checked_urls',
         'out/urls/predictions.csv') == ('out/checked_urls/predictions.csv')
 
 
 # ---------------------------------------------------------------------------
-def url_ok(url: str) -> bool:
+def request_url(url: str) -> Union[int, str]:
     """
-    Check that a URL returns status code 200
-
+    Check a URL once using try-except to catch exceptions
+    
     Parameters:
     `url`: URL string
-
-    Return: True if URL is good, False otherwise
+    
+    Return: Status code or error message
     """
 
-    # For any exception caused by
     try:
         r = requests.head(url)
-    except requests.exceptions.RequestException:
-        return False
+    except requests.exceptions.RequestException as err:
+        return str(err)
 
-    return r.status_code == 200
+    return r.status_code
 
 
 # ---------------------------------------------------------------------------
-def test_url_ok() -> None:
-    """ Test url_ok() """
+def test_request_url() -> None:
+    """ Test request_url() """
 
     # Hopefully, Google doesn't disappear, if it does use a different URL
-    assert url_ok('https://www.google.com')
+    assert request_url('https://www.google.com') == 200
 
     # Bad URLs
-    # 301
-    assert not url_ok('http://google.com')
-    # 404
-    assert not url_ok('https://www.amazon.com/afbadfbnvbadfbaefbnaegn')
+    assert request_url('http://google.com') == 301
+    assert request_url('https://www.amazon.com/afbadfbnvbadfbaefbnaegn') == 404
+
     # Runtime exception
-    assert not url_ok('adflkbndijfbn')
+    assert request_url('adflkbndijfbn') == (
+        "Invalid URL 'adflkbndijfbn': No scheme supplied. "
+        "Perhaps you meant http://adflkbndijfbn?")
+
+
+# ---------------------------------------------------------------------------
+def check_url(url: str, num_tries: int, wait: int) -> Union[int, str]:
+    """
+    Try requesting URL the specified number of tries, returning 200
+    if it succeeds at least once
+
+    Parameters:
+    `url`: URL string
+    `num_tries`: Number of times to try requesting URL
+    `wait`: Wait time between tries in ms
+
+    Return: Status code or error message
+    """
+
+    for _ in range(num_tries):
+        status = request_url(url)
+        if status == 200:  # Status code was returned
+            break
+        time.sleep(wait / 1000)
+
+    return status
+
+
+# ---------------------------------------------------------------------------
+def test_check_url() -> None:
+    """ Test check_url() """
+
+    assert check_url('https://www.google.com', 3, 0) == 200
+
+    # Bad URLs
+    assert check_url('http://google.com', 3, 0) == 301
+    assert check_url('https://www.amazon.com/afbadfbnvbadfbaefbnaegn', 3,
+                     250) == 404
+
+    # Runtime exception
+    assert check_url(
+        'adflkbndijfbn', 3,
+        250) == ("Invalid URL 'adflkbndijfbn': No scheme supplied. "
+                 "Perhaps you meant http://adflkbndijfbn?")
 
 
 # ---------------------------------------------------------------------------
@@ -165,6 +288,96 @@ def test_check_wayback() -> None:
 
 
 # ---------------------------------------------------------------------------
+def check_urls(df: pd.DataFrame, ncpu: Optional[int], num_tries: int,
+               wait: int) -> pd.DataFrame:
+    """
+    Check all URLs in df
+    
+    Parameters:
+    `df`: Dataframe with url column
+    
+    Return: Dataframe
+    """
+
+    check_url_part = partial(check_url, num_tries=num_tries, wait=wait)
+
+    with get_pool(ncpu) as pool:
+        df['extracted_url_status'] = pool.map_async(check_url_part,
+                                                    df['extracted_url']).get()
+        df['wayback_url'] = pool.map_async(check_wayback,
+                                           df['extracted_url']).get().append
+
+    return df
+
+
+# ---------------------------------------------------------------------------
+def test_check_urls() -> None:
+    """ Test check_urls() """
+
+    in_df = pd.DataFrame(
+        [[123, 'Some text', 'https://www.google.com'],
+         [456, 'More text', 'http://google.com'],
+         [789, 'Foo', 'https://www.amazon.com/afbadfbnvbadfbaefbnaegn']],
+        columns=['ID', 'text', 'extracted_url'])
+
+    out_df = in_df = pd.DataFrame(
+        [[123, 'Some text', 'https://www.google.com', 200],
+         [456, 'More text', 'http://google.com', 301],
+         [789, 'Foo', 'https://www.amazon.com/afbadfbnvbadfbaefbnaegn', 404]],
+        columns=['ID', 'text', 'extracted_url', 'extracted_url_status'])
+
+    returned_df = check_urls(in_df, None, 3, 0)
+    returned_df.sort_values('ID', inplace=True)
+
+    assert_frame_equal(returned_df, out_df)
+
+
+# ---------------------------------------------------------------------------
+def regroup_df(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Regroup dataframe to contain one row per article, columns may contain
+    list elements
+    
+    `df`: Dataframe with one row per URL
+    
+    Return: Dataframe with one row per article
+    """
+
+    df['extracted_url_status'] = df['extracted_url_status'].astype(str)
+
+    out_df = (df.groupby(['ID', 'text']).agg({
+        'extracted_url':
+        lambda x: ', '.join(x),
+        'extracted_url_status':
+        lambda x: ', '.join(x)
+    }).reset_index())
+
+    return out_df
+
+
+# ---------------------------------------------------------------------------
+def test_regroup_df() -> None:
+    """ Test regroup_df() """
+
+    in_df = pd.DataFrame(
+        [[123, 'Some text', 'https://www.google.com', 200],
+         [123, 'Some text', 'http://google.com', 301],
+         [789, 'Foo', 'https://www.amazon.com/afbadfbnvbadfbaefbnaegn', 404]],
+        columns=['ID', 'text', 'extracted_url', 'extracted_url_status'])
+
+    out_df = pd.DataFrame([[
+        123, 'Some text', 'https://www.google.com, http://google.com',
+        '200, 301'
+    ], [789, 'Foo', 'https://www.amazon.com/afbadfbnvbadfbaefbnaegn', '404']],
+                          columns=[
+                              'ID', 'text', 'extracted_url',
+                              'extracted_url_status'
+                          ])
+
+    assert_frame_equal(regroup_df(in_df), out_df)
+
+
+# ---------------------------------------------------------------------------
 def main() -> None:
     """ Main function """
 
@@ -176,7 +389,11 @@ def main() -> None:
 
     df = pd.read_csv(args.file)
 
-    print(df)
+    df = expand_url_col(df)
+    df = check_urls(df, args.ncpu, args.num_tries, args.wait)
+    df = regroup_df(df)
+
+    df.to_csv(make_filename(out_dir, args.file), index=False)
 
 
 # ---------------------------------------------------------------------------
