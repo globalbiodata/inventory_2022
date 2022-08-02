@@ -5,12 +5,13 @@ Authors: Kenneth Schackart
 """
 
 import argparse
-from functools import partial
+import logging
 import multiprocessing as mp
 import os
 import time
-from typing import NamedTuple, Optional, TextIO, Union, cast
+from functools import partial
 from multiprocessing.pool import Pool
+from typing import List, NamedTuple, Optional, TextIO, Union, cast
 
 import pandas as pd
 import requests
@@ -27,6 +28,16 @@ class Args(NamedTuple):
     num_tries: int
     wait: int
     ncpu: Optional[int]
+    verbose: bool
+
+
+# ---------------------------------------------------------------------------
+class URLStatus(NamedTuple):
+    """
+    URL and its returned status
+    """
+    url: str
+    status: Union[str, int]
 
 
 # ---------------------------------------------------------------------------
@@ -79,10 +90,15 @@ def get_args() -> Args:
                         type=int,
                         help=('Number of CPUs for parallel '
                               'processing (default: all)'))
+    parser.add_argument('-v',
+                        '--verbose',
+                        action='store_true',
+                        help=('Run with additional messages'))
 
     args = parser.parse_args()
 
-    return Args(args.file, args.out_dir, args.num_tries, args.wait, args.ncpu)
+    return Args(args.file, args.out_dir, args.num_tries, args.wait, args.ncpu,
+                args.verbose)
 
 
 # ---------------------------------------------------------------------------
@@ -94,6 +110,7 @@ def expand_url_col(df: pd.DataFrame) -> pd.DataFrame:
     
     Return: Dataframe with row per URL
     """
+    logging.debug('Expanding URL column. One row per URL')
 
     df['extracted_url'] = df['extracted_url'].str.split(', ')
 
@@ -136,7 +153,7 @@ def get_pool(ncpu: Optional[int]) -> Pool:
 
     n_cpus = ncpu if ncpu else mp.cpu_count()
 
-    print(f'Running with {n_cpus} processes')
+    logging.debug(f'Running with {n_cpus} processes')
 
     return mp.Pool(n_cpus)
 
@@ -201,7 +218,7 @@ def test_request_url() -> None:
 
 
 # ---------------------------------------------------------------------------
-def check_url(url: str, num_tries: int, wait: int) -> Union[int, str]:
+def check_url(url: str, num_tries: int, wait: int) -> URLStatus:
     """
     Try requesting URL the specified number of tries, returning 200
     if it succeeds at least once
@@ -216,29 +233,72 @@ def check_url(url: str, num_tries: int, wait: int) -> Union[int, str]:
 
     for _ in range(num_tries):
         status = request_url(url)
-        if status == 200:  # Status code was returned
+        if status == 200:
             break
         time.sleep(wait / 1000)
 
-    return status
+    return URLStatus(url, status)
 
 
 # ---------------------------------------------------------------------------
 def test_check_url() -> None:
     """ Test check_url() """
 
-    assert check_url('https://www.google.com', 3, 0) == 200
+    assert check_url('https://www.google.com', 3,
+                     0) == URLStatus('https://www.google.com', 200)
 
     # Bad URLs
-    assert check_url('http://google.com', 3, 0) == 301
-    assert check_url('https://www.amazon.com/afbadfbnvbadfbaefbnaegn', 3,
-                     250) == 404
+    assert check_url('http://google.com', 3,
+                     0) == URLStatus('http://google.com', 301)
+    assert check_url('https://www.amazon.com/afbadffbaefbnaegn', 3,
+                     250) == URLStatus(
+                         'https://www.amazon.com/afbadffbaefbnaegn', 404)
 
     # Runtime exception
-    assert check_url(
-        'adflkbndijfbn', 3,
-        250) == ("Invalid URL 'adflkbndijfbn': No scheme supplied. "
-                 "Perhaps you meant http://adflkbndijfbn?")
+    assert check_url('adflkbndijfbn', 3, 250) == URLStatus(
+        'adflkbndijfbn', ("Invalid URL 'adflkbndijfbn': No scheme supplied. "
+                          "Perhaps you meant http://adflkbndijfbn?"))
+
+
+# ---------------------------------------------------------------------------
+def merge_url_statuses(df: pd.DataFrame,
+                       url_statuses: List[URLStatus]) -> pd.DataFrame:
+    """
+    Create column of URL statuses
+    
+    Parameters:
+    `df`: Dataframe containing extracted_url column
+    `url_statuses`: List of `URLStatus` objects
+    
+    Return: Same dataframe, with addition extracted_url_status column
+    """
+
+    url_dict = {x.url: x.status for x in url_statuses}
+
+    df['extracted_url_status'] = df['extracted_url'].map(url_dict)
+
+    return df
+
+
+# ---------------------------------------------------------------------------
+def test_merge_url_statuses() -> None:
+    """ Test merge_url_statuses() """
+
+    in_df = pd.DataFrame([[123, 'Some text', 'https://www.google.com'],
+                          [456, 'More text', 'http://google.com']],
+                         columns=['ID', 'text', 'extracted_url'])
+
+    statuses = [
+        URLStatus('http://google.com', 301),
+        URLStatus('https://www.google.com', 200)
+    ]
+
+    out_df = pd.DataFrame(
+        [[123, 'Some text', 'https://www.google.com', 200],
+         [456, 'More text', 'http://google.com', 301]],
+        columns=['ID', 'text', 'extracted_url', 'extracted_url_status'])
+
+    assert_frame_equal(merge_url_statuses(in_df, statuses), out_df)
 
 
 # ---------------------------------------------------------------------------
@@ -256,18 +316,18 @@ def check_wayback(url: str) -> WayBackSnapshot:
     # Not using try-except because if there is an exception it is not
     # because there is not an archived version, it means the API
     # has changed.
-    r = requests.get(f'http://archive.org/wayback/available?url={url}')
+    r = requests.get(f'http://archive.org/wayback/available?url={url}',
+                     headers={'User-agent': 'biodata_resource_inventory'})
 
     returned_dict = cast(dict, r.json())
     snapshots = cast(dict, returned_dict.get('archived_snapshots'))
 
     if not snapshots:
-        return WayBackSnapshot(None, None, None)
+        return 'no_wayback'
 
     snapshot = cast(dict, snapshots.get('closest'))
 
-    return WayBackSnapshot(
-        *[snapshot.get(key) for key in ['url', 'timestamp', 'status']])
+    return snapshot.get('url')
 
 
 # ---------------------------------------------------------------------------
@@ -275,16 +335,12 @@ def test_check_wayback() -> None:
     """ Test check_wayback() """
 
     # Example from their website
-    retrieved = check_wayback('example.com')
-
-    assert retrieved.status is not None
-    assert retrieved.url is not None
-    assert retrieved.timestamp is not None
+    assert check_wayback('example.com') != ''
 
     # Valid URL, but not present as a snapshot
 
     # Invalid URL
-    assert check_wayback('aegkbnwefnb') == WayBackSnapshot(None, None, None)
+    assert check_wayback('aegkbnwefnb') == 'no_wayback'
 
 
 # ---------------------------------------------------------------------------
@@ -302,10 +358,24 @@ def check_urls(df: pd.DataFrame, ncpu: Optional[int], num_tries: int,
     check_url_part = partial(check_url, num_tries=num_tries, wait=wait)
 
     with get_pool(ncpu) as pool:
-        df['extracted_url_status'] = pool.map_async(check_url_part,
-                                                    df['extracted_url']).get()
-        df['wayback_url'] = pool.map_async(check_wayback,
-                                           df['extracted_url']).get().append
+        logging.debug('Checking extracted URL statuses.\n'
+                      f'\tMax attempts: {num_tries}.\n'
+                      f'\tTime between attempts: {wait} ms.')
+
+        url_statuses = pool.map_async(check_url_part,
+                                      df['extracted_url']).get()
+
+        df = merge_url_statuses(df, url_statuses)
+
+        df['extracted_url_status']
+
+        logging.debug('Finished checking extracted URLs.')
+        logging.debug('Checking for snapshots of extracted URLs '
+                      'on WayBack Machine.')
+
+        df['wayback_url'] = df['extracted_url'].map(check_wayback)
+
+        logging.debug('Finished checking WayBack Machine.')
 
     return df
 
@@ -320,16 +390,16 @@ def test_check_urls() -> None:
          [789, 'Foo', 'https://www.amazon.com/afbadfbnvbadfbaefbnaegn']],
         columns=['ID', 'text', 'extracted_url'])
 
-    out_df = in_df = pd.DataFrame(
-        [[123, 'Some text', 'https://www.google.com', 200],
-         [456, 'More text', 'http://google.com', 301],
-         [789, 'Foo', 'https://www.amazon.com/afbadfbnvbadfbaefbnaegn', 404]],
-        columns=['ID', 'text', 'extracted_url', 'extracted_url_status'])
-
     returned_df = check_urls(in_df, None, 3, 0)
     returned_df.sort_values('ID', inplace=True)
 
-    assert_frame_equal(returned_df, out_df)
+    # Correct number of rows
+    assert len(returned_df) == 3
+
+    # Correct columns
+    assert all(x == y for x, y in zip(returned_df.columns, [
+        'ID', 'text', 'extracted_url', 'extracted_url_status', 'wayback_url'
+    ]))
 
 
 # ---------------------------------------------------------------------------
@@ -343,12 +413,17 @@ def regroup_df(df: pd.DataFrame) -> pd.DataFrame:
     Return: Dataframe with one row per article
     """
 
+    logging.debug('Collapsing columns. One row per article')
     df['extracted_url_status'] = df['extracted_url_status'].astype(str)
+    df['extracted_url'] = df['extracted_url'].astype(str)
+    df['wayback_url'] = df['wayback_url'].astype(str)
 
     out_df = (df.groupby(['ID', 'text']).agg({
         'extracted_url':
         lambda x: ', '.join(x),
         'extracted_url_status':
+        lambda x: ', '.join(x),
+        'wayback_url':
         lambda x: ', '.join(x)
     }).reset_index())
 
@@ -360,19 +435,30 @@ def test_regroup_df() -> None:
     """ Test regroup_df() """
 
     in_df = pd.DataFrame(
-        [[123, 'Some text', 'https://www.google.com', 200],
-         [123, 'Some text', 'http://google.com', 301],
-         [789, 'Foo', 'https://www.amazon.com/afbadfbnvbadfbaefbnaegn', 404]],
-        columns=['ID', 'text', 'extracted_url', 'extracted_url_status'])
+        [[123, 'Some text', 'https://www.google.com', 200, 'wayback_google'],
+         [123, 'Some text', 'http://google.com', 301, 'no_wayback'],
+         [
+             789, 'Foo', 'https://www.amazon.com/afbadfbnvbadfbaefbnaegn', 404,
+             'no_wayback'
+         ]],
+        columns=[
+            'ID', 'text', 'extracted_url', 'extracted_url_status',
+            'wayback_url'
+        ])
 
-    out_df = pd.DataFrame([[
-        123, 'Some text', 'https://www.google.com, http://google.com',
-        '200, 301'
-    ], [789, 'Foo', 'https://www.amazon.com/afbadfbnvbadfbaefbnaegn', '404']],
-                          columns=[
-                              'ID', 'text', 'extracted_url',
-                              'extracted_url_status'
-                          ])
+    out_df = pd.DataFrame(
+        [[
+            123, 'Some text', 'https://www.google.com, http://google.com',
+            '200, 301', 'wayback_google, no_wayback'
+        ],
+         [
+             789, 'Foo', 'https://www.amazon.com/afbadfbnvbadfbaefbnaegn',
+             '404', 'no_wayback'
+         ]],
+        columns=[
+            'ID', 'text', 'extracted_url', 'extracted_url_status',
+            'wayback_url'
+        ])
 
     assert_frame_equal(regroup_df(in_df), out_df)
 
@@ -384,16 +470,23 @@ def main() -> None:
     args = get_args()
     out_dir = args.out_dir
 
+    if args.verbose:
+        logging.basicConfig(level=logging.DEBUG)
+
     if not os.path.isdir(out_dir):
         os.makedirs(out_dir)
 
+    logging.debug(f'Reading input file: {args.file.name}.')
     df = pd.read_csv(args.file)
 
     df = expand_url_col(df)
     df = check_urls(df, args.ncpu, args.num_tries, args.wait)
     df = regroup_df(df)
 
-    df.to_csv(make_filename(out_dir, args.file), index=False)
+    outfile = make_filename(out_dir, args.file.name)
+    df.to_csv(outfile, index=False)
+    
+    print(f'Done. Wrote output to {outfile}.')
 
 
 # ---------------------------------------------------------------------------
