@@ -123,9 +123,9 @@ def add_url_column(df: pd.DataFrame) -> pd.DataFrame:
     Return: Dataframe with new column of URLs, with URLs separated by commas
     """
 
-    df['url'] = df['text'].apply(extract_urls)
+    df['extracted_url'] = df['text'].apply(extract_urls)
 
-    df['url'] = df['url'].apply(', '.join)
+    df['extracted_url'] = df['extracted_url'].apply(', '.join)
 
     return df
 
@@ -159,7 +159,7 @@ def test_add_url_column() -> None:
          ]],
         columns=[
             'ID', 'text', 'common_name', 'common_prob', 'full_name',
-            'full_prob', 'url'
+            'full_prob', 'extracted_url'
         ])
 
     assert_frame_equal(add_url_column(in_df), out_df)
