@@ -4,12 +4,13 @@ This directory contains configuration files for several aspects of this project.
 
 ```
 .
-├── .pylintrc       # Configurations for pylint
-├── config.yml      # Snakemake pipeline configs
-├── environment.yml # Conda environment description
-├── models_info.tsv # Model training parameters
-├── query.txt       # EuropePMC query string
-└── README.md
+├── .pylintrc             # Configurations for pylint
+├── environment.yml       # Conda environment description
+├── models_info.tsv       # Model training parameters
+├── query.txt             # EuropePMC query string
+├── README.md
+├── train_predict.yml     # Configs for reproducing results
+└── update_inventory.yml  # Configs for updating inventory
 ```
 
 # File Descriptions
@@ -17,10 +18,6 @@ This directory contains configuration files for several aspects of this project.
 ## `.pylintrc`
 
 Since the test suite includes linting of all Python files with pylint, this configuration file informs pylint about what rules to follow during linting. This helps ensure a consistent testing environment across machines.
-
-## `config.yml`
-
-This YAML file contains the majority of the configurations used in the Snakemake pipelines, such as directories and some model training configurations. Changes can be made to this file to alter the parameters used by the Snakemake pipelines.
 
 ## `environment.yml`
 
@@ -42,3 +39,10 @@ More information about these parameters can be found on [Hugging Face 🤗](http
 
 This text file contains a single string, which is the search query sent to EuropePMC. The publication date range should contain placeholders `{0}` and `{1}`, for the from- and to-dates respectively. If placeholders are not used, the date arguments of `src/query_epmc.py` are ignored.
 
+## `train_predict.yml`
+
+This YAML file contains the majority of the configurations used in the Snakemake pipelines, such as directories and model training configurations. These are the configurations used for reproducing the original results
+
+## `update_inventory.yml`
+
+This YAML file contains the configurations used when updating the inventory. It is mostly just directory specifications.
