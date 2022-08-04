@@ -2,27 +2,34 @@
 project_env: './env'
 
 # Directories
+
+## Querying
+query_out_dir: 'out/original_query'
+last_date_dir: 'out/last_query_date'
+
 ## Classification
 classif_splits_dir: 'data/classif_splits'
 classif_train_outdir: 'out/classif_train_out'
-best_classif_dir: 'out/classif_train_out/best'
 classif_benchmark_dir: 'out/benchmarks/classif'
 classif_log_dir: 'out/logs/classif'
+classif_out_dir: 'out/original_query/classification'
 
 ## NER
 ner_splits_dir: 'data/ner_splits'
 ner_train_outdir: 'out/ner_train_out'
-best_ner_dir: 'out/ner_train_out/best'
 ner_benchmark_dir: 'out/benchmarks/ner'
 ner_log_dir: 'out/logs/ner'
+ner_out_dir: 'out/original_query/ner'
 
-split_ratios: '0.8 0.1 0.1'
+## URL Extraction
+extract_url_dir: 'out/original_query/url_extraction'
 
+## URL Checking
+check_url_dir: 'out/original_query/url_checking'
 
 # Input files
 classif_data: 'data/manual_classifications.csv'
 ner_data: 'data/manual_ner_extraction.csv'
-full_corpus: 'data/full_corpus.csv'
 
 # File with configuration settings for the models
 models: 'config/models_info.tsv'
@@ -32,6 +39,9 @@ initial_query_start: 2001
 initial_query_end: 2021
 query_string: 'config/query.txt'
 
+# Ratios used for data splitting
+split_ratios: '0.8 0.1 0.1'
+
 # Metrics used for choosing best model/epoch
 class_criteria_metric: 'precision'
 ner_criteria_metric: 'precision'
@@ -39,9 +49,3 @@ ner_criteria_metric: 'precision'
 # Number of epochs
 classif_epochs: 10
 ner_epochs: 10
-
-# Number of threads, each gets 5 Gb
-train_threads: 12
-
-# Time for job
-train_time: '24:00:00'
