@@ -90,6 +90,7 @@ graph TD
 .
 ├── config/          # Workflow configuration files
 ├── data/            # Manual curation files and data splits
+├── snakemake/       # Snakemake pipelines and rules
 ├── src/             # Python scripts
 ├── tests/           # pytest scripts
 ├── .gitignore
@@ -98,8 +99,6 @@ graph TD
 ├── README.md
 ├── requirements.txt
 ├── running_pipeline.ipynb
-├── train_predict.smk
-├── update_inventory.smk
 └── updating_inventory.ipynb
 ```
 
@@ -188,20 +187,20 @@ $ make train_and_predict
 
 If Make is unavailable, run
 ```
-$ snakemake -s train_predict.smk --configfile config/config.yml -c1
+$ snakemake -s snakemake/train_predict.smk --configfile config/train_predict.yml -c1
 ```
 
 The above commands run the Snakemake pipeline. If you wish to run the steps manually, see [src/README.md](src/README.md#training-and-prediction).
 
 ## Updating the inventory
 
-Before running the automated pipelines, if there is not a file `data/last_query_date.txt`, it must first be created. In that file place the date at which you want the query to begin (should align with date of last query).
+Before running the automated pipelines, if there is not a file `out/last_query_date/last_query_date.txt`, it must first be created. In that file place the date at which you want the query to begin (should align with date of last query).
 
-*Note*: There should only be one file matching each pattern `out/classif_train_out/best/*/best_checkpt.pt` and `out/ner_train_out/best/*/best_checkpt.pt`
+*Note*: There should only be one file matching each pattern `out/classif_train_out/best/best_checkpt.txt` and `out/ner_train_out/best/best_checkpt.txt`
 
 To run the pipeline from a notebook in Colab, follow the steps in [updating_inventory.ipynb](updating_inventory.ipynb). To run from the command line, follow these steps.
 
-First, make sure that the trained classifier and NER models are present at `out/classif_train_out/best/*/best_checkpt.pt` and `out/ner_train_out/best/*/best_checkpt.pt`.
+First, make sure that the trained classifier and NER models are present at `out/classif_train_out/best/best_checkpt.txt` and `out/ner_train_out/best/best_checkpt.txt`.
 
 If you do not have trained models, and do not want to perform training, they can be downloaded with:
 ```
@@ -223,7 +222,7 @@ $ make update_inventory
 
 If Make is unavailable, run
 ```
-$ snakemake -s update_inventory.smk --configfile config/config.yml -c1
+$ snakemake -s snakemake/update_inventory.smk --configfile config/update_inventory.yml -c1
 ```
 
 The above commands run the Snakemake pipeline. If you wish to run the steps manually, see [src/README.md](src/README.md#updating-the-inventory).
@@ -232,7 +231,7 @@ The above commands run the Snakemake pipeline. If you wish to run the steps manu
 
 The Snakemake pipelines are built such that they capture the workflow logic, while all configurations are stored separately. This makes it possible to adjust the workflows without changing source code or the Snakemake pipelines.
 
-Most of the configurations are stored in [config/config.yml](config/config.yml) such as train/validation/split ratios and output directories.
+Configurations for reproducing original results are in [config/train_predict.yml](config/train_predict.yml) such as train/validation/split ratios and output directories. Configurations for updating the inventory are in [config/update_inventory.yml](config/update_inventory.yml).
 
 Configurations regarding model training parameters are stored in [config/models_info.tsv](config/models_info.tsv), such as number of epochs, and convenient model names as well as official HuggingFace model names.
 
