@@ -27,7 +27,7 @@ class Args(NamedTuple):
     out_dir: str
     num_tries: int
     wait: int
-    ncpu: Optional[int]
+    cores: Optional[int]
     verbose: bool
 
 
@@ -41,25 +41,12 @@ class URLStatus(NamedTuple):
 
 
 # ---------------------------------------------------------------------------
-class WayBackSnapshot(NamedTuple):
-    """
-    Information about a WayBack Archive Snapshot
-
-    `url`: URL of Snapshot on WayBack Machine
-    `timestamp`: Timestamp of archive
-    `status`: Snapshot status
-    """
-    url: Optional[str]
-    timestamp: Optional[str]
-    status: Optional[str]
-
-
-# ---------------------------------------------------------------------------
 def get_args() -> Args:
     """ Parse command-line arguments """
 
     parser = argparse.ArgumentParser(
-        description=('Check extracted URL statuses'),
+        description=('Check extracted URL statuses and '
+                     'see if snapsot is in WayBack Machine'),
         formatter_class=CustomHelpFormatter)
 
     parser.add_argument('file',
@@ -77,27 +64,27 @@ def get_args() -> Args:
                         metavar='INT',
                         type=int,
                         default=3,
-                        help='Number of tried for checking URL')
+                        help='Number of tries for checking URL')
     parser.add_argument('-w',
                         '--wait',
                         metavar='TIME',
                         type=int,
                         default=500,
                         help='Time (ms) to wait between tries')
-    parser.add_argument('-t',
-                        '--ncpu',
-                        metavar='CPU',
+    parser.add_argument('-c',
+                        '--cores',
+                        metavar='CORE',
                         type=int,
-                        help=('Number of CPUs for parallel '
+                        help=('Number of cores for parallel '
                               'processing (default: all)'))
     parser.add_argument('-v',
                         '--verbose',
                         action='store_true',
-                        help=('Run with additional messages'))
+                        help=('Run with debugging messages'))
 
     args = parser.parse_args()
 
-    return Args(args.file, args.out_dir, args.num_tries, args.wait, args.ncpu,
+    return Args(args.file, args.out_dir, args.num_tries, args.wait, args.cores,
                 args.verbose)
 
 
@@ -105,9 +92,9 @@ def get_args() -> Args:
 def expand_url_col(df: pd.DataFrame) -> pd.DataFrame:
     """
     Expand the URL column, by creating a row per URL.
-    
+
     `df`: Dataframe with extracted_url column
-    
+
     Return: Dataframe with row per URL
     """
     logging.debug('Expanding URL column. One row per URL')
@@ -140,22 +127,22 @@ def test_expand_url_col() -> None:
 
 
 # ---------------------------------------------------------------------------
-def get_pool(ncpu: Optional[int]) -> Pool:
+def get_pool(cores: Optional[int]) -> Pool:
     """
     Get Pool for multiprocessing.
-    
+
     Parameters:
-    `ncpu`: Number of CPUs to use, if not specified detect number available
-    
+    `cores`: Number of CPUs to use, if not specified detect number available
+
     Return:
-    `Pool` using `ncpu` or number of available CPUs
+    `Pool` using `cores` or number of available CPUs
     """
 
-    n_cpus = ncpu if ncpu else mp.cpu_count()
+    n_cpus = cores if cores else mp.cpu_count()
 
-    logging.debug(f'Running with {n_cpus} processes')
+    logging.debug('Running with %d processes', n_cpus)
 
-    return mp.Pool(n_cpus)
+    return mp.Pool(n_cpus)  # pylint: disable=consider-using-with
 
 
 # ---------------------------------------------------------------------------
@@ -185,10 +172,10 @@ def test_make_filenames() -> None:
 def request_url(url: str) -> Union[int, str]:
     """
     Check a URL once using try-except to catch exceptions
-    
+
     Parameters:
     `url`: URL string
-    
+
     Return: Status code or error message
     """
 
@@ -228,7 +215,7 @@ def check_url(url: str, num_tries: int, wait: int) -> URLStatus:
     `num_tries`: Number of times to try requesting URL
     `wait`: Wait time between tries in ms
 
-    Return: Status code or error message
+    Return: `URLStatus` (URL and its status code or error message)
     """
 
     for _ in range(num_tries):
@@ -265,12 +252,12 @@ def merge_url_statuses(df: pd.DataFrame,
                        url_statuses: List[URLStatus]) -> pd.DataFrame:
     """
     Create column of URL statuses
-    
+
     Parameters:
     `df`: Dataframe containing extracted_url column
     `url_statuses`: List of `URLStatus` objects
-    
-    Return: Same dataframe, with addition extracted_url_status column
+
+    Return: Same dataframe, with additional extracted_url_status column
     """
 
     url_dict = {x.url: x.status for x in url_statuses}
@@ -302,20 +289,19 @@ def test_merge_url_statuses() -> None:
 
 
 # ---------------------------------------------------------------------------
-def check_wayback(url: str) -> WayBackSnapshot:
+def check_wayback(url: str) -> str:
     """
-    Check the WayBack Machine for an archived version of requested URL.
+    Check the WayBack Machine for an archived version of requested URL
 
     Parameters:
     `url`: URL to check
 
-    Return: A `WayBackSnapshot` NamedTuple
-    with attributes `url`, `timestamp`, and `status`
+    Return: WayBack snapshot URL or "no_wayback"
     """
 
     # Not using try-except because if there is an exception it is not
     # because there is not an archived version, it means the API
-    # has changed.
+    # has changed. The code must be updated then.
     r = requests.get(f'http://archive.org/wayback/available?url={url}',
                      headers={'User-agent': 'biodata_resource_inventory'})
 
@@ -327,7 +313,7 @@ def check_wayback(url: str) -> WayBackSnapshot:
 
     snapshot = cast(dict, snapshots.get('closest'))
 
-    return snapshot.get('url')
+    return snapshot.get('url', 'no_wayback')
 
 
 # ---------------------------------------------------------------------------
@@ -344,30 +330,30 @@ def test_check_wayback() -> None:
 
 
 # ---------------------------------------------------------------------------
-def check_urls(df: pd.DataFrame, ncpu: Optional[int], num_tries: int,
+def check_urls(df: pd.DataFrame, cores: Optional[int], num_tries: int,
                wait: int) -> pd.DataFrame:
     """
-    Check all URLs in df
-    
+    Check all URLs in extracted_url column of dataframe
+
     Parameters:
-    `df`: Dataframe with url column
-    
-    Return: Dataframe
+    `df`: Dataframe with extracted_url column
+
+    Return: Dataframe with extracted_url_status
+    and wayback_url columns added
     """
 
     check_url_part = partial(check_url, num_tries=num_tries, wait=wait)
 
-    with get_pool(ncpu) as pool:
-        logging.debug('Checking extracted URL statuses.\n'
-                      f'\tMax attempts: {num_tries}.\n'
-                      f'\tTime between attempts: {wait} ms.')
+    with get_pool(cores) as pool:
+        logging.debug(
+            'Checking extracted URL statuses. '
+            'Max attempts: %d. '
+            'Time between attempts: %d ms.', num_tries, wait)
 
         url_statuses = pool.map_async(check_url_part,
                                       df['extracted_url']).get()
 
         df = merge_url_statuses(df, url_statuses)
-
-        df['extracted_url_status']
 
         logging.debug('Finished checking extracted URLs.')
         logging.debug('Checking for snapshots of extracted URLs '
@@ -407,9 +393,9 @@ def regroup_df(df: pd.DataFrame) -> pd.DataFrame:
     """
     Regroup dataframe to contain one row per article, columns may contain
     list elements
-    
+
     `df`: Dataframe with one row per URL
-    
+
     Return: Dataframe with one row per article
     """
 
@@ -418,13 +404,18 @@ def regroup_df(df: pd.DataFrame) -> pd.DataFrame:
     df['extracted_url'] = df['extracted_url'].astype(str)
     df['wayback_url'] = df['wayback_url'].astype(str)
 
-    out_df = (df.groupby(['ID', 'text']).agg({
-        'extracted_url':
-        lambda x: ', '.join(x),
-        'extracted_url_status':
-        lambda x: ', '.join(x),
-        'wayback_url':
-        lambda x: ', '.join(x)
+    columns = [
+        col for col in df.columns
+        if col not in ['extracted_url', 'extracted_url_status', 'wayback_url']
+    ]
+
+    def join_commas(x):
+        return ', '.join(x)
+
+    out_df = (df.groupby(columns).agg({
+        'extracted_url': join_commas,
+        'extracted_url_status': join_commas,
+        'wayback_url': join_commas
     }).reset_index())
 
     return out_df
@@ -476,16 +467,16 @@ def main() -> None:
     if not os.path.isdir(out_dir):
         os.makedirs(out_dir)
 
-    logging.debug(f'Reading input file: {args.file.name}.')
+    logging.debug('Reading input file: %s.', args.file.name)
     df = pd.read_csv(args.file)
 
     df = expand_url_col(df)
-    df = check_urls(df, args.ncpu, args.num_tries, args.wait)
+    df = check_urls(df, args.cores, args.num_tries, args.wait)
     df = regroup_df(df)
 
     outfile = make_filename(out_dir, args.file.name)
     df.to_csv(outfile, index=False)
-    
+
     print(f'Done. Wrote output to {outfile}.')
 
 
