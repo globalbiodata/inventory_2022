@@ -127,9 +127,13 @@ Once classification and NER have been performed, other information can be gather
 
 ## Checking URLs
 
-`check_urls.py` checks if each URL gives a return code of '200' meaning good. If the URL returns any other code, or causes an exception, it is noted that the URL in the abstract is not available. 
+`check_urls.py` checks each extracted URL by submitting a request. The status of the request (either a status code or the returned error message if an exception occurs) is recorded in a new column labeled extracted_url_status.
 
-For those that did not give a 200 code, the script checks the [Internet Archive WaybackMachine](https://archive.org/help/wayback_api.php) to see if there exists an archived snapshot of the given URL. If so, this is marked as the checked URL.
+Then, each URL is submitted to [Internet Archive WaybackMachine](https://archive.org/help/wayback_api.php) to see if there exists an archived snapshot of the given URL. If so, this is marked as the checked URL.
+
+Since this process can take quite a while, it is implemented to allow for asynchronous parallelization. Each core supplied can submit a request at the same time, and as soon as one core finishes, it submits another. By default all available cores are used, but the desired number of cores can be specified with the `-c|--cores` flag.
+
+Additionally, a `-v|--verbose` flag is available for debugging.
 
 # Manual Workflow Examples
 
