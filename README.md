@@ -211,8 +211,7 @@ Next, **make sure that output from previous updates have been saved elsewhere, a
 
 To remove the outputs of previous run:
 ```
-$ rm data/new_query_results.csv
-$ rm -rf data/new_paper_predictions/
+$ rm -rf out/new_query
 ```
 
 Then the pipeline for updating results can be run:
