@@ -14,12 +14,18 @@ import time
 from functools import partial
 from multiprocessing.pool import Pool
 from typing import List, NamedTuple, Optional, TextIO, Union, cast
+from urllib import response
 
 import pandas as pd
 import requests
 from pandas.testing import assert_frame_equal
 
 from utils import CustomHelpFormatter
+
+API_REQ_DICT = {
+    'ipinfo': 'https://ipinfo.io/{}/json',
+    'ip-api': 'http://ip-api.com/json/{}'
+}
 
 
 # ---------------------------------------------------------------------------
@@ -36,11 +42,21 @@ class Args(NamedTuple):
 # ---------------------------------------------------------------------------
 class URLStatus(NamedTuple):
     """
-    URL and its returned status
+    URL and its returned status and location
     """
     url: str
     status: Union[str, int]
-    location: str
+    country: str
+    latitude: str
+    longitude: str
+
+
+# ---------------------------------------------------------------------------
+class IPLocation(NamedTuple):
+    """ IP address location """
+    country: str
+    latitude: str
+    longitude: str
 
 
 # ---------------------------------------------------------------------------
@@ -235,18 +251,72 @@ def test_extract_domain() -> None:
 
 
 # ---------------------------------------------------------------------------
-def get_location(url: str) -> str:
+def query_ip(ip: str, api: str) -> IPLocation:
+    """
+    Query an API trying to find location from IP address
+
+    Parameters:
+    `ip`: IP address to check
+    `api`: API to query
+
+    Return: Location or empty string
+    """
+
+    query_template = API_REQ_DICT[api]
+
+    response = requests.get(query_template.format(ip), verify=True)
+
+    if response.status_code != 200:
+        return ''
+
+    data = cast(dict, response.json())
+
+    country = data.get('country', '')
+    latitude, longitude = '', ''
+
+    if api == 'ipinfo':
+        lat_lon = cast(str, data.get('loc', ''))
+        lat_lon_split = lat_lon.split(',')
+        if len(lat_lon_split) == 2:
+            latitude, longitude = lat_lon_split
+    elif api == 'ip-api':
+        latitude = str(data.get('lat', ''))
+        longitude = str(data.get('lon', ''))
+
+    return IPLocation(country, latitude, longitude)
+
+
+# ---------------------------------------------------------------------------
+def get_location(url: str) -> IPLocation:
     """
     Get location (country) of URL by first fetching the IP address of
     the connection, then searching for location of that IP address
 
     Parameters:
     `url`: URL to search
-    
+
     Return: Location or empty string
     """
 
-    ip_add = socket.gethostbyname(extract_domain(url))
+    ip = socket.gethostbyname(extract_domain(url))
+
+    location = query_ip(ip, 'ipinfo')
+
+    if '' in [location.country, location.latitude, location.longitude]:
+        location = query_ip(ip, 'ip-api')
+
+    return location
+
+
+# ---------------------------------------------------------------------------
+def test_get_location() -> None:
+    """ Test get_location() """
+
+    location = get_location('https://google.com')
+    assert location.country != ''
+
+    location = get_location('google.com')
+    assert location.country != ''
 
 
 # ---------------------------------------------------------------------------
@@ -263,7 +333,7 @@ def check_url(url: str, num_tries: int, wait: int) -> URLStatus:
     Return: `URLStatus` (URL and its status code or error message)
     """
 
-    location = ''
+    location = IPLocation('', '', '')
     for _ in range(num_tries):
         status = request_url(url)
         if status == 200:
@@ -271,27 +341,36 @@ def check_url(url: str, num_tries: int, wait: int) -> URLStatus:
             break
         time.sleep(wait / 1000)
 
-    return URLStatus(url, status, location)
+    return URLStatus(url, status, location.country, location.latitude,
+                     location.longitude)
 
 
 # ---------------------------------------------------------------------------
 def test_check_url() -> None:
     """ Test check_url() """
 
-    assert check_url('https://www.google.com', 3,
-                     0) == URLStatus('https://www.google.com', 200)
+    url_status = check_url('https://www.google.com', 3, 0)
+    assert url_status.url == 'https://www.google.com'
+    assert url_status.status == 200
 
     # Bad URLs
-    assert check_url('http://google.com', 3,
-                     0) == URLStatus('http://google.com', 301)
-    assert check_url('https://www.amazon.com/afbadffbaefbnaegn', 3,
-                     250) == URLStatus(
-                         'https://www.amazon.com/afbadffbaefbnaegn', 404)
+    url_status = check_url('http://google.com', 3, 0)
+    assert url_status.url == 'http://google.com'
+    assert url_status.status == 301
+    assert url_status.country == ''
+
+    url_status = check_url('https://www.amazon.com/afbadffbaefbnaegn', 3, 0)
+    assert url_status.url == 'https://www.amazon.com/afbadffbaefbnaegn'
+    assert url_status.status == 404
+    assert url_status.country == ''
 
     # Runtime exception
-    assert check_url('adflkbndijfbn', 3, 250) == URLStatus(
-        'adflkbndijfbn', ("Invalid URL 'adflkbndijfbn': No scheme supplied. "
-                          "Perhaps you meant http://adflkbndijfbn?"))
+    url_status = check_url('adflkbndijfbn', 3, 250)
+    assert url_status.url == 'adflkbndijfbn'
+    assert url_status.status == (
+        "Invalid URL 'adflkbndijfbn': No scheme supplied. "
+        "Perhaps you meant http://adflkbndijfbn?")
+    assert url_status.country == ''
 
 
 # ---------------------------------------------------------------------------
@@ -307,9 +386,24 @@ def merge_url_statuses(df: pd.DataFrame,
     Return: Same dataframe, with additional extracted_url_status column
     """
 
-    url_dict = {x.url: x.status for x in url_statuses}
+    url_dict = {
+        x.url: {
+            'status': x.status,
+            'country': x.country,
+            'latitude': x.latitude,
+            'longitude': x.longitude
+        }
+        for x in url_statuses
+    }
 
-    df['extracted_url_status'] = df['extracted_url'].map(url_dict)
+    df['extracted_url_status'] = df['extracted_url'].map(
+        lambda x: url_dict[x]['status'])
+    df['extracted_url_country'] = df['extracted_url'].map(
+        lambda x: url_dict[x]['country'])
+    df['extracted_url_latitude'] = df['extracted_url'].map(
+        lambda x: url_dict[x]['latitude'])
+    df['extracted_url_longitude'] = df['extracted_url'].map(
+        lambda x: url_dict[x]['longitude'])
 
     return df
 
@@ -323,14 +417,21 @@ def test_merge_url_statuses() -> None:
                          columns=['ID', 'text', 'extracted_url'])
 
     statuses = [
-        URLStatus('http://google.com', 301),
-        URLStatus('https://www.google.com', 200)
+        URLStatus('http://google.com', 301, '', '', ''),
+        URLStatus('https://www.google.com', 200, 'United States', '34.0522',
+                  '-118.2437')
     ]
 
-    out_df = pd.DataFrame(
-        [[123, 'Some text', 'https://www.google.com', 200],
-         [456, 'More text', 'http://google.com', 301]],
-        columns=['ID', 'text', 'extracted_url', 'extracted_url_status'])
+    out_df = pd.DataFrame([[
+        123, 'Some text', 'https://www.google.com', 200, 'United States',
+        '34.0522', '-118.2437'
+    ], [456, 'More text', 'http://google.com', 301, '', '', '']],
+                          columns=[
+                              'ID', 'text', 'extracted_url',
+                              'extracted_url_status', 'extracted_url_country',
+                              'extracted_url_latitude',
+                              'extracted_url_longitude'
+                          ])
 
     assert_frame_equal(merge_url_statuses(in_df, statuses), out_df)
 
@@ -431,7 +532,9 @@ def test_check_urls() -> None:
 
     # Correct columns
     assert all(x == y for x, y in zip(returned_df.columns, [
-        'ID', 'text', 'extracted_url', 'extracted_url_status', 'wayback_url'
+        'ID', 'text', 'extracted_url', 'extracted_url_status',
+        'extracted_url_country', 'extracted_url_latitude',
+        'extracted_url_longitude', 'wayback_url'
     ]))
 
 
