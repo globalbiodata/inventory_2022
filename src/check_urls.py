@@ -14,7 +14,6 @@ import time
 from functools import partial
 from multiprocessing.pool import Pool
 from typing import List, NamedTuple, Optional, TextIO, Union, cast
-from urllib import response
 
 import pandas as pd
 import requests
@@ -227,10 +226,10 @@ def test_request_url() -> None:
 def extract_domain(url: str) -> str:
     """
     Extract domain name from URL
-    
+
     Parameters:
     `url`: URL string
-    
+
     Return: Domain string
     """
 
@@ -264,12 +263,12 @@ def query_ip(ip: str, api: str) -> IPLocation:
 
     query_template = API_REQ_DICT[api]
 
-    response = requests.get(query_template.format(ip), verify=True)
+    r = requests.get(query_template.format(ip), verify=True)
 
-    if response.status_code != 200:
-        return ''
+    if r.status_code != 200:
+        return IPLocation('', '', '')
 
-    data = cast(dict, response.json())
+    data = cast(dict, r.json())
 
     country = data.get('country', '')
     latitude, longitude = '', ''
