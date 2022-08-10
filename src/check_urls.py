@@ -8,6 +8,8 @@ import argparse
 import logging
 import multiprocessing as mp
 import os
+import re
+import socket
 import time
 from functools import partial
 from multiprocessing.pool import Pool
@@ -38,6 +40,7 @@ class URLStatus(NamedTuple):
     """
     url: str
     status: Union[str, int]
+    location: str
 
 
 # ---------------------------------------------------------------------------
@@ -205,6 +208,48 @@ def test_request_url() -> None:
 
 
 # ---------------------------------------------------------------------------
+def extract_domain(url: str) -> str:
+    """
+    Extract domain name from URL
+    
+    Parameters:
+    `url`: URL string
+    
+    Return: Domain string
+    """
+
+    domain = re.sub('https?://', '', url)
+    domain = re.sub('/.*$', '', domain)
+
+    return domain
+
+
+# ---------------------------------------------------------------------------
+def test_extract_domain() -> None:
+    """ Test extract_domain() """
+
+    assert extract_domain('https://www.google.com') == 'www.google.com'
+    assert extract_domain('www.google.com') == 'www.google.com'
+    assert extract_domain(
+        'http://proteome.moffitt.org/QUAD/') == 'proteome.moffitt.org'
+
+
+# ---------------------------------------------------------------------------
+def get_location(url: str) -> str:
+    """
+    Get location (country) of URL by first fetching the IP address of
+    the connection, then searching for location of that IP address
+
+    Parameters:
+    `url`: URL to search
+    
+    Return: Location or empty string
+    """
+
+    ip_add = socket.gethostbyname(extract_domain(url))
+
+
+# ---------------------------------------------------------------------------
 def check_url(url: str, num_tries: int, wait: int) -> URLStatus:
     """
     Try requesting URL the specified number of tries, returning 200
@@ -218,13 +263,15 @@ def check_url(url: str, num_tries: int, wait: int) -> URLStatus:
     Return: `URLStatus` (URL and its status code or error message)
     """
 
+    location = ''
     for _ in range(num_tries):
         status = request_url(url)
         if status == 200:
+            location = get_location(url)
             break
         time.sleep(wait / 1000)
 
-    return URLStatus(url, status)
+    return URLStatus(url, status, location)
 
 
 # ---------------------------------------------------------------------------
