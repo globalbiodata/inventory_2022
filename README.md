@@ -86,7 +86,7 @@ graph TD
 
 # Repository Structure
 
-```
+```sh
 .
 ├── config/          # Workflow configuration files
 ├── data/            # Manual curation files and data splits
@@ -110,7 +110,7 @@ There are several ways to install the dependencies for this workflow.
 
 If installing with pip, ensure you have Python version 3.8. Older or newer versions may not work.
 
-```
+```sh
 $ python3 --version
 Python 3.8.12
 ```
@@ -119,19 +119,19 @@ Then you can install Python dependencies using pip.
 
 A make command is available for installing dependencies.
 
-```
+```sh
 $ make setup
 ```
 
 Alternatively, to install them manually:
 
-```
+```sh
 $ pip install -r requirements.txt
 ```
 
 Then download punkt:
 
-```
+```python
 $ python3
 >>> import nltk
 >>> nltk.download('punkt')
@@ -140,20 +140,20 @@ $ python3
 ## Anaconda
 
 To create the environment in your `$HOME` directory, run:
-```
+```sh
 $ conda env create -f config/environment.yml
 $ conda activate inventory_env
 ```
 
 Or you can create the environment in this repository by running:
-```
+```sh
 $ conda env create -f config/environment.yml -p ./env
 $ conda activate ./env
 ```
 
 Then download punkt:
 
-```
+```python
 $ python3
 >>> import nltk
 >>> nltk.download('punkt')
@@ -163,7 +163,7 @@ $ python3
 
 A full test suite is included to help ensure that everything is running as expected. To run the full test suite, run:
 
-```
+```sh
 $ make test
 ```
 
@@ -172,7 +172,7 @@ $ make test
 ## Dry run
 
 To see what steps would be run in the workflow, a dry run can be run:
-```
+```sh
 $ make dryrun_reproduction
 ```
 
@@ -181,12 +181,12 @@ $ make dryrun_reproduction
 To run the pipeline from a notebook in Colab, follow the steps in [running_pipeline.ipynb](running_pipeline.ipynb).
 
 Alternatively, to run the pipeline from the command-line, run:
-```
+```sh
 $ make train_and_predict
 ```
 
 If Make is unavailable, run
-```
+```sh
 $ snakemake -s snakemake/train_predict.smk --configfile config/train_predict.yml -c1
 ```
 
@@ -203,24 +203,24 @@ To run the pipeline from a notebook in Colab, follow the steps in [updating_inve
 First, make sure that the trained classifier and NER models are present at `out/classif_train_out/best/best_checkpt.txt` and `out/ner_train_out/best/best_checkpt.txt`.
 
 If you do not have trained models, and do not want to perform training, they can be downloaded with:
-```
+```sh
 # Add code here for getting models!
 ```
 
 Next, **make sure that output from previous updates have been saved elsewhere, as the old results must be deleted**.
 
 To remove the outputs of previous run:
-```
+```sh
 $ rm -rf out/new_query
 ```
 
 Then the pipeline for updating results can be run:
-```
+```sh
 $ make update_inventory
 ```
 
 If Make is unavailable, run
-```
+```sh
 $ snakemake -s snakemake/update_inventory.smk --configfile config/update_inventory.yml -c1
 ```
 

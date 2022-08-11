@@ -47,7 +47,7 @@ In those cases, there will be multiple rows for the same article. For this reaso
 
 In R this may look something like:
 
-```
+```R
 all_elements <- read.csv('extracted_elements_2022-02-15.csv')
 
 names <- all_elements %>%

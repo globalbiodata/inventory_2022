@@ -2,7 +2,7 @@
 
 This directory contains configuration files for several aspects of this project.
 
-```
+```sh
 .
 ├── .pylintrc             # Configurations for pylint
 ├── environment.yml       # Conda environment description

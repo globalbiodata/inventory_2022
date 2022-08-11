@@ -4,7 +4,7 @@ Snakemake is used to organize the various steps involved in reproducing the orig
 
 This directory contains both workflow files, and a file of rules (steps) shared by multiple workflows.
 
-```
+```sh
 .
 ├── README.md
 ├── shared_rules.smk      # File with shared rules
@@ -16,7 +16,7 @@ These files should not need to be edited, since they just capture the workflow l
 
 However, if any of these files get edited, it can be nice to format them. This makes them have consistent formatting, and can spot some syntax errors:
 
-```
+```sh
 # To format the Snakefiles
 $ snakefmt *.smk
 ```
@@ -28,7 +28,7 @@ The rules in this file are imported for use in the other workflows by having the
 
 Note that the rules in this file often specify values obtained from the config file. For instance:
 
-```
+```python
 infile=config["query_out_dir"] + "/query_results.csv",
 ```
 
