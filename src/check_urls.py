@@ -21,10 +21,18 @@ from pandas.testing import assert_frame_equal
 
 from utils import CustomHelpFormatter
 
+# ---------------------------------------------------------------------------
 API_REQ_DICT = {
     'ipinfo': 'https://ipinfo.io/{}/json',
     'ip-api': 'http://ip-api.com/json/{}'
 }
+"""
+Dictionary of APIs that geolocate from IP, and their templates.
+Fill in template with `API_REQ_DICT[api].format(ip)`
+
+`key`: API name
+`value`: Template with `{}` placeholder for IP address
+"""
 
 
 # ---------------------------------------------------------------------------
@@ -42,6 +50,12 @@ class Args(NamedTuple):
 class URLStatus(NamedTuple):
     """
     URL and its returned status and location
+    
+    `url`: URL string
+    `status`: URL status or error message from request
+    `country`: Geolocated country from IP address
+    `latitude`: Geolocated latitude from IP address
+    `longitude`: Geolocated longitude from IP address
     """
     url: str
     status: Union[str, int]
@@ -52,7 +66,13 @@ class URLStatus(NamedTuple):
 
 # ---------------------------------------------------------------------------
 class IPLocation(NamedTuple):
-    """ IP address location """
+    """
+    IP address location
+    
+    `country`: Geolocated country from IP address
+    `latitude`: Geolocated latitude from IP address
+    `longitude`: Geolocated longitude from IP address
+    """
     country: str
     latitude: str
     longitude: str
@@ -64,7 +84,7 @@ def get_args() -> Args:
 
     parser = argparse.ArgumentParser(
         description=('Check extracted URL statuses and '
-                     'see if snapsot is in WayBack Machine'),
+                     'see if snapshot is in WayBack Machine'),
         formatter_class=CustomHelpFormatter)
 
     parser.add_argument('file',
@@ -153,14 +173,14 @@ def get_pool(cores: Optional[int]) -> Pool:
     `cores`: Number of CPUs to use, if not specified detect number available
 
     Return:
-    `Pool` using `cores` or number of available CPUs
+    `Pool` using `cores` or number of available cores
     """
 
-    n_cpus = cores if cores else mp.cpu_count()
+    n_cores = cores if cores else mp.cpu_count()
 
-    logging.debug('Running with %d processes', n_cpus)
+    logging.debug('Running with %d processes', n_cores)
 
-    return mp.Pool(n_cpus)  # pylint: disable=consider-using-with
+    return mp.Pool(n_cores)  # pylint: disable=consider-using-with
 
 
 # ---------------------------------------------------------------------------
@@ -169,7 +189,8 @@ def make_filename(out_dir: str, infile_name: str) -> str:
     Make filename for output reusing input file's basename
 
     Parameters:
-    `outdir`: Output directory
+    `out_dir`: Output directory
+    `infile_name`: Input file name
 
     Return: Output filename
     '''
@@ -252,13 +273,13 @@ def test_extract_domain() -> None:
 # ---------------------------------------------------------------------------
 def query_ip(ip: str, api: str) -> IPLocation:
     """
-    Query an API trying to find location from IP address
+    Query an API to find location from IP address
 
     Parameters:
     `ip`: IP address to check
     `api`: API to query
 
-    Return: Location or empty string
+    Return: An `IPLocation` object, which may have empty strings
     """
 
     logging.debug('Querying %s.', api)
@@ -290,13 +311,13 @@ def query_ip(ip: str, api: str) -> IPLocation:
 # ---------------------------------------------------------------------------
 def get_location(url: str) -> IPLocation:
     """
-    Get location (country) of URL by first fetching the IP address of
+    Get location of URL by first fetching the IP address of
     the connection, then searching for location of that IP address
 
     Parameters:
     `url`: URL to search
 
-    Return: Location or empty string
+    Return: An `IPLocation` object, which may have empty strings
     """
 
     logging.debug('Attempting to determine IP address of %s', url)
@@ -340,7 +361,7 @@ def check_url(url: str, num_tries: int, wait: int) -> URLStatus:
     `num_tries`: Number of times to try requesting URL
     `wait`: Wait time between tries in ms
 
-    Return: `URLStatus` (URL and its status code or error message)
+    Return: `URLStatus` object
     """
 
     location = IPLocation('', '', '')
@@ -501,6 +522,9 @@ def check_urls(df: pd.DataFrame, cores: Optional[int], num_tries: int,
 
     Parameters:
     `df`: Dataframe with extracted_url column
+    `cores`: (optional) number of cores to use
+    `num_tries`: Number of request attempts per URL
+    `wait`: Wait time between requests in sec
 
     Return: Dataframe with extracted_url_status
     and wayback_url columns added
