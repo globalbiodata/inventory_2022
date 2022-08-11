@@ -85,7 +85,7 @@ def get_args() -> Args:
                         help='Number of tries for checking URL')
     parser.add_argument('-w',
                         '--wait',
-                        metavar='TIME',
+                        metavar='MS',
                         type=int,
                         default=500,
                         help='Time (ms) to wait between tries')
@@ -261,6 +261,7 @@ def query_ip(ip: str, api: str) -> IPLocation:
     Return: Location or empty string
     """
 
+    logging.debug('Querying %s.', api)
     query_template = API_REQ_DICT[api]
 
     r = requests.get(query_template.format(ip), verify=True)
@@ -282,6 +283,7 @@ def query_ip(ip: str, api: str) -> IPLocation:
         latitude = str(data.get('lat', ''))
         longitude = str(data.get('lon', ''))
 
+    logging.debug('Obtained IP address location: %s', IPLocation.country)
     return IPLocation(country, latitude, longitude)
 
 
@@ -297,13 +299,22 @@ def get_location(url: str) -> IPLocation:
     Return: Location or empty string
     """
 
+    logging.debug('Attempting to determine IP address of %s', url)
     ip = socket.gethostbyname(extract_domain(url))
 
+    if not ip:
+        logging.debug('IP address for %s could not be determined', url)
+        return IPLocation('', '', '')
+
+    logging.debug('IP address found: %s.', ip)
+    logging.debug('Attempting to geolocate IP address.')
     location = query_ip(ip, 'ipinfo')
 
     if '' in [location.country, location.latitude, location.longitude]:
         location = query_ip(ip, 'ip-api')
 
+    logging.debug('Final location information for %s, %s', ip,
+                  IPLocation.country)
     return location
 
 
@@ -333,8 +344,14 @@ def check_url(url: str, num_tries: int, wait: int) -> URLStatus:
     """
 
     location = IPLocation('', '', '')
-    for _ in range(num_tries):
+    for i in range(num_tries):
+        logging.debug('Requesting %s for the %d%s time', url, i + 1, {
+            '1': 'st',
+            '2': 'nd',
+            '3': 'rd'
+        }.get(str(i + 1)[-1], 'th'))
         status = request_url(url)
+        logging.debug('Returned status for %s: %s', url, str(status))
         if status == 200:
             location = get_location(url)
             break
