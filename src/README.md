@@ -125,15 +125,23 @@ Once classification and NER have been performed, other information can be gather
 
 `check_urls.py` checks each extracted URL by submitting a request. The status of the request (either a status code or the returned error message if an exception occurs) is recorded in a new column labeled extracted_url_status.
 
-The number of attempts to request the URL can be modified with the `-n|--num-tries` flag, and the time between attempts (in ms) can be adjusted with the `-w|--wait` flag.
+The number of attempts to request the URL can be modified with the `-n|--num-tries` flag. To avoid exceeding the allowable number of attempts in a certain period of time, the `-b|--backoff` flag is used, where 0 adds no wait time and 1 adds the most wait time.
 
-Additionally, for URLs that return a 200 status, various APIs are queried attempting to obtain the geolocation of the IP address which responded to the request. From this, the country and lat, lon coordinates are recorded.
+Additionally, for URLs that return a status less than 400, various APIs are queried attempting to obtain the geolocation of the IP address which responded to the request. From this, the country and lat, lon coordinates are recorded.
 
 Then, each URL is submitted to [Internet Archive WaybackMachine](https://archive.org/help/wayback_api.php) to see if there exists an archived snapshot of the given URL. If so, this is marked as the checked URL.
 
 Since this process can take quite a while, it is implemented to allow for asynchronous parallelization. Each core supplied can submit a request at the same time, and as soon as one core finishes, it submits another. By default all available cores are used, but the desired number of cores can be specified with the `-c|--cores` flag.
 
 Additionally, a `-v|--verbose` flag is available for debugging.
+
+*Note* Actual wait time is calculated as
+
+```
+{backoff factor} * (2 ** ({number of total retries} - 1))
+```
+
+So with a back off factor of 0.1, it will sleep for [0.0s, 0.2s, 0.4s, ...]. More information can be found in the [urllib3 documentation](https://urllib3.readthedocs.io/en/latest/reference/urllib3.util.html#module-urllib3.util.retry)
 
 # Manual Workflow Examples
 

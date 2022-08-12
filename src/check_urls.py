@@ -10,14 +10,16 @@ import multiprocessing as mp
 import os
 import re
 import socket
-import time
 from functools import partial
 from multiprocessing.pool import Pool
 from typing import List, NamedTuple, Optional, TextIO, Union, cast
 
 import pandas as pd
+import pytest
 import requests
 from pandas.testing import assert_frame_equal
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from inventory_utils.custom_classes import CustomHelpFormatter
 
@@ -41,7 +43,7 @@ class Args(NamedTuple):
     file: TextIO
     out_dir: str
     num_tries: int
-    wait: int
+    backoff: float
     cores: Optional[int]
     verbose: bool
 
@@ -103,12 +105,12 @@ def get_args() -> Args:
                         type=int,
                         default=3,
                         help='Number of tries for checking URL')
-    parser.add_argument('-w',
-                        '--wait',
-                        metavar='MS',
-                        type=int,
-                        default=500,
-                        help='Time (ms) to wait between tries')
+    parser.add_argument('-b',
+                        '--backoff',
+                        metavar='[0-1]',
+                        type=float,
+                        default=0.5,
+                        help='Back-off Factor for retries')
     parser.add_argument('-c',
                         '--cores',
                         metavar='CORE',
@@ -122,8 +124,53 @@ def get_args() -> Args:
 
     args = parser.parse_args()
 
-    return Args(args.file, args.out_dir, args.num_tries, args.wait, args.cores,
-                args.verbose)
+    if not 0 <= args.backoff <= 1:
+        parser.error(f'--backoff ({args.backoff}) must '
+                     'be between 0 and 1, inclusive.')
+
+    if not args.num_tries > 0:
+        parser.error(f'--num-tries ({args.num_tries}) must be at least 1')
+
+    return Args(args.file, args.out_dir, args.num_tries, args.backoff,
+                args.cores, args.verbose)
+
+
+# ---------------------------------------------------------------------------
+def get_session(tries: int, backoff: float = 0) -> requests.Session:
+    """
+    Establish request `Session` applying tries and backoff
+
+    Parameters:
+    `tries`: Number of request attempts
+    `backoff`: Backoff factor to prevent quota error
+
+    Return: A `requests.Session`
+    """
+
+    session = requests.Session()
+    retry = Retry(connect=tries, backoff_factor=backoff)
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount('http://', adapter)
+    session.mount('https://', adapter)
+
+    return session
+
+
+# ---------------------------------------------------------------------------
+def test_get_session() -> None:
+    """ Test get_session() """
+
+    session = get_session(3, 0.5)
+
+    assert isinstance(session, requests.Session)
+
+
+# ---------------------------------------------------------------------------
+@pytest.fixture(name='testing_session')
+def fixture_testing_session() -> requests.Session:
+    """ A basic session used for testing requests """
+
+    return get_session(1, 0)
 
 
 # ---------------------------------------------------------------------------
@@ -208,18 +255,19 @@ def test_make_filenames() -> None:
 
 
 # ---------------------------------------------------------------------------
-def request_url(url: str) -> Union[int, str]:
+def request_url(url: str, session: requests.Session) -> Union[int, str]:
     """
     Check a URL once using try-except to catch exceptions
 
     Parameters:
     `url`: URL string
+    `session`: request `Session`
 
     Return: Status code or error message
     """
 
     try:
-        r = requests.head(url)
+        r = session.head(url)
     except requests.exceptions.RequestException as err:
         return str(err)
 
@@ -227,18 +275,19 @@ def request_url(url: str) -> Union[int, str]:
 
 
 # ---------------------------------------------------------------------------
-def test_request_url() -> None:
+def test_request_url(testing_session: requests.Session) -> None:
     """ Test request_url() """
 
     # Hopefully, Google doesn't disappear, if it does use a different URL
-    assert request_url('https://www.google.com') == 200
+    assert request_url('https://www.google.com', testing_session) == 200
 
     # Bad URLs
-    assert request_url('http://google.com') == 301
-    assert request_url('https://www.amazon.com/afbadfbnvbadfbaefbnaegn') == 404
+    assert request_url('http://google.com', testing_session) == 301
+    assert request_url('https://www.amazon.com/afbadfbnvbadfbaefbnaegn',
+                       testing_session) == 404
 
     # Runtime exception
-    assert request_url('adflkbndijfbn') == (
+    assert request_url('adflkbndijfbn', testing_session) == (
         "Invalid URL 'adflkbndijfbn': No scheme supplied. "
         "Perhaps you meant http://adflkbndijfbn?")
 
@@ -351,58 +400,52 @@ def test_get_location() -> None:
 
 
 # ---------------------------------------------------------------------------
-def check_url(url: str, num_tries: int, wait: int) -> URLStatus:
+def check_url(url: str, session: requests.Session) -> URLStatus:
     """
     Try requesting URL the specified number of tries, returning 200
     if it succeeds at least once
 
     Parameters:
     `url`: URL string
-    `num_tries`: Number of times to try requesting URL
-    `wait`: Wait time between tries in ms
+    `session`: request `Session`
 
     Return: `URLStatus` object
     """
 
     location = IPLocation('', '', '')
-    for i in range(num_tries):
-        logging.debug('Requesting %s for the %d%s time', url, i + 1, {
-            '1': 'st',
-            '2': 'nd',
-            '3': 'rd'
-        }.get(str(i + 1)[-1], 'th'))
-        status = request_url(url)
-        logging.debug('Returned status for %s: %s', url, str(status))
-        if status == 200:
-            location = get_location(url)
-            break
-        time.sleep(wait / 1000)
+
+    logging.debug('Requesting %s', url)
+    status = request_url(url, session)
+    logging.debug('Returned status for %s: %s', url, str(status))
+
+    if isinstance(status, int) and status < 400:
+        location = get_location(url)
 
     return URLStatus(url, status, location.country, location.latitude,
                      location.longitude)
 
 
 # ---------------------------------------------------------------------------
-def test_check_url() -> None:
+def test_check_url(testing_session: requests.Session) -> None:
     """ Test check_url() """
 
-    url_status = check_url('https://www.google.com', 3, 0)
+    url_status = check_url('https://www.google.com', testing_session)
     assert url_status.url == 'https://www.google.com'
     assert url_status.status == 200
 
     # Bad URLs
-    url_status = check_url('http://google.com', 3, 0)
+    url_status = check_url('http://google.com', testing_session)
     assert url_status.url == 'http://google.com'
     assert url_status.status == 301
-    assert url_status.country == ''
 
-    url_status = check_url('https://www.amazon.com/afbadffbaefbnaegn', 3, 0)
+    url_status = check_url('https://www.amazon.com/afbadffbaefbnaegn',
+                           testing_session)
     assert url_status.url == 'https://www.amazon.com/afbadffbaefbnaegn'
     assert url_status.status == 404
     assert url_status.country == ''
 
     # Runtime exception
-    url_status = check_url('adflkbndijfbn', 3, 250)
+    url_status = check_url('adflkbndijfbn', testing_session)
     assert url_status.url == 'adflkbndijfbn'
     assert url_status.status == (
         "Invalid URL 'adflkbndijfbn': No scheme supplied. "
@@ -515,28 +558,24 @@ def test_check_wayback() -> None:
 
 
 # ---------------------------------------------------------------------------
-def check_urls(df: pd.DataFrame, cores: Optional[int], num_tries: int,
-               wait: int) -> pd.DataFrame:
+def check_urls(df: pd.DataFrame, cores: Optional[int],
+               session: requests.Session) -> pd.DataFrame:
     """
     Check all URLs in extracted_url column of dataframe
 
     Parameters:
     `df`: Dataframe with extracted_url column
     `cores`: (optional) number of cores to use
-    `num_tries`: Number of request attempts per URL
-    `wait`: Wait time between requests in sec
+    `session`: requests `Session`
 
     Return: Dataframe with extracted_url_status
     and wayback_url columns added
     """
 
-    check_url_part = partial(check_url, num_tries=num_tries, wait=wait)
+    check_url_part = partial(check_url, session=session)
 
     with get_pool(cores) as pool:
-        logging.debug(
-            'Checking extracted URL statuses. '
-            'Max attempts: %d. '
-            'Time between attempts: %d ms.', num_tries, wait)
+        logging.debug('Checking extracted URL statuses. ' 'Max attempts: %d. ')
 
         url_statuses = pool.map_async(check_url_part,
                                       df['extracted_url']).get()
@@ -555,7 +594,7 @@ def check_urls(df: pd.DataFrame, cores: Optional[int], num_tries: int,
 
 
 # ---------------------------------------------------------------------------
-def test_check_urls() -> None:
+def test_check_urls(testing_session: requests.Session) -> None:
     """ Test check_urls() """
 
     in_df = pd.DataFrame(
@@ -564,7 +603,7 @@ def test_check_urls() -> None:
          [789, 'Foo', 'https://www.amazon.com/afbadfbnvbadfbaefbnaegn']],
         columns=['ID', 'text', 'extracted_url'])
 
-    returned_df = check_urls(in_df, None, 3, 0)
+    returned_df = check_urls(in_df, None, testing_session)
     returned_df.sort_values('ID', inplace=True)
 
     # Correct number of rows
@@ -595,8 +634,10 @@ def regroup_df(df: pd.DataFrame) -> pd.DataFrame:
     df['wayback_url'] = df['wayback_url'].astype(str)
 
     columns = [
-        col for col in df.columns
-        if col not in ['extracted_url', 'extracted_url_status', 'wayback_url']
+        col for col in df.columns if col not in [
+            'extracted_url', 'extracted_url_status', 'extracted_url_country',
+            'extracted_url_latitude', 'extracted_url_longitude', 'wayback_url'
+        ]
     ]
 
     def join_commas(x):
@@ -657,11 +698,13 @@ def main() -> None:
     if not os.path.isdir(out_dir):
         os.makedirs(out_dir)
 
+    session = get_session(args.num_tries, args.backoff)
+
     logging.debug('Reading input file: %s.', args.file.name)
     df = pd.read_csv(args.file)
 
     df = expand_url_col(df)
-    df = check_urls(df, args.cores, args.num_tries, args.wait)
+    df = check_urls(df, args.cores, session)
     df = regroup_df(df)
 
     outfile = make_filename(out_dir, args.file.name)
