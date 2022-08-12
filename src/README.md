@@ -1,25 +1,21 @@
 # Overview
 
-This directory contains the source code used in this project. The process for both article classification and NER are very similar, so those steps for each process are described together.
+This directory contains the source code used in this project.
 
-These scripts are modules, and are not to be executed:
-* `class_data_handler.py`
-* `ner_data_handler.py`
-* `utils.py`
-
-The following are executable Python scripts:
-* `check_urls.py`
-* `class_data_generator.py`
-* `class_predict.py`
-* `class_train.py`
-* `model_picker.py`
-* `ner_data_generator.py`
-* `ner_predict.py`
-* `ner_train.py`
-* `url_extractor.py`
-* `class_predict.py`
-* `query_epmc.py`
-* `utils.py`
+```sh
+.
+├── inventory_utils/         # Modules used in the project
+├── check_urls.py            # Gather information from URLs
+├── class_data_generator.py  # Prepare and split classification data
+├── class_predict.py         # Use trained model to predict classification
+├── class_train.py           # Train classifier
+├── model_picker.py          # Select best trained model
+├── ner_data_generator.py    # Prepare and split NER data
+├── ner_predict.py           # Use trained model to perform NER
+├── ner_train.py             # Train NER model
+├── url_extractor.py         # Extract URLs from text
+└── query_epmc.py            # Query EuropePMC
+```
 
 ## Accessing Help
 
