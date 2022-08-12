@@ -13,7 +13,8 @@ from typing import List, NamedTuple, Set, TextIO
 import pandas as pd
 from pandas.testing import assert_frame_equal
 
-from utils import CustomHelpFormatter, preprocess_data
+from inventory_utils.custom_classes import CustomHelpFormatter
+from inventory_utils.wrangling import preprocess_data
 
 
 # ---------------------------------------------------------------------------

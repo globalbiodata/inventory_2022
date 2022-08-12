@@ -13,7 +13,7 @@ from datasets import ClassLabel, Dataset
 from torch.utils.data import DataLoader
 from transformers import AutoTokenizer, PreTrainedTokenizer
 
-from utils import preprocess_data
+from .wrangling import preprocess_data
 
 
 # ---------------------------------------------------------------------------

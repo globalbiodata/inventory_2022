@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Purpose: Check URLs
+Purpose: Check URL statuses, attempt to Geolocate, and check WayBack
 Authors: Kenneth Schackart
 """
 
@@ -19,7 +19,7 @@ import pandas as pd
 import requests
 from pandas.testing import assert_frame_equal
 
-from utils import CustomHelpFormatter
+from inventory_utils.custom_classes import CustomHelpFormatter
 
 # ---------------------------------------------------------------------------
 API_REQ_DICT = {
@@ -50,7 +50,7 @@ class Args(NamedTuple):
 class URLStatus(NamedTuple):
     """
     URL and its returned status and location
-    
+
     `url`: URL string
     `status`: URL status or error message from request
     `country`: Geolocated country from IP address
@@ -68,7 +68,7 @@ class URLStatus(NamedTuple):
 class IPLocation(NamedTuple):
     """
     IP address location
-    
+
     `country`: Geolocated country from IP address
     `latitude`: Geolocated latitude from IP address
     `longitude`: Geolocated longitude from IP address

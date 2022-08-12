@@ -19,8 +19,11 @@ from transformers.modeling_outputs import TokenClassifierOutput
 from transformers.tokenization_utils import PreTrainedTokenizer
 from transformers.tokenization_utils_base import CharSpan
 
-from utils import (ID2NER_TAG, CustomHelpFormatter, get_torch_device,
-                   preprocess_data, get_ner_model)
+from inventory_utils.constants import ID2NER_TAG
+from inventory_utils.custom_classes import CustomHelpFormatter
+from inventory_utils.filing import get_ner_model
+from inventory_utils.runtime import get_torch_device
+from inventory_utils.wrangling import preprocess_data
 
 pd.options.mode.chained_assignment = None
 

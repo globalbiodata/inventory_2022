@@ -16,10 +16,13 @@ from tqdm.auto import tqdm
 from transformers import (AdamW, AutoModelForSequenceClassification,
                           get_scheduler)
 
-from class_data_handler import DataFields, RunParams, get_dataloader
-from utils import (CustomHelpFormatter, Metrics, Settings, get_classif_metrics,
-                   make_filenames, save_model, save_train_stats,
-                   set_random_seed)
+from inventory_utils.class_data_handler import (DataFields, RunParams,
+                                                get_dataloader)
+from inventory_utils.custom_classes import (CustomHelpFormatter, Metrics,
+                                            Settings)
+from inventory_utils.filing import make_filenames, save_model, save_train_stats
+from inventory_utils.metrics import get_classif_metrics
+from inventory_utils.runtime import set_random_seed
 
 
 # ---------------------------------------------------------------------------

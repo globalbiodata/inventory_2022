@@ -11,7 +11,7 @@ from typing import BinaryIO, Dict, List, NamedTuple, Union, cast
 import pandas as pd
 import torch
 
-from utils import CustomHelpFormatter, Metrics
+from inventory_utils.custom_classes import CustomHelpFormatter, Metrics
 
 
 # ---------------------------------------------------------------------------

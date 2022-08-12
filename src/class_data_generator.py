@@ -12,7 +12,8 @@ from typing import List, NamedTuple, TextIO
 import pandas as pd
 from pandas.testing import assert_frame_equal
 
-from utils import CustomHelpFormatter, split_df
+from inventory_utils.custom_classes import CustomHelpFormatter
+from inventory_utils.wrangling import split_df
 
 
 # ---------------------------------------------------------------------------

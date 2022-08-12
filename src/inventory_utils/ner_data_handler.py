@@ -16,7 +16,7 @@ from transformers import (AutoTokenizer, DataCollatorForTokenClassification,
                           PreTrainedTokenizer)
 from transformers.tokenization_utils_base import BatchEncoding
 
-from utils import NER_TAG2ID
+from .constants import NER_TAG2ID
 
 
 # ---------------------------------------------------------------------------

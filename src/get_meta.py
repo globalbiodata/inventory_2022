@@ -15,7 +15,7 @@ import pycountry
 import requests
 from pandas.testing import assert_series_equal
 
-from utils import CustomHelpFormatter
+from inventory_utils.custom_classes import CustomHelpFormatter
 
 
 # ---------------------------------------------------------------------------

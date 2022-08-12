@@ -17,10 +17,13 @@ from tqdm.auto import tqdm
 from transformers import (AutoModelForTokenClassification, get_scheduler,
                           optimization)
 
-from ner_data_handler import RunParams, get_dataloader
-from utils import (ID2NER_TAG, NER_TAG2ID, CustomHelpFormatter, Metrics,
-                   Settings, get_ner_metrics, make_filenames, save_model,
-                   save_train_stats, set_random_seed)
+from inventory_utils.constants import ID2NER_TAG, NER_TAG2ID
+from inventory_utils.custom_classes import (CustomHelpFormatter, Metrics,
+                                            Settings)
+from inventory_utils.filing import make_filenames, save_model, save_train_stats
+from inventory_utils.metrics import get_ner_metrics
+from inventory_utils.ner_data_handler import RunParams, get_dataloader
+from inventory_utils.runtime import set_random_seed
 
 
 # ---------------------------------------------------------------------------
