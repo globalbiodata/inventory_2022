@@ -4,6 +4,7 @@ Authors: Ana-Maria Istrate and Kenneth Schackart
 """
 
 import random
+import sys
 from functools import partial
 from typing import List, NamedTuple, Optional, cast
 
@@ -143,3 +144,8 @@ def test_align_labels_with_tokens() -> None:
     out_labels = [-100, 0, 3, 4, 4, 4, 4, 0, 0, 0, -100]
 
     assert align_labels_with_tokens(in_labels, word_ids) == out_labels
+
+
+# ---------------------------------------------------------------------------
+if __name__ == '__main__':
+    sys.exit('This file is a module, and is not meant to be run.')

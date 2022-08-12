@@ -686,3 +686,8 @@ def save_metrics(metrics: Metrics, filename: str) -> None:
               f'{metrics.f1},{metrics.loss}',
               sep='',
               file=fh)
+
+
+# ---------------------------------------------------------------------------
+if __name__ == '__main__':
+    sys.exit('This file is a module, and is not meant to be run.')

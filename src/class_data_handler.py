@@ -189,3 +189,8 @@ def tokenize_text(text: List, labels: List, class_labels: ClassLabel,
     tokenized_dataset.set_format("torch")
 
     return tokenized_dataset
+
+
+# ---------------------------------------------------------------------------
+if __name__ == '__main__':
+    sys.exit('This file is a module, and is not meant to be run.')
