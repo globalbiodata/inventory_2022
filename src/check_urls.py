@@ -128,7 +128,7 @@ def get_args() -> Args:
         parser.error(f'--backoff ({args.backoff}) must '
                      'be between 0 and 1, inclusive.')
 
-    if not args.num_tries > 0:
+    if not args.num_tries >= 0:
         parser.error(f'--num-tries ({args.num_tries}) must be at least 1')
 
     return Args(args.file, args.out_dir, args.num_tries, args.backoff,
@@ -148,7 +148,7 @@ def get_session(tries: int, backoff: float = 0) -> requests.Session:
     """
 
     session = requests.Session()
-    retry = Retry(connect=tries, backoff_factor=backoff)
+    retry = Retry(total=tries, backoff_factor=backoff)
     adapter = HTTPAdapter(max_retries=retry)
     session.mount('http://', adapter)
     session.mount('https://', adapter)
@@ -166,7 +166,7 @@ def test_get_session() -> None:
     assert isinstance(session.adapters, OrderedDict)
     assert isinstance(session.adapters['http://'], HTTPAdapter)
     assert isinstance(session.adapters['http://'].max_retries, Retry)
-    assert session.adapters['http://'].max_retries.connect == 3
+    assert session.adapters['http://'].max_retries.total == 3
 
 
 # ---------------------------------------------------------------------------
@@ -344,7 +344,6 @@ def query_ip(ip: str, api: str) -> IPLocation:
         return IPLocation('', '', '')
 
     data = cast(dict, r.json())
-
     country = data.get('country', '')
     latitude, longitude = '', ''
 
@@ -357,8 +356,10 @@ def query_ip(ip: str, api: str) -> IPLocation:
         latitude = str(data.get('lat', ''))
         longitude = str(data.get('lon', ''))
 
-    logging.debug('Obtained IP address location: %s', IPLocation.country)
-    return IPLocation(country, latitude, longitude)
+    ip_location = IPLocation(country, latitude, longitude)
+
+    logging.debug('Obtained IP address location: %s', ip_location.country)
+    return ip_location
 
 
 # ---------------------------------------------------------------------------
@@ -388,7 +389,7 @@ def get_location(url: str) -> IPLocation:
         location = query_ip(ip, 'ip-api')
 
     logging.debug('Final location information for %s, %s', ip,
-                  IPLocation.country)
+                  location.country)
     return location
 
 
@@ -637,19 +638,15 @@ def regroup_df(df: pd.DataFrame) -> pd.DataFrame:
     df['extracted_url'] = df['extracted_url'].astype(str)
     df['wayback_url'] = df['wayback_url'].astype(str)
 
-    columns = [
-        col for col in df.columns if col not in [
-            'extracted_url', 'extracted_url_status', 'extracted_url_country',
-            'extracted_url_latitude', 'extracted_url_longitude', 'wayback_url'
-        ]
-    ]
-
     def join_commas(x):
         return ', '.join(x)
 
-    out_df = (df.groupby(columns).agg({
+    out_df = (df.groupby(['ID', 'text']).agg({
         'extracted_url': join_commas,
         'extracted_url_status': join_commas,
+        'extracted_url_country': join_commas,
+        'extracted_url_latitude': join_commas,
+        'extracted_url_longitude': join_commas,
         'wayback_url': join_commas
     }).reset_index())
 
@@ -661,29 +658,38 @@ def test_regroup_df() -> None:
     """ Test regroup_df() """
 
     in_df = pd.DataFrame(
-        [[123, 'Some text', 'https://www.google.com', 200, 'wayback_google'],
-         [123, 'Some text', 'http://google.com', 301, 'no_wayback'],
+        [[
+            123, 'Some text', 'https://www.google.com', 200, 'US', '12', '10',
+            'wayback_google'
+        ],
+         [
+             123, 'Some text', 'http://google.com', 301, 'US', '100', '17',
+             'no_wayback'
+         ],
          [
              789, 'Foo', 'https://www.amazon.com/afbadfbnvbadfbaefbnaegn', 404,
-             'no_wayback'
+             '', '', '', 'no_wayback'
          ]],
         columns=[
             'ID', 'text', 'extracted_url', 'extracted_url_status',
-            'wayback_url'
+            'extracted_url_country', 'extracted_url_latitude',
+            'extracted_url_longitude', 'wayback_url'
         ])
 
     out_df = pd.DataFrame(
         [[
             123, 'Some text', 'https://www.google.com, http://google.com',
-            '200, 301', 'wayback_google, no_wayback'
+            '200, 301', 'US, US', '12, 100', '10, 17',
+            'wayback_google, no_wayback'
         ],
          [
              789, 'Foo', 'https://www.amazon.com/afbadfbnvbadfbaefbnaegn',
-             '404', 'no_wayback'
+             '404', '', '', '', 'no_wayback'
          ]],
         columns=[
             'ID', 'text', 'extracted_url', 'extracted_url_status',
-            'wayback_url'
+            'extracted_url_country', 'extracted_url_latitude',
+            'extracted_url_longitude', 'wayback_url'
         ])
 
     assert_frame_equal(regroup_df(in_df), out_df)
@@ -709,7 +715,11 @@ def main() -> None:
 
     df = expand_url_col(df)
     df = check_urls(df, args.cores, session)
+
+    print(df)
     df = regroup_df(df)
+
+    print(df)
 
     outfile = make_filename(out_dir, args.file.name)
     df.to_csv(outfile, index=False)
