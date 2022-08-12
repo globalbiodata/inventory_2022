@@ -12,7 +12,7 @@ import re
 import socket
 from functools import partial
 from multiprocessing.pool import Pool
-from typing import List, NamedTuple, Optional, TextIO, Union, cast
+from typing import List, NamedTuple, Optional, OrderedDict, TextIO, Union, cast
 
 import pandas as pd
 import pytest
@@ -163,6 +163,10 @@ def test_get_session() -> None:
     session = get_session(3, 0.5)
 
     assert isinstance(session, requests.Session)
+    assert isinstance(session.adapters, OrderedDict)
+    assert isinstance(session.adapters['http://'], HTTPAdapter)
+    assert isinstance(session.adapters['http://'].max_retries, Retry)
+    assert session.adapters['http://'].max_retries.connect == 3
 
 
 # ---------------------------------------------------------------------------
