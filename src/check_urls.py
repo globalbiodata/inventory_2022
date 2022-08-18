@@ -56,14 +56,12 @@ class URLStatus(NamedTuple):
     `url`: URL string
     `status`: URL status or error message from request
     `country`: Geolocated country from IP address
-    `latitude`: Geolocated latitude from IP address
-    `longitude`: Geolocated longitude from IP address
+    `coordinates`: Geolocated coordinates (lan, lon) from IP address
     """
     url: str
     status: Union[str, int]
     country: str
-    latitude: str
-    longitude: str
+    coordinates: str
 
 
 # ---------------------------------------------------------------------------
@@ -72,12 +70,10 @@ class IPLocation(NamedTuple):
     IP address location
 
     `country`: Geolocated country from IP address
-    `latitude`: Geolocated latitude from IP address
-    `longitude`: Geolocated longitude from IP address
+    `coordinates`: Geolocated coordinates (lan, lon) from IP address
     """
     country: str
-    latitude: str
-    longitude: str
+    coordinates: str
 
 
 # ---------------------------------------------------------------------------
@@ -341,7 +337,7 @@ def query_ip(ip: str, api: str) -> IPLocation:
     r = requests.get(query_template.format(ip), verify=True)
 
     if r.status_code != 200:
-        return IPLocation('', '', '')
+        return IPLocation('', '')
 
     data = cast(dict, r.json())
     country = data.get('country', '')
@@ -356,7 +352,8 @@ def query_ip(ip: str, api: str) -> IPLocation:
         latitude = str(data.get('lat', ''))
         longitude = str(data.get('lon', ''))
 
-    ip_location = IPLocation(country, latitude, longitude)
+    coordinates = '(' + latitude + ',' + longitude + ')'
+    ip_location = IPLocation(country, coordinates)
 
     logging.debug('Obtained IP address location: %s', ip_location.country)
     return ip_location
@@ -379,18 +376,24 @@ def get_location(url: str) -> IPLocation:
 
     if not ip:
         logging.debug('IP address for %s could not be determined', url)
-        return IPLocation('', '', '')
+        return IPLocation('', '')
 
     logging.debug('IP address found: %s.', ip)
     logging.debug('Attempting to geolocate IP address.')
     location = query_ip(ip, 'ipinfo')
+    country = location.country
+    coordinates = location.coordinates
 
-    if '' in [location.country, location.latitude, location.longitude]:
+    if '' in [country, coordinates]:
         location = query_ip(ip, 'ip-api')
 
-    logging.debug('Final location information for %s, %s', ip,
-                  location.country)
-    return location
+    # Select non-empty location attributes
+    country = country if country else location.country
+    coordinates = coordinates if coordinates else location.coordinates
+
+    logging.debug('Final location information for %s: %s', ip, country)
+
+    return IPLocation(country, coordinates)
 
 
 # ---------------------------------------------------------------------------
@@ -417,7 +420,7 @@ def check_url(url: str, session: requests.Session) -> URLStatus:
     Return: `URLStatus` object
     """
 
-    location = IPLocation('', '', '')
+    location = IPLocation('', '')
 
     logging.debug('Requesting %s', url)
     status = request_url(url, session)
@@ -426,8 +429,7 @@ def check_url(url: str, session: requests.Session) -> URLStatus:
     if isinstance(status, int) and status < 400:
         location = get_location(url)
 
-    return URLStatus(url, status, location.country, location.latitude,
-                     location.longitude)
+    return URLStatus(url, status, location.country, location.coordinates)
 
 
 # ---------------------------------------------------------------------------
@@ -475,8 +477,7 @@ def merge_url_statuses(df: pd.DataFrame,
         x.url: {
             'status': x.status,
             'country': x.country,
-            'latitude': x.latitude,
-            'longitude': x.longitude
+            'coordinates': x.coordinates
         }
         for x in url_statuses
     }
@@ -485,10 +486,8 @@ def merge_url_statuses(df: pd.DataFrame,
         lambda x: url_dict[x]['status'])
     df['extracted_url_country'] = df['extracted_url'].map(
         lambda x: url_dict[x]['country'])
-    df['extracted_url_latitude'] = df['extracted_url'].map(
-        lambda x: url_dict[x]['latitude'])
-    df['extracted_url_longitude'] = df['extracted_url'].map(
-        lambda x: url_dict[x]['longitude'])
+    df['extracted_url_coordinates'] = df['extracted_url'].map(
+        lambda x: url_dict[x]['coordinates'])
 
     return df
 
@@ -502,20 +501,19 @@ def test_merge_url_statuses() -> None:
                          columns=['ID', 'text', 'extracted_url'])
 
     statuses = [
-        URLStatus('http://google.com', 301, '', '', ''),
-        URLStatus('https://www.google.com', 200, 'United States', '34.0522',
-                  '-118.2437')
+        URLStatus('http://google.com', 301, '', ''),
+        URLStatus('https://www.google.com', 200, 'United States',
+                  '(34.0522,-118.2437)')
     ]
 
     out_df = pd.DataFrame([[
         123, 'Some text', 'https://www.google.com', 200, 'United States',
-        '34.0522', '-118.2437'
-    ], [456, 'More text', 'http://google.com', 301, '', '', '']],
+        '(34.0522,-118.2437)'
+    ], [456, 'More text', 'http://google.com', 301, '', '']],
                           columns=[
                               'ID', 'text', 'extracted_url',
                               'extracted_url_status', 'extracted_url_country',
-                              'extracted_url_latitude',
-                              'extracted_url_longitude'
+                              'extracted_url_coordinates'
                           ])
 
     assert_frame_equal(merge_url_statuses(in_df, statuses), out_df)
@@ -617,8 +615,7 @@ def test_check_urls(testing_session: requests.Session) -> None:
     # Correct columns
     assert all(x == y for x, y in zip(returned_df.columns, [
         'ID', 'text', 'extracted_url', 'extracted_url_status',
-        'extracted_url_country', 'extracted_url_latitude',
-        'extracted_url_longitude', 'wayback_url'
+        'extracted_url_country', 'extracted_url_coordinates', 'wayback_url'
     ]))
 
 
@@ -642,11 +639,14 @@ def regroup_df(df: pd.DataFrame) -> pd.DataFrame:
         return ', '.join(x)
 
     out_df = (df.groupby(['ID', 'text']).agg({
+        'common_name': 'first',
+        'common_prob': 'first',
+        'full_name': 'first',
+        'full_prob': 'first',
         'extracted_url': join_commas,
         'extracted_url_status': join_commas,
         'extracted_url_country': join_commas,
-        'extracted_url_latitude': join_commas,
-        'extracted_url_longitude': join_commas,
+        'extracted_url_coordinates': join_commas,
         'wayback_url': join_commas
     }).reset_index())
 
@@ -659,37 +659,39 @@ def test_regroup_df() -> None:
 
     in_df = pd.DataFrame(
         [[
-            123, 'Some text', 'https://www.google.com', 200, 'US', '12', '10',
-            'wayback_google'
+            123, 'Some text', 'google', 0.99, '', '', 'https://www.google.com',
+            200, 'US', '(12,10)', 'wayback_google'
         ],
          [
-             123, 'Some text', 'http://google.com', 301, 'US', '100', '17',
-             'no_wayback'
+             123, 'Some text', 'google', 0.99, '', '', 'http://google.com',
+             301, 'US', '(100,17)', 'no_wayback'
          ],
          [
-             789, 'Foo', 'https://www.amazon.com/afbadfbnvbadfbaefbnaegn', 404,
-             '', '', '', 'no_wayback'
+             789, 'Foo', 'amazon', 0.87, 'The Amazon', 0.65,
+             'https://www.amazon.com/afbadfbnvbadfbaefbnaegn', 404, '', '',
+             'no_wayback'
          ]],
         columns=[
-            'ID', 'text', 'extracted_url', 'extracted_url_status',
-            'extracted_url_country', 'extracted_url_latitude',
-            'extracted_url_longitude', 'wayback_url'
+            'ID', 'text', 'common_name', 'common_prob', 'full_name',
+            'full_prob', 'extracted_url', 'extracted_url_status',
+            'extracted_url_country', 'extracted_url_coordinates', 'wayback_url'
         ])
 
     out_df = pd.DataFrame(
         [[
-            123, 'Some text', 'https://www.google.com, http://google.com',
-            '200, 301', 'US, US', '12, 100', '10, 17',
-            'wayback_google, no_wayback'
+            123, 'Some text', 'google', 0.99, '', '',
+            'https://www.google.com, http://google.com', '200, 301', 'US, US',
+            '(12,10), (100,17)', 'wayback_google, no_wayback'
         ],
          [
-             789, 'Foo', 'https://www.amazon.com/afbadfbnvbadfbaefbnaegn',
-             '404', '', '', '', 'no_wayback'
+             789, 'Foo', 'amazon', 0.87, 'The Amazon', 0.65,
+             'https://www.amazon.com/afbadfbnvbadfbaefbnaegn', '404', '', '',
+             'no_wayback'
          ]],
         columns=[
-            'ID', 'text', 'extracted_url', 'extracted_url_status',
-            'extracted_url_country', 'extracted_url_latitude',
-            'extracted_url_longitude', 'wayback_url'
+            'ID', 'text', 'common_name', 'common_prob', 'full_name',
+            'full_prob', 'extracted_url', 'extracted_url_status',
+            'extracted_url_country', 'extracted_url_coordinates', 'wayback_url'
         ])
 
     assert_frame_equal(regroup_df(in_df), out_df)
