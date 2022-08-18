@@ -3,7 +3,7 @@ include: "shared_rules.smk"
 
 rule all:
     input:
-        config["extract_url_dir"] + "/predictions.csv",
+        config["check_url_dir"] + "/predictions.csv",
 
 
 # Run EuropePMC query with new dates
