@@ -62,3 +62,19 @@ rule extract_urls:
             -o {params.out_dir} \
             {input}
         """
+
+
+# Check URL status, get locations, and check for Wayback Snapshot
+rule check_urls:
+    input:
+        config["extract_url_dir"] + "/predictions.csv",
+    output:
+        config["check_url_dir"] + "/predictions.csv",
+    params:
+        out_dir=config["url_chec_dir"],
+    shell:
+        """
+        python3 src/check_urls.py \
+            -o {params.out_dir} \
+            {input}
+        """
