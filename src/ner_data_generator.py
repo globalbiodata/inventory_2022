@@ -16,8 +16,9 @@ from numpy.core.numeric import NaN
 from pandas._testing.asserters import assert_series_equal
 from pandas.testing import assert_frame_equal
 
-from utils import (CustomHelpFormatter, concat_title_abstract, split_df,
-                   strip_xml)
+from inventory_utils.custom_classes import CustomHelpFormatter
+from inventory_utils.wrangling import (concat_title_abstract, split_df,
+                                       strip_xml)
 
 
 # ---------------------------------------------------------------------------

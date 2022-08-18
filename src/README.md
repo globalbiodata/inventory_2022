@@ -1,31 +1,28 @@
 # Overview
 
-This directory contains the source code used in this project. The process for both article classification and NER are very similar, so those steps for each process are described together.
+This directory contains the source code used in this project.
 
-These scripts are modules, and are not to be executed:
-* `class_data_handler.py`
-* `ner_data_handler.py`
-* `utils.py`
-
-The following are executable Python scripts:
-* `class_data_generator.py`
-* `class_predict.py`
-* `class_train.py`
-* `model_picker.py`
-* `ner_data_generator.py`
-* `ner_predict.py`
-* `ner_train.py`
-* `url_extractor.py`
-* `class_predict.py`
-* `query_epmc.py`
-* `utils.py`
+```sh
+.
+├── inventory_utils/         # Modules used in the project
+├── check_urls.py            # Gather information from URLs
+├── class_data_generator.py  # Prepare and split classification data
+├── class_predict.py         # Use trained model to predict classification
+├── class_train.py           # Train classifier
+├── model_picker.py          # Select best trained model
+├── ner_data_generator.py    # Prepare and split NER data
+├── ner_predict.py           # Use trained model to perform NER
+├── ner_train.py             # Train NER model
+├── url_extractor.py         # Extract URLs from text
+└── query_epmc.py            # Query EuropePMC
+```
 
 ## Accessing Help
 
 Each of the executable scripts listed above will respond to the `-h` or `--help` flag by providing a usage statement.
 
 For example:
-```
+```sh
 $ url_extractor.py --help
 usage: url_extractor.py [-h] [-o DIR] FILE
 
@@ -96,11 +93,10 @@ Once training is complete, two outputs are created in `--out-dir`:
 
 `model_picker.py`
 
-Once all models that are to be compared have finished training, `model_picker.py` takes all the `train_stats.csv` files as input in order to select the one with the highest validation *F*1 score.
+Once all models that are to be compared have finished training, `model_picker.py` takes all the model checkpoint files as input in order to select the one with the highest validation score. Which metric to use for choosing the best model is passed in as `-m|--metric`.
 
-Two outputs are created in `--out-dir`:
-* `{best_model_name}/best_checkpt.pt`: Checkpoint of best model (copied from its original location)
-* `{best_model_name}/combined_stats.csv`: File with training stats for each epoch of every model compared
+One output is created in `--out-dir`:
+* best_checkpt.txt`: Text file containing locations of best model checkpoint.
 
 # Model evaluation
 
@@ -125,6 +121,28 @@ Once classification and NER have been performed, other information can be gather
 
 `url_extractor.py` is used to extract all unique URLs from the "text" (title + abstract). This is done using a regular expression.
 
+## Checking URLs
+
+`check_urls.py` checks each extracted URL by submitting a request. The status of the request (either a status code or the returned error message if an exception occurs) is recorded in a new column labeled extracted_url_status.
+
+The number of attempts to request the URL can be modified with the `-n|--num-tries` flag. To avoid exceeding the allowable number of attempts in a certain period of time, the `-b|--backoff` flag is used, where 0 adds no wait time and 1 adds the most wait time.
+
+Additionally, for URLs that return a status less than 400, various APIs are queried attempting to obtain the geolocation of the IP address which responded to the request. From this, the country and lat, lon coordinates are recorded.
+
+Then, each URL is submitted to [Internet Archive WaybackMachine](https://archive.org/help/wayback_api.php) to see if there exists an archived snapshot of the given URL. If so, this is marked as the checked URL.
+
+Since this process can take quite a while, it is implemented to allow for asynchronous parallelization. Each core supplied can submit a request at the same time, and as soon as one core finishes, it submits another. By default all available cores are used, but the desired number of cores can be specified with the `-c|--cores` flag.
+
+Additionally, a `-v|--verbose` flag is available for debugging.
+
+*Note* Actual wait time is calculated as
+
+```
+{backoff factor} * (2 ** ({number of total retries} - 1))
+```
+
+So with a back off factor of 0.1, it will sleep for [0.0s, 0.2s, 0.4s, ...]. More information can be found in the [urllib3 documentation](https://urllib3.readthedocs.io/en/latest/reference/urllib3.util.html#module-urllib3.util.retry)
+
 # Manual Workflow Examples
 
 Here, you can find an example of how to run the entire workflow(s) manually from the command-line. This should not be necessary, since there are Snakemake pipelines to automate, and notebooks to guide, the process (see [../README.md](../README.md)). What is shown here is essentially what is run by the Snakemake pipelines. This may be useful for debugging.
@@ -136,7 +154,7 @@ Here, you can find an example of how to run the entire workflow(s) manually from
 ### Data Splitting
 
 First, split the manually curated datasets. We will split into 80% training, 10% validation, 10% test. A random seed is used to ensure that the splits are the same each time this step is run. The choice of output directoriy is arbitrary. In these examples I will follow the schemes used in the Snakemake pipelines.
-```
+```sh
 $ python3 src/class_data_generator.py \
     --out-dir out/classif_splits \
     --splits 0.8 0.1 0.1 \
@@ -153,13 +171,13 @@ Done. Wrote 6 files to out/ner_splits.
 ```
 
 3 files are created by `class_data_generator.py`, each is a .csv file of the corresponding dataset split. 
-```
+```sh
 $ ls out/classif_splits
 test_paper_classif.csv  train_paper_classif.csv  val_paper_classif.csv
 ```
 
 `ner_data_generator.py` creates 6 files. For each split, 2 files are created: a .csv file and .pkl file. The .pkl file is created because that is the input to the NER training. pkl is a Python Pickle file, which is essentially a way of directly storing a Python object. By storing the object directly, it simplifies reading in the tokenized and annotated data for training.
-```
+```sh
 $ ls out/ner_splits
 test_ner.csv  test_ner.pkl  train_ner.csv  train_ner.pkl  val_ner.csv  val_ner.pkl
 ```
@@ -171,7 +189,7 @@ Now, training can be performed. For the original project, 15 models were trained
 During training, several messages will be output to the terminal. They are ommitted here.
 
 First, training the paper classifier:
-```
+```sh
 $ python3 src/class_train.py \
     --train-file out/classif_splits/train_paper_classif.csv \
     --val-file out/classif_splits/val_paper_classif.csv \
@@ -195,14 +213,14 @@ $ python3 src/class_train.py \
     --seed
 ```
 
-After training, two files are created. The model checkpoint, which contains the trained model, and a .csv file of the performance metrics on the training and validation sets for each epoch of training. The best performing model checkpoint is saved, even if at later epochs the performance drops.
-```
+After training, two files are created. The model checkpoint, which contains the trained model (along with training metrics), and a .csv file of the performance metrics on the training and validation sets for each epoch of training. The best performing model checkpoint is saved, even if at later epochs the performance drops.
+```sh
 $ ls out/classif_train_out/bert
 checkpt.pt  train_stats.csv
 ```
 
 Then triaining the NER model:
-```
+```sh
 $ python3 src/ner_train.py \
     --train-file out/ner_splits/train_ner.pkl \
     --val-file out/ner_splits/val_ner.pkl \
@@ -228,98 +246,135 @@ $ python3 src/ner_train.py \
 
 ### Model Comparison
 
-The same program is used to choose both the best classification and NER model. It takes any number of training stats csv files as input.
+The same program is used to choose both the best classification and NER model. It takes any number of model checkpoints as input.
 
-This program assumes that the model checkpoint file is in the same directory as the training stats file. This is how the training script outputs, so as long as nothing is moved manually, this assumption is met.
-```
+```sh
 $ python3 src/model_picker.py \
     --out-dir out/classif_train_out/best \
-    out/classif_train_out/*/train_stats.csv
+    out/classif_train_out/*/checkpt.pt
 Checkpoint of best model is out/classif_train_out/biomed_roberta/checkpt.pt
-Done. Wrote combined stats file and best model checkpoint to out/classif_train_out/bestbiomed_roberta/
+Done. Wrote output to out/classif_train_out/best/best_checkpt.txt
 
 $ python3 src/model_picker.py \
     --out-dir out/ner_train_out/best \
-    out/ner_train_out/*/train_stats.csv
+    out/ner_train_out/*/checkpt.pt
 Checkpoint of best model is out/ner_train_out/biomed_roberta/checkpt.pt
-Done. Wrote combined stats file and best model checkpoint to out/ner_train_out/bestbiomed_roberta/
+Done. Wrote output to out/ner_train_out/best/best_checkpt.txt
 ```
 
-This creates a folder in the output directory reflecting the name of the best model. Inside that folder, 2 outputs are placed: the model checkpoint of the best model, and a file containing the per-epoch training metrics of all the models compared (essentially concatenating all the input file contents)
-```
+This creates a text file in the output directory which contains the path of the best model checkpoint.
+```sh
 $ ls out/classif_train_out/best
-biomed_roberta/
+best_checkpt.txt
 
-$ ls out/classif_train_out/best/biomed_roberta
-best_checkpt.pt  combined_stats.csv
+$ ls out/classif_train_out/best
+best_checkpt.txt
 ```
 
 ### Model Evaluation
 
 To estimate how the model will perform on the full dataset and in future runs, the best model is evaluated on the held-out test set. Since the model has not yet seen these data at all, it acts as a representative of new incoming data.
 
-```
-$ python3 src/class_final_eval.py \
-    --out-dir out/classif_train_out/best/biomed_roberta/test_set_eval \
+You can manually supply the path to the best model checkpoint as indicated in the above steps, or just `cat` the contents of the `best_checkpt.txt` file and pipe that into the evaluation command using `/dev/stdin` as shown below.
+
+```sh
+$ cat out/classif_train_out/best/best_checkpt.txt | \
+  python3 src/class_final_eval.py \
+    --out-dir out/classif_train_out/best/test_set_evaluation \
     --test-file out/classif_splits/test_paper_classif.csv \
-    --checkpoint out/classif_train_out/best/biomed_roberta/best_checkpt.pt
-Done. Wrote output to out/classif_train_out/best/biomed_roberta/test_set_eval/.
+    --checkpoint /dev/stdin
+Done. Wrote output to out/classif_train_out/best/test_set_evaluation/.
 
-$ python3 src/ner_final_eval.py \
-    --out-dir out/ner_train_out/best/biomed_roberta/test_set_eval \
+$ cat out/ner_train_out/best/best_checkpt.txt | \
+  python3 src/ner_final_eval.py \
+    --out-dir out/ner_train_out/best/test_set_evaluation \
     --test-file out/ner_splits/test_ner.pkl \
-    --checkpoint out/ner_train_out/best/biomed_roberta/best_checkpt.pt
-Done. Wrote output to out/ner_train_out/best/biomed_roberta/test_set_eval/.
+    --checkpoint /dev/stdin
+Done. Wrote output to out/ner_train_out/best/test_set_evaluation.
 
-$ ls out/ner_train_out/best/biomed_roberta/test_set_eval/
+$ ls out/ner_train_out/best/test_set_evaluation
 metrics.csv
 ```
 
-### Predicting on Full Corpus
+### Performing Query
+
+To get the full list of papers that we will assess, we can obtain the original query. Note that if papers are added retroactively, the yield of this query may change in the future, but should be largely the same.
+
+```sh
+$ python3 src/query_epmc.csv \
+    --out-dir out/original_query \
+    --from-date 2011 \
+    --to-date 2021 \
+    config/query.txt
+Done. Wrote 2 files to out/original_query
+```
+
+2 Files are written to the output directory. One is the results of the query, the other is a text fle containing today's date
+
+```sh
+$ ls out/original_query
+last_query_date.txt  query_results.csv
+```
+
+In order to always have the last query date text file in a known place, copy it over. That way, we can always pass in the file out/last_query_date/last_suery_date.txt when updating the inventory.
+```sh
+$ cp out/original_query/last_query_date.txt out/last_query_date/
+```
+
+### Predicting on Full Query Results
 
 Now, we have the best trained models, and an indication of how they will perform on new data, so we can run them on the original full corpus.
 
 First, run classification
-```
-$ python3 src/class_predict.py \
-    --out-dir data/full_corpus_predictions/classification \
-    --checkpoint out/classif_train_out/best/biomed_roberta/best_checkpt.pt \
-    --input-file data/full_corpus.csv
+```sh
+$ cat out/classif_train_out/best/best_checkpt.txt | \
+  python3 src/class_predict.py \
+    --out-dir out/original_query/classification \
+    --input-file out/original_query/query_results.csv \
+    --checkpoint /dev/stdin
 
-$ ls data/full_corpus_predictions/classification
+$ ls out/original_query/classification
 predictions.csv
 ```
 
 Filter to include only those papers predicted to describe biodata resources. This can be done with `grep -v` to get lines not containing the negative label.
-```
+```sh
 $ grep -v 'not-bio-resource' \
-    data/full_corpus_predictions/classification/predictions.csv \
-    > data/full_corpus_predictions/classification/predicted_positives.csv
+    out/original_query/classification/predictions.csv \
+    > out/original_query/classification/predicted_positives.csv
 ```
 
 Run NER on the predicted positives
-```
-$ python3 src/ner_predict.py \
-    --out-dir data/full_corpus_predictions/ner \
-    --checkpoint out/ner_train_out/best/biomed_roberta/best_checkpt.pt \
-    --input-file data/full_corpus_predictions/classification/predicted_positives.csv
+```sh
+$ cat out/ner_train_out/best/best_checkpt.txt | \
+  python3 src/ner_predict.py \
+    --out-dir out/original_query/ner \
+    --input-file out/original_query/classification/predicted_positives.csv \
+    --checkpoint /dev/stdin
 
-$ ls data/full_corpus_predictions/ner
+$ ls out/original_query/ner
 predictions.csv
 ```
 
 Extract URLs
-```
+```sh
 $ python3 src/url_extractor.py \
-    --out-dir data/full_corpus_predictions/urls \
-    data/full_corpus_predictions/ner/predictions.csv
+    --out-dir out/original_query/urls \
+    out/original_query/ner/predictions.csv
+```
+
+Check URLs
+```sh
+$ python3 src/check_urls.py \
+    --out-dir out/original_query/check_urls \
+    out/original_query/urls/predictions.csv
 ```
 
 Get other metadata from EuropePMC query
-```
+```sh
 $ python3 src/get_meta.py \
-    --out-dir data/full_corpus_predictions/meta \
-    data/full_corpus_predictions/urls/predictions.csv
+    --out-dir out/original_query/meta \
+    out/original_query/check_urls/predictions.csv
 ```
 
 ## Updating the Inventory
@@ -328,79 +383,72 @@ These commands do not have to be run manually, since there are Snakemake pipelin
 
 ### Query EuropePMC
 
-If this is the first time updating the inventory, the `--from-date` must be supplied manually. Here, I will use the last date from the original inventory.
-```
+If this is the first time updating the inventory, the `--from-date` must be supplied manually. Here, I will use the last date from the original inventory. Otherwise, you can use the file resulting from the last run.
+```sh
 $ python3 src/query_epmc.py
-    --out-dir data \
-    --from-date 2021 \
+    --out-dir out/new_query \
+    --from-date out/last_query_date/last_query_date.txt \
     config/query.txt
+Done. Wrote 2 files to out/new_query
+
+$ cp out/new_query/last_query_date.txt out/last_query_date/
 ```
 
-Two files are output to `--out-dir`: `last_query_date.txt` and `new_query_results.csv`. The former is then used in the next query. In the above step, the file `data/last_query_date.txt` could have been created manually and filled in with the desired date.
-```
-$ python3 src/query_epmc.py
-    --out-dir data \
-    --from-date data/last_query_date.txt \
-    config/query.txt
-```
+Two files are output to `--out-dir`: `last_query_date.txt` and `new_query_results.csv`. The former is then used in the next query.
 
 ### Obtain models
 
 If the best trained models are not present in `out/classif_train_out/best/` and `out/ner_train_out/best/`, then they can be downloaded using the following command.
 
-```
+```sh
 # command to get models
 ```
 
 ### Perform predictions and get other information
 
-*Note*: There should only be one file matching each pattern `out/classif_train_out/best/*/best_checkpt.pt` and `out/ner_train_out/best/*/best_checkpt.pt`
-
-To check that this is true, run:
-```
-$ ls out/classif_train_out/best/*/best_checkpt.pt
-out/classif_train_out/best/biomed_roberta/best_checkpt.pt # Single match
-
-$ ls out/ner_train_out/best/*/best_checkpt.pt
-out/ner_train_out/best/biomed_roberta/best_checkpt.pt # Single match
-```
-
-If multiple files are returned remove the one with lower performance
-
 Classify the new results:
-```
-$ python3 src/class_predict.py \
-    --out-dir data/new_paper_predictions/classification \
-    --checkpoint out/classif_train_out/best/*/best_checkpt.pt \
-    --input-file data/new_query_results.csv
+```sh
+$ cat out/classif_train_out/best/best_checkpt.txt | \
+  python3 src/class_predict.py \
+    --out-dir out/new_query/classification \
+    --input-file out/new_query/new_query_results.csv \
+    --checkpoint /dev/stdin
 ```
 
 Filter to include only those papers predicted to describe biodata resources.
-```
+```sh
 $ grep -v 'not-bio-resource' \
-    data/new_paper_predictions/classification/predictions.csv \
-    > data/new_paper_predictions/classification/predicted_positives.csv
+    out/new_query/classification/predictions.csv \
+    > out/new_query/classification/predicted_positives.csv
 ```
 
 Run NER on the predicted positives
-```
-$ python3 src/ner_predict.py \
-    --out-dir data/new_paper_predictions/ner \
-    --checkpoint out/ner_train_out/best/*/best_checkpt.pt \
-    --input-file data/new_paper_predictions/classification/predicted_positives.csv
+```sh
+$ cat out/ner_train_out/best/best_checkpt.txt | \
+  python3 src/ner_predict.py \
+    --out-dir out/new_query/ner \
+    --input-file out/new_query/classification/predicted_positives.csv \
+    --checkpoint /dev/stdin
 ```
 
 Extract URLs
-```
+```sh
 $ python3 src/url_extractor.py \
-    --out-dir data/new_paper_predictions/urls \
-    data/new_paper_predictions/ner/predictions.csv
+    --out-dir out/new_query/urls \
+    out/new_query/ner/predictions.csv
+```
+
+Check URLs
+```sh
+$ python3 src/check_urls.py \
+    --out-dir out/new_query/check_urls \
+    out/new_query/urls/predictions.csv
 ```
 
 Get other metadata from EuropePMC query
-```
+```sh
 $ python3 src/get_meta.py \
-    --out-dir data/new_paper_predictions/meta \
-    data/new_paper_predictions/urls/predictions.csv
+    --out-dir out/new_query/meta \
+    out/new_query/check_urls/predictions.csv
 ```
 

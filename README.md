@@ -86,10 +86,11 @@ graph TD
 
 # Repository Structure
 
-```
+```sh
 .
 ├── config/          # Workflow configuration files
 ├── data/            # Manual curation files and data splits
+├── snakemake/       # Snakemake pipelines and rules
 ├── src/             # Python scripts
 ├── tests/           # pytest scripts
 ├── .gitignore
@@ -98,8 +99,6 @@ graph TD
 ├── README.md
 ├── requirements.txt
 ├── running_pipeline.ipynb
-├── train_predict.smk
-├── update_inventory.smk
 └── updating_inventory.ipynb
 ```
 
@@ -111,7 +110,7 @@ There are several ways to install the dependencies for this workflow.
 
 If installing with pip, ensure you have Python version 3.8. Older or newer versions may not work.
 
-```
+```sh
 $ python3 --version
 Python 3.8.12
 ```
@@ -120,19 +119,19 @@ Then you can install Python dependencies using pip.
 
 A make command is available for installing dependencies.
 
-```
+```sh
 $ make setup
 ```
 
 Alternatively, to install them manually:
 
-```
+```sh
 $ pip install -r requirements.txt
 ```
 
 Then download punkt:
 
-```
+```python
 $ python3
 >>> import nltk
 >>> nltk.download('punkt')
@@ -141,20 +140,20 @@ $ python3
 ## Anaconda
 
 To create the environment in your `$HOME` directory, run:
-```
+```sh
 $ conda env create -f config/environment.yml
 $ conda activate inventory_env
 ```
 
 Or you can create the environment in this repository by running:
-```
+```sh
 $ conda env create -f config/environment.yml -p ./env
 $ conda activate ./env
 ```
 
 Then download punkt:
 
-```
+```python
 $ python3
 >>> import nltk
 >>> nltk.download('punkt')
@@ -164,7 +163,7 @@ $ python3
 
 A full test suite is included to help ensure that everything is running as expected. To run the full test suite, run:
 
-```
+```sh
 $ make test
 ```
 
@@ -173,7 +172,7 @@ $ make test
 ## Dry run
 
 To see what steps would be run in the workflow, a dry run can be run:
-```
+```sh
 $ make dryrun_reproduction
 ```
 
@@ -182,48 +181,47 @@ $ make dryrun_reproduction
 To run the pipeline from a notebook in Colab, follow the steps in [running_pipeline.ipynb](running_pipeline.ipynb).
 
 Alternatively, to run the pipeline from the command-line, run:
-```
+```sh
 $ make train_and_predict
 ```
 
 If Make is unavailable, run
-```
-$ snakemake -s train_predict.smk --configfile config/config.yml -c1
+```sh
+$ snakemake -s snakemake/train_predict.smk --configfile config/train_predict.yml -c1
 ```
 
 The above commands run the Snakemake pipeline. If you wish to run the steps manually, see [src/README.md](src/README.md#training-and-prediction).
 
 ## Updating the inventory
 
-Before running the automated pipelines, if there is not a file `data/last_query_date.txt`, it must first be created. In that file place the date at which you want the query to begin (should align with date of last query).
+Before running the automated pipelines, if there is not a file `out/last_query_date/last_query_date.txt`, it must first be created. In that file place the date at which you want the query to begin (should align with date of last query).
 
-*Note*: There should only be one file matching each pattern `out/classif_train_out/best/*/best_checkpt.pt` and `out/ner_train_out/best/*/best_checkpt.pt`
+*Note*: There should only be one file matching each pattern `out/classif_train_out/best/best_checkpt.txt` and `out/ner_train_out/best/best_checkpt.txt`
 
 To run the pipeline from a notebook in Colab, follow the steps in [updating_inventory.ipynb](updating_inventory.ipynb). To run from the command line, follow these steps.
 
-First, make sure that the trained classifier and NER models are present at `out/classif_train_out/best/*/best_checkpt.pt` and `out/ner_train_out/best/*/best_checkpt.pt`.
+First, make sure that the trained classifier and NER models are present at `out/classif_train_out/best/best_checkpt.txt` and `out/ner_train_out/best/best_checkpt.txt`.
 
 If you do not have trained models, and do not want to perform training, they can be downloaded with:
-```
+```sh
 # Add code here for getting models!
 ```
 
 Next, **make sure that output from previous updates have been saved elsewhere, as the old results must be deleted**.
 
 To remove the outputs of previous run:
-```
-$ rm data/new_query_results.csv
-$ rm -rf data/new_paper_predictions/
+```sh
+$ rm -rf out/new_query
 ```
 
 Then the pipeline for updating results can be run:
-```
+```sh
 $ make update_inventory
 ```
 
 If Make is unavailable, run
-```
-$ snakemake -s update_inventory.smk --configfile config/config.yml -c1
+```sh
+$ snakemake -s snakemake/update_inventory.smk --configfile config/update_inventory.yml -c1
 ```
 
 The above commands run the Snakemake pipeline. If you wish to run the steps manually, see [src/README.md](src/README.md#updating-the-inventory).
@@ -232,7 +230,7 @@ The above commands run the Snakemake pipeline. If you wish to run the steps manu
 
 The Snakemake pipelines are built such that they capture the workflow logic, while all configurations are stored separately. This makes it possible to adjust the workflows without changing source code or the Snakemake pipelines.
 
-Most of the configurations are stored in [config/config.yml](config/config.yml) such as train/validation/split ratios and output directories.
+Configurations for reproducing original results are in [config/train_predict.yml](config/train_predict.yml) such as train/validation/split ratios and output directories. Configurations for updating the inventory are in [config/update_inventory.yml](config/update_inventory.yml).
 
 Configurations regarding model training parameters are stored in [config/models_info.tsv](config/models_info.tsv), such as number of epochs, and convenient model names as well as official HuggingFace model names.
 

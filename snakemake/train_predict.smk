@@ -1,5 +1,9 @@
 import pandas as pd
 
+
+include: "shared_rules.smk"
+
+
 # Import tab separated file containing the configurations
 # used for training each model.
 model_df = pd.read_table(config["models"]).set_index("model", drop=True)
@@ -8,9 +12,7 @@ model_df = model_df.fillna("")
 
 rule all:
     input:
-        "data/full_corpus_predictions/predicted_positives.csv",
-        "data/full_corpus_predictions/ner/predictions.csv",
-        "data/full_corpus_predictions/urls/predictions.csv",
+        config["extract_url_dir"] + "/predictions.csv",
         config["classif_train_outdir"] + "/best/test_set_evaluation/metrics.csv",
         config["ner_train_outdir"] + "/best/test_set_evaluation/metrics.csv",
 
@@ -18,10 +20,11 @@ rule all:
 # Run EruopePMC query
 rule query_epmc:
     output:
-        query=config["full_corpus"],
-        last_date="data/last_query_date.txt",
+        query_results=config["query_out_dir"] + "/query_results.csv",
+        date_file1=config["query_out_dir"] + "/last_query_date.txt",
+        date_file2=config["last_date_dir"] + "/last_query_date.txt",
     params:
-        out_dir="data",
+        out_dir=config["query_out_dir"],
         begin_date=config["initial_query_start"],
         end_date=config["initial_query_end"],
         query=config["query_string"],
@@ -33,7 +36,7 @@ rule query_epmc:
             --to-date {params.end_date} \
             {params.query}
 
-        mv {params.out_dir}/new_query_results.csv {output.query}
+        cp {output.date_file1} {output.date_file2}
         """
 
 
@@ -68,6 +71,7 @@ rule train_classif:
         config["classif_train_outdir"] + "/{model}/train_stats.csv",
     params:
         out_dir=config["classif_train_outdir"] + "/{model}",
+        metric=config["class_criteria_metric"],
         epochs=config["classif_epochs"],
         hf_model=lambda w: model_df.loc[w.model, "hf_name"],
         batch_size=lambda w: model_df.loc[w.model, "batch_size"],
@@ -81,6 +85,7 @@ rule train_classif:
     shell:
         """
         (python3 src/class_train.py \
+            -c {params.metric} \
             -m {params.hf_model} \
             -ne {params.epochs} \
             -t {input.train} \
@@ -99,24 +104,20 @@ rule train_classif:
 rule find_best_classifier:
     input:
         expand(
-            "{d}/{model}/train_stats.csv",
+            "{d}/{model}/checkpt.pt",
             d=config["classif_train_outdir"],
             model=model_df.index,
         ),
     output:
-        dynamic(
-            config["classif_train_outdir"] + "/best/{best_classifier}/best_checkpt.pt"
-        ),
-        dynamic(
-            config["classif_train_outdir"]
-            + "/best/{best_classifier}/combined_stats.csv"
-        ),
+        config["classif_train_outdir"] + "/best/best_checkpt.txt",
     params:
         out_dir=config["classif_train_outdir"] + "/best",
+        metric=config["class_criteria_metric"],
     shell:
         """
         python3 src/model_picker.py \
             -o {params.out_dir} \
+            -m {params.metric} \
             {input}
         """
 
@@ -125,51 +126,18 @@ rule find_best_classifier:
 rule evaluate_best_classifier:
     input:
         infile=config["classif_splits_dir"] + "/test_paper_classif.csv",
-        model=dynamic(
-            config["classif_train_outdir"] + "/best/{best_classifier}/best_checkpt.pt"
-        ),
+        model=config["classif_train_outdir"] + "/best/best_checkpt.txt",
     output:
         config["classif_train_outdir"] + "/best/test_set_evaluation/metrics.csv",
     params:
         outdir=config["classif_train_outdir"] + "/best/test_set_evaluation",
     shell:
         """
+        cat {input.model} | \
         python3 src/class_final_eval.py \
             -o {params.outdir} \
             -t {input.infile} \
-            -c {input.model}
-        """
-
-
-# Predict classification of entire corpus
-rule classify_full_corpus:
-    input:
-        classifier=dynamic(
-            config["classif_train_outdir"] + "/best/{best_classifier}/best_checkpt.pt"
-        ),
-        infile=config["full_corpus"],
-    output:
-        "data/full_corpus_predictions/classification/predictions.csv",
-    params:
-        out_dir="data/full_corpus_predictions/classification",
-    shell:
-        """
-        python3 src/class_predict.py \
-            -o {params.out_dir} \
-            -c {input.classifier} \
-            -i {input.infile}
-        """
-
-
-# Filter out only predicted biodata resources
-rule filter_positives:
-    input:
-        "data/full_corpus_predictions/classification/predictions.csv",
-    output:
-        "data/full_corpus_predictions/classification/predicted_positives.csv",
-    shell:
-        """
-        grep -v 'not-bio-resource' {input} > {output}
+            -c /dev/stdin
         """
 
 
@@ -207,6 +175,7 @@ rule train_ner:
         config["ner_train_outdir"] + "/{model}/train_stats.csv",
     params:
         out_dir=config["ner_train_outdir"] + "/{model}",
+        metric=config["ner_criteria_metric"],
         epochs=config["ner_epochs"],
         hf_model=lambda w: model_df.loc[w.model, "hf_name"],
         batch_size=lambda w: model_df.loc[w.model, "batch_size"],
@@ -220,6 +189,7 @@ rule train_ner:
     shell:
         """
         (python3 src/ner_train.py \
+            -c {params.metric} \
             -m {params.hf_model} \
             -ne {params.epochs} \
             -t {input.train} \
@@ -243,14 +213,15 @@ rule find_best_ner:
             model=model_df.index,
         ),
     output:
-        dynamic(config["ner_train_outdir"] + "/best/{best_ner}/best_checkpt.pt"),
-        dynamic(config["ner_train_outdir"] + "/best/{best_ner}/combined_stats.csv"),
+        config["ner_train_outdir"] + "/best/best_checkpt.txt",
     params:
         out_dir=config["ner_train_outdir"] + "/best",
+        metric=config["ner_criteria_metric"],
     shell:
         """
         python3 src/model_picker.py \
             -o {params.out_dir} \
+            -m {params.metric} \
             {input}
         """
 
@@ -259,51 +230,16 @@ rule find_best_ner:
 rule evaluate_best_ner:
     input:
         infile=config["ner_splits_dir"] + "/test_ner.pkl",
-        model=dynamic(config["ner_train_outdir"] + "/best/{best_ner}/best_checkpt.pt"),
+        model=config["ner_train_outdir"] + "/best/best_checkpt.txt",
     output:
         config["ner_train_outdir"] + "/best/test_set_evaluation/metrics.csv",
     params:
         outdir=config["ner_train_outdir"] + "/best/test_set_evaluation",
     shell:
         """
+        cat {input.model} | \
         python3 src/ner_final_eval.py \
             -o {params.outdir} \
             -t {input.infile} \
-            -c {input.model}
-        """
-
-
-# Predict NER on predicted biodata resource papers
-rule ner_full_corpus:
-    input:
-        classifier=dynamic(
-            config["ner_train_outdir"] + "/best/{best_ner}/best_checkpt.pt"
-        ),
-        infile="data/full_corpus_predictions/classification/predicted_positives.csv",
-    output:
-        "data/full_corpus_predictions/ner/predictions.csv",
-    params:
-        out_dir="data/full_corpus_predictions/ner",
-    shell:
-        """
-        python3 src/ner_predict.py \
-            -o {params.out_dir} \
-            -c {input.classifier} \
-            -i {input.infile}
-        """
-
-
-# Extract out URLS
-rule get_urls:
-    input:
-        "data/full_corpus_predictions/ner/predictions.csv",
-    output:
-        "data/full_corpus_predictions/urls/predictions.csv",
-    params:
-        out_dir="data/full_corpus_predictions/urls",
-    shell:
-        """
-        python3 src/url_extractor.py \
-            -o {params.out_dir} \
-            {input}
+            -c /dev/stdin
         """

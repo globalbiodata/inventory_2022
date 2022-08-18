@@ -16,10 +16,13 @@ from tqdm.auto import tqdm
 from transformers import (AdamW, AutoModelForSequenceClassification,
                           get_scheduler)
 
-from class_data_handler import DataFields, RunParams, get_dataloader
-from utils import (CustomHelpFormatter, Metrics, Settings, get_classif_metrics,
-                   make_filenames, save_model, save_train_stats,
-                   set_random_seed)
+from inventory_utils.class_data_handler import (DataFields, RunParams,
+                                                get_dataloader)
+from inventory_utils.custom_classes import (CustomHelpFormatter, Metrics,
+                                            Settings)
+from inventory_utils.filing import make_filenames, save_model, save_train_stats
+from inventory_utils.metrics import get_classif_metrics
+from inventory_utils.runtime import set_random_seed
 
 
 # ---------------------------------------------------------------------------
@@ -28,6 +31,7 @@ class Args(NamedTuple):
     train_file: TextIO
     val_file: TextIO
     out_dir: str
+    metric: str
     predictive_field: str
     labels_field: str
     descriptive_labels: List[str]
@@ -74,6 +78,13 @@ def get_args():
                         default='out/',
                         help='Directory to output checkpt and loss plot')
 
+    data_info.add_argument('-c',
+                           '--metric',
+                           metavar='METRIC',
+                           choices=['f1', 'precision', 'recall'],
+                           default='f1',
+                           type=str,
+                           help='Metric to use for choosing best model epoch')
     data_info.add_argument('-pred',
                            '--predictive-field',
                            metavar='PRED',
@@ -150,7 +161,7 @@ def get_args():
 
     args = parser.parse_args()
 
-    return Args(args.train_file, args.val_file, args.out_dir,
+    return Args(args.train_file, args.val_file, args.out_dir, args.metric,
                 args.predictive_field, args.labels_field,
                 args.descriptive_labels, args.model_name, args.max_len,
                 args.learning_rate, args.weight_decay, args.num_training,
@@ -158,14 +169,17 @@ def get_args():
 
 
 # ---------------------------------------------------------------------------
-def train(settings: Settings) -> Tuple[Any, pd.DataFrame]:
+def train(settings: Settings,
+          crit_metric: str) -> Tuple[Any, pd.DataFrame, Metrics, Metrics]:
     """
     Train the classifier
 
     Parameters:
     `settings`: Model settings (NamedTuple)
+    `crit_metric`: Metric used for selecting best epoch
 
-    Return: Tuple of best model, and training stats dataframe
+    Return: Tuple of best model, training stats dataframe, train_metrics,
+    and validation_metrics
     """
 
     model = settings.model
@@ -189,7 +203,7 @@ def train(settings: Settings) -> Tuple[Any, pd.DataFrame]:
         val_metrics = get_classif_metrics(model, settings.val_dataloader,
                                           settings.device)
 
-        if val_metrics.f1 > best_val.f1:
+        if getattr(val_metrics, crit_metric) > getattr(best_val, crit_metric):
             best_val = val_metrics
             best_train = train_metrics
             best_model = copy.deepcopy(model)
@@ -233,7 +247,7 @@ def train(settings: Settings) -> Tuple[Any, pd.DataFrame]:
           f'Best Val Recall: {best_val.recall:.3f}\n'
           f'Best Val F1: {best_val.f1:.3f}\n')
 
-    return best_model, train_progress
+    return best_model, train_progress, best_val, best_train
 
 
 # ---------------------------------------------------------------------------
@@ -362,11 +376,12 @@ def main() -> None:
     print('Starting model training...')
     print('=' * 30)
 
-    model, train_stats_df = train(settings)
+    model, train_stats_df, train_metrics, val_metrics = train(
+        settings, args.metric)
     train_stats_df['model_name'] = model_name
 
     checkpt_filename, train_stats_filename = make_filenames(out_dir)
-    save_model(model, model_name, checkpt_filename)
+    save_model(model, model_name, train_metrics, val_metrics, checkpt_filename)
     save_train_stats(train_stats_df, train_stats_filename)
 
     print('Done. Saved best checkpoint to', checkpt_filename)

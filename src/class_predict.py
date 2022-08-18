@@ -6,15 +6,18 @@ Authors: Ana-Maria Istrate and Kenneth Schackart
 
 import argparse
 import os
-from typing import List, NamedTuple, TextIO, BinaryIO
+from typing import BinaryIO, List, NamedTuple, TextIO
 
 import pandas as pd
 import torch
 from datasets import ClassLabel
 from torch.utils.data.dataloader import DataLoader
 
-from class_data_handler import DataFields, RunParams, get_dataloader
-from utils import CustomHelpFormatter, get_torch_device, get_classif_model
+from inventory_utils.class_data_handler import (DataFields, RunParams,
+                                                get_dataloader)
+from inventory_utils.custom_classes import CustomHelpFormatter
+from inventory_utils.filing import get_classif_model
+from inventory_utils.runtime import get_torch_device
 
 
 # ---------------------------------------------------------------------------

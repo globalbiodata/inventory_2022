@@ -13,7 +13,7 @@ from typing import NamedTuple, Tuple, cast
 import pandas as pd
 import requests
 
-from utils import CustomHelpFormatter
+from inventory_utils.custom_classes import CustomHelpFormatter
 
 
 # ---------------------------------------------------------------------------
