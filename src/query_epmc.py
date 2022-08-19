@@ -8,7 +8,7 @@ import argparse
 import os
 import re
 from datetime import datetime
-from typing import NamedTuple, Tuple, cast
+from typing import List, NamedTuple, Tuple, cast
 
 import pandas as pd
 import requests
@@ -109,7 +109,7 @@ def test_make_filenames() -> None:
 
 
 # ---------------------------------------------------------------------------
-def clean_results(results: dict) -> pd.DataFrame:
+def clean_results(results: List[dict]) -> pd.DataFrame:
     """
     Retrieve the PMIDs, titles, and abstracts from results of query
 
@@ -122,10 +122,11 @@ def clean_results(results: dict) -> pd.DataFrame:
     pmids = []
     titles = []
     abstracts = []
-    for paper in results.get('resultList').get('result'):  # type: ignore
-        pmids.append(paper.get('pmid'))
-        titles.append(paper.get('title'))
-        abstracts.append(paper.get('abstractText'))
+    for page in results:
+        for paper in page.get('resultList').get('result'):  # type: ignore
+            pmids.append(paper.get('pmid'))
+            titles.append(paper.get('title'))
+            abstracts.append(paper.get('abstractText'))
 
     return pd.DataFrame({'id': pmids, 'title': titles, 'abstract': abstracts})
 
@@ -155,7 +156,19 @@ def run_query(query: str, from_date: str, to_date: str) -> pd.DataFrame:
 
     results_json = cast(dict, results.json())
 
-    return clean_results(results_json)
+    result_pages: List[dict] = []
+    result_pages.append(results_json)
+
+    while results_json.get('nextPageUrl') is not None:
+        results = requests.get(results_json['nextPageUrl'])
+        if results.status_code != requests.codes.ok:  # pylint: disable=no-member
+            results.raise_for_status()
+
+        results_json = cast(dict, results.json())
+
+        result_pages.append(results_json)
+
+    return clean_results(result_pages)
 
 
 # ---------------------------------------------------------------------------
