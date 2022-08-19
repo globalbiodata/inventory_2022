@@ -135,7 +135,7 @@ def main() -> None:
     best_model = get_best_model(all_metrics, args.metric)
 
     out_file = os.path.join(args.out_dir, 'best_checkpt.txt')
-    with open(out_file) as out_fh:
+    with open(out_file, 'wt') as out_fh:
         print(best_model, file=out_fh)
 
     print(f'Best model checkpoint is {best_model}.')
