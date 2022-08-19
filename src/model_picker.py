@@ -30,7 +30,7 @@ def get_args() -> Args:
         description='Choose model with highest validation metric of choice',
         formatter_class=CustomHelpFormatter)
 
-    parser.add_argument('checkpointss',
+    parser.add_argument('checkpoints',
                         nargs='+',
                         metavar='FILE',
                         type=argparse.FileType('rb'),
