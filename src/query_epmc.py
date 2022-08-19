@@ -61,8 +61,8 @@ def get_args() -> Args:
 
     if os.path.isfile(args.query):
         args.query = open(args.query).read()
-    if os.path.isfile(args.date):
-        args.date = open(args.date).read()
+    if os.path.isfile(args.from_date):
+        args.from_date = open(args.from_date).read()
 
     date_pattern = re.compile(
         r'''^           # Beginning of date string
