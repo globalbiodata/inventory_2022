@@ -92,8 +92,6 @@ def main() -> None:
 
     device = get_torch_device()
 
-    print(args.checkpoint.name)
-
     model, model_name, _ = get_ner_model(args.checkpoint, device)
 
     dataloader = get_test_dataloader(args, model_name)
