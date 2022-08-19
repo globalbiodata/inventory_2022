@@ -129,7 +129,8 @@ def main() -> None:
     for checkpoint in args.checkpoints:
         metrics = get_metrics(checkpoint)
         metrics['checkpt'] = checkpoint.name
-        all_metrics = pd.concat([all_metrics, pd.DataFrame(metrics, index=0)])
+        all_metrics = pd.concat(
+            [all_metrics, pd.DataFrame(metrics, index=[0])])
 
     best_model = get_best_model(all_metrics, args.metric)
 
