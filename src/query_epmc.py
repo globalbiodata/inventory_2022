@@ -73,8 +73,8 @@ def get_args() -> Args:
             $           # Followed by nothing else
             ''', re.X)
     for date in [args.from_date, args.to_date]:
-        if not re.match(date_pattern, args.date):
-            parser.error(f'Last date "{date}" must be one of:\n'
+        if not re.match(date_pattern, date):
+            parser.error(f'Date "{date}" must be one of:\n'
                          '\t\t\tYYYY\n'
                          '\t\t\tYYYY-MM\n'
                          '\t\t\tYYYY-MM-DD')
