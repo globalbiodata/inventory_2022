@@ -71,7 +71,7 @@ rule check_urls:
     output:
         config["check_url_dir"] + "/predictions.csv",
     params:
-        out_dir=config["url_chec_dir"],
+        out_dir=config["check_url_dir"],
     shell:
         """
         python3 src/check_urls.py \

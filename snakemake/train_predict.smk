@@ -12,7 +12,7 @@ model_df = model_df.fillna("")
 
 rule all:
     input:
-        config["extract_url_dir"] + "/predictions.csv",
+        config["check_url_dir"] + "/predictions.csv",
         config["classif_train_outdir"] + "/best/test_set_evaluation/metrics.csv",
         config["ner_train_outdir"] + "/best/test_set_evaluation/metrics.csv",
 
