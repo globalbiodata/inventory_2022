@@ -9,11 +9,10 @@ rule classify_papers:
         out_dir=config["classif_out_dir"],
     shell:
         """
-        cat {input.model} | \
         python3 src/class_predict.py \
             -o {params.out_dir} \
             -i {input.infile} \
-            -c /dev/stdin
+            -c "$(< {input.model})"
         """
 
 
@@ -40,11 +39,10 @@ rule ner_predict:
         out_dir=config["ner_out_dir"],
     shell:
         """
-        cat  {input.model} | \
         python3 src/ner_predict.py \
             -o {params.out_dir} \
             -i {input.infile} \
-            -c /dev/stdin
+            -c "$(< {input.model})"
         """
 
 

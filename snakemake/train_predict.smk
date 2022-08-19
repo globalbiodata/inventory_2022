@@ -133,11 +133,10 @@ rule evaluate_best_classifier:
         outdir=config["classif_train_outdir"] + "/best/test_set_evaluation",
     shell:
         """
-        cat {input.model} | \
         python3 src/class_final_eval.py \
             -o {params.outdir} \
             -t {input.infile} \
-            -c /dev/stdin
+            -c "$(< {input.model})"
         """
 
 
@@ -237,9 +236,8 @@ rule evaluate_best_ner:
         outdir=config["ner_train_outdir"] + "/best/test_set_evaluation",
     shell:
         """
-        cat {input.model} | \
         python3 src/ner_final_eval.py \
             -o {params.outdir} \
             -t {input.infile} \
-            -c /dev/stdin
+            -c "$(< {input.model})"
         """
