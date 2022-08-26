@@ -10,6 +10,7 @@ import multiprocessing as mp
 import os
 import re
 import socket
+from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 from multiprocessing.pool import Pool
 from typing import List, NamedTuple, Optional, OrderedDict, TextIO, Union, cast
@@ -111,8 +112,12 @@ def get_args() -> Args:
                         '--cores',
                         metavar='CORE',
                         type=int,
-                        help=('Number of cores for parallel '
-                              'processing (default: all)'))
+                        help=('Number of cores for multi-'
+                              'processing. -c <= 0 will use'
+                              ' -c less than all available. '
+                              'If not supplied, threading is used '
+                              'instead of multiprocessing. '
+                              '(default: threading)'))
     parser.add_argument('-v',
                         '--verbose',
                         action='store_true',
@@ -212,20 +217,24 @@ def test_expand_url_col() -> None:
 
 
 # ---------------------------------------------------------------------------
-def get_pool(cores: Optional[int]) -> Pool:
+def get_pool(cores: int) -> Pool:
     """
     Get Pool for multiprocessing.
 
     Parameters:
-    `cores`: Number of CPUs to use, if not specified detect number available
+    `cores`: Number of cores to use. If `cores` >= 1 , use `cores`.
+    If `cores` <= 0, use available cores - |`cores`|
 
     Return:
-    `Pool` using `cores` or number of available cores
+    multiprocessing `Pool`
     """
 
-    n_cores = cores if cores else mp.cpu_count()
+    if cores <= 0:
+        n_cores = mp.cpu_count() - abs(cores)
+    else:
+        n_cores = cores
 
-    logging.debug('Running with %d processes', n_cores)
+    logging.debug('Running with %d cores', n_cores)
 
     return mp.Pool(n_cores)  # pylint: disable=consider-using-with
 
@@ -579,24 +588,42 @@ def check_urls(df: pd.DataFrame, cores: Optional[int],
     """
 
     check_url_part = partial(check_url, session=session)
+    out_df = df.copy()
 
-    with get_pool(cores) as pool:
-        logging.debug('Checking extracted URL statuses. ' 'Max attempts: %d. ')
+    if cores is not None:
+        logging.debug('Starting multiple processes.')
+        with get_pool(cores) as pool:
+            logging.debug('Checking extracted URL statuses. ')
 
-        url_statuses = pool.map_async(check_url_part,
-                                      df['extracted_url']).get()
+            url_statuses = pool.map_async(check_url_part,
+                                          out_df['extracted_url']).get()
+    else:
+        logging.debug('Starting thread pool.')
+        with ThreadPoolExecutor() as executor:
+            logging.debug('Checking extracted URL statuses. ')
 
-        df = merge_url_statuses(df, url_statuses)
+            url_statuses = list(
+                executor.map(check_url_part, out_df['extracted_url']))
 
-        logging.debug('Finished checking extracted URLs.')
-        logging.debug('Checking for snapshots of extracted URLs '
-                      'on WayBack Machine.')
+    out_df = merge_url_statuses(out_df, url_statuses)
 
-        df['wayback_url'] = df['extracted_url'].map(check_wayback)
+    logging.debug('Finished checking extracted URLs.')
+    logging.debug('Checking for snapshots of extracted URLs '
+                  'on WayBack Machine.')
 
-        logging.debug('Finished checking WayBack Machine.')
+    out_df['wayback_url'] = out_df['extracted_url'].map(check_wayback)
 
-    return df
+    logging.debug('Finished checking WayBack Machine.')
+
+    logging.debug('Finished checking extracted URLs.')
+    logging.debug('Checking for snapshots of extracted URLs '
+                  'on WayBack Machine.')
+
+    out_df['wayback_url'] = out_df['extracted_url'].map(check_wayback)
+
+    logging.debug('Finished checking WayBack Machine.')
+
+    return out_df
 
 
 # ---------------------------------------------------------------------------
@@ -609,17 +636,20 @@ def test_check_urls(testing_session: requests.Session) -> None:
          [789, 'Foo', 'https://www.amazon.com/afbadfbnvbadfbaefbnaegn']],
         columns=['ID', 'text', 'extracted_url'])
 
-    returned_df = check_urls(in_df, None, testing_session)
-    returned_df.sort_values('ID', inplace=True)
+    # Check that it can run with either threading or multiprocessing
+    # cores == None -> threading
+    # cores == 0 or -1 -> multiprocessing
+    for cores in [None, 0, -1]:
+        returned_df = check_urls(in_df, cores, testing_session)
 
-    # Correct number of rows
-    assert len(returned_df) == 3
+        # Correct number of rows
+        assert len(returned_df) == 3
 
-    # Correct columns
-    assert all(x == y for x, y in zip(returned_df.columns, [
-        'ID', 'text', 'extracted_url', 'extracted_url_status',
-        'extracted_url_country', 'extracted_url_coordinates', 'wayback_url'
-    ]))
+        # Correct columns
+        assert (returned_df.columns == [
+            'ID', 'text', 'extracted_url', 'extracted_url_status',
+            'extracted_url_country', 'extracted_url_coordinates', 'wayback_url'
+        ]).all()
 
 
 # ---------------------------------------------------------------------------
