@@ -372,7 +372,10 @@ def get_location(url: str) -> IPLocation:
     """
 
     logging.debug('Attempting to determine IP address of %s', url)
-    ip = socket.gethostbyname(extract_domain(url))
+    try:
+        ip = socket.gethostbyname(extract_domain(url))
+    except socket.gaierror:
+        ip = ''
 
     if not ip:
         logging.debug('IP address for %s could not be determined', url)
@@ -635,7 +638,7 @@ def regroup_df(df: pd.DataFrame) -> pd.DataFrame:
     df['extracted_url'] = df['extracted_url'].astype(str)
     df['wayback_url'] = df['wayback_url'].astype(str)
 
-    def join_commas(x):
+    def join_commas(x: List[str]) -> str:
         return ', '.join(x)
 
     out_df = (df.groupby(['ID', 'text']).agg({
@@ -718,10 +721,7 @@ def main() -> None:
     df = expand_url_col(df)
     df = check_urls(df, args.cores, session)
 
-    print(df)
     df = regroup_df(df)
-
-    print(df)
 
     outfile = make_filename(out_dir, args.file.name)
     df.to_csv(outfile, index=False)
