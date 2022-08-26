@@ -751,6 +751,8 @@ def main() -> None:
     df = expand_url_col(df)
     df = check_urls(df, args.cores, session)
 
+    session.close()
+
     df = regroup_df(df)
 
     outfile = make_filename(out_dir, args.file.name)
