@@ -10,6 +10,7 @@ from itertools import chain
 from typing import Dict, Iterator, List, NamedTuple, TextIO, Union
 
 import pandas as pd
+from pandas._testing.asserters import assert_frame_equal
 import pytest
 from pandas.testing import assert_series_equal
 
@@ -380,6 +381,55 @@ def test_wrangle_names(raw_data: pd.DataFrame) -> None:
     assert_series_equal(out_df['best_full'], best_full)
     assert_series_equal(out_df['best_name'], best_overall)
     assert_series_equal(out_df['best_name_prob'], best_prob)
+
+
+# ---------------------------------------------------------------------------
+def flag_for_review(df: pd.DataFrame, thresh: float) -> pd.DataFrame:
+    """
+    Flag rows with best name probability < `thresh` for manual review
+    
+    Parameters:
+    `df`: Dataframe with wrangled names
+    `thresh`: Threshold for flagging
+    
+    Return: Flagged dataframe
+    """
+
+    df['confidence'] = ''
+    df['confidence'][df['best_name_prob'] < thresh] = 'manual_review'
+
+    return df
+
+
+# ---------------------------------------------------------------------------
+def test_flag_for_review(raw_data: pd.DataFrame) -> None:
+    """ Test flag_for_review() """
+
+    in_df = wrangle_names(filter_urls(raw_data, 0, 0))
+
+    thresh = 0.99
+    confidence = pd.Series([
+        'manual_review', 'manual_review', '', '', '', 'manual_review',
+        'manual_review', 'manual_review', 'manual_review'
+    ],
+                           name='confidence')
+
+    out_df = flag_for_review(in_df, thresh)
+
+    assert_series_equal(out_df['confidence'], confidence)
+
+
+# ---------------------------------------------------------------------------
+def deduplicate(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Deduplicate the resource dataframe, by finding resources with the same
+    names.
+    
+    Parameters:
+    `df`: Dataframe that has gone through URL filtering and name wrangling
+    
+    Return: Deduplicated dataframe
+    """
 
 
 # ---------------------------------------------------------------------------
