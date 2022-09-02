@@ -263,8 +263,8 @@ def select_names(common_names: str, common_probs: str, full_names: str,
     `full_names`: Predicted full name(s)
     `full_probs`: Probabilities of predicted full name(s)
 
-    Return: Pandas Series withprobable common name, probable full name,
-    best overall name, probability of best overall name
+    Return: Pandas Series with probable common name, probable full name,
+    best overall name, and probabilities of each
     """
     def convert_number(s: str) -> float:
         return float(s) if s else 0
@@ -279,52 +279,66 @@ def select_names(common_names: str, common_probs: str, full_names: str,
         common_dict,
         key=common_dict.get,  # type: ignore
         reverse=True)[0]
+    best_common_prob = combined_dict[best_common]
     best_full = sorted(
         full_dict,
         key=full_dict.get,  # type: ignore
         reverse=True)[0]
+    best_full_prob = combined_dict[best_full]
     best_name = sorted(
         combined_dict,
         key=combined_dict.get,  # type: ignore
         reverse=True)[0]
     best_prob = combined_dict[best_name]
 
-    return pd.Series(
-        [best_common, best_full, best_name, best_prob],
-        index=['best_common', 'best_full', 'best_name', 'best_name_prob'])
+    return pd.Series([
+        best_common, best_common_prob, best_full, best_full_prob, best_name,
+        best_prob
+    ],
+                     index=[
+                         'best_common', 'best_common_prob', 'best_full',
+                         'best_full_prob', 'best_name', 'best_name_prob'
+                     ])
 
 
 # ---------------------------------------------------------------------------
 def test_select_names() -> None:
     """ Test select_names() """
 
-    idx = ['best_common', 'best_full', 'best_name', 'best_name_prob']
+    idx = [
+        'best_common', 'best_common_prob', 'best_full', 'best_full_prob',
+        'best_name', 'best_name_prob'
+    ]
     # Only one found
     in_list = ['LBD2000', '0.997', '', '']
-    output = pd.Series(['LBD2000', '', 'LBD2000', 0.997], index=idx)
+    output = pd.Series(['LBD2000', 0.997, '', 0, 'LBD2000', 0.997], index=idx)
     assert_series_equal(select_names(*in_list), output)
 
     # Common name is better
     in_list = ['PDB', '0.983', 'Protein Data Bank', '0.964']
-    output = pd.Series(['PDB', 'Protein Data Bank', 'PDB', 0.983], index=idx)
+    output = pd.Series(
+        ['PDB', 0.983, 'Protein Data Bank', 0.964, 'PDB', 0.983], index=idx)
     assert_series_equal(select_names(*in_list), output)
 
     # Full name is better
     in_list = ['PDB', '0.963', 'Protein Data Bank', '0.984']
     output = pd.Series(
-        ['PDB', 'Protein Data Bank', 'Protein Data Bank', 0.984], index=idx)
+        ['PDB', 0.963, 'Protein Data Bank', 0.984, 'Protein Data Bank', 0.984],
+        index=idx)
     assert_series_equal(select_names(*in_list), output)
 
     # Multiple to unpack
     in_list = ['mmCIF, PDB', '0.987, 0.775', 'Protein Data Bank', '0.717']
-    output = pd.Series(['mmCIF', 'Protein Data Bank', 'mmCIF', 0.987],
-                       index=idx)
+    output = pd.Series(
+        ['mmCIF', 0.987, 'Protein Data Bank', 0.717, 'mmCIF', 0.987],
+        index=idx)
     assert_series_equal(select_names(*in_list), output)
 
     # Equal probability, favor full name
     in_list = ['PDB', '0.963', 'Protein Data Bank', '0.963']
     output = pd.Series(
-        ['PDB', 'Protein Data Bank', 'Protein Data Bank', 0.963], index=idx)
+        ['PDB', 0.963, 'Protein Data Bank', 0.963, 'Protein Data Bank', 0.963],
+        index=idx)
     assert_series_equal(select_names(*in_list), output)
 
 
@@ -340,7 +354,10 @@ def wrangle_names(df: pd.DataFrame) -> pd.DataFrame:
     Return: Dataframe with 4 new columns
     """
 
-    new_cols = ['best_common', 'best_full', 'best_name', 'best_name_prob']
+    new_cols = [
+        'best_common', 'best_common_prob', 'best_full', 'best_full_prob',
+        'best_name', 'best_name_prob'
+    ]
 
     df[new_cols] = df.apply(lambda x: list(
         select_names(x['common_name'], x['common_prob'], x['full_name'], x[
@@ -387,11 +404,11 @@ def test_wrangle_names(raw_data: pd.DataFrame) -> None:
 def flag_for_review(df: pd.DataFrame, thresh: float) -> pd.DataFrame:
     """
     Flag rows with best name probability < `thresh` for manual review
-    
+
     Parameters:
     `df`: Dataframe with wrangled names
     `thresh`: Threshold for flagging
-    
+
     Return: Flagged dataframe
     """
 
