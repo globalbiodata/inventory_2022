@@ -14,10 +14,9 @@ import socket
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 from multiprocessing.pool import Pool
-import sys
 from typing import List, NamedTuple, Optional, OrderedDict, TextIO, Union, cast
-import numpy as np
 
+import numpy as np
 import pandas as pd
 import pytest
 import requests
