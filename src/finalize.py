@@ -7,11 +7,12 @@ Authors: Kenneth Schackart
 import argparse
 import os
 from itertools import chain
-from typing import Dict, Iterator, List, NamedTuple, TextIO, Tuple, Union
+from typing import Dict, Iterator, List, NamedTuple, TextIO, Union
 
 import pandas as pd
 import pytest
 from pandas.testing import assert_series_equal
+
 from inventory_utils.custom_classes import CustomHelpFormatter
 
 pd.options.mode.chained_assignment = None
@@ -250,7 +251,7 @@ def test_combine_dicts() -> None:
 
 # ---------------------------------------------------------------------------
 def select_names(common_names: str, common_probs: str, full_names: str,
-                 full_probs: str) -> Tuple[str, str, str, float]:
+                 full_probs: str) -> pd.Series:
     """
     Select common name with highest probability, full name with highest
     probability, and name with overall highest probability
@@ -261,8 +262,8 @@ def select_names(common_names: str, common_probs: str, full_names: str,
     `full_names`: Predicted full name(s)
     `full_probs`: Probabilities of predicted full name(s)
 
-    Return: probable common name, probable full name, best overall name,
-    probability of best overall name
+    Return: Pandas Series withprobable common name, probable full name,
+    best overall name, probability of best overall name
     """
     def convert_number(s: str) -> float:
         return float(s) if s else 0
@@ -287,37 +288,43 @@ def select_names(common_names: str, common_probs: str, full_names: str,
         reverse=True)[0]
     best_prob = combined_dict[best_name]
 
-    return best_common, best_full, best_name, best_prob
+    return pd.Series(
+        [best_common, best_full, best_name, best_prob],
+        index=['best_common', 'best_full', 'best_name', 'best_name_prob'])
 
 
 # ---------------------------------------------------------------------------
 def test_select_names() -> None:
     """ Test select_names() """
 
+    idx = ['best_common', 'best_full', 'best_name', 'best_name_prob']
     # Only one found
     in_list = ['LBD2000', '0.997', '', '']
-    output = ('LBD2000', '', 'LBD2000', 0.997)
-    assert select_names(*in_list) == output
+    output = pd.Series(['LBD2000', '', 'LBD2000', 0.997], index=idx)
+    assert_series_equal(select_names(*in_list), output)
 
     # Common name is better
     in_list = ['PDB', '0.983', 'Protein Data Bank', '0.964']
-    output = ('PDB', 'Protein Data Bank', 'PDB', 0.983)
-    assert select_names(*in_list) == output
+    output = pd.Series(['PDB', 'Protein Data Bank', 'PDB', 0.983], index=idx)
+    assert_series_equal(select_names(*in_list), output)
 
     # Full name is better
     in_list = ['PDB', '0.963', 'Protein Data Bank', '0.984']
-    output = ('PDB', 'Protein Data Bank', 'Protein Data Bank', 0.984)
-    assert select_names(*in_list) == output
+    output = pd.Series(
+        ['PDB', 'Protein Data Bank', 'Protein Data Bank', 0.984], index=idx)
+    assert_series_equal(select_names(*in_list), output)
 
     # Multiple to unpack
     in_list = ['mmCIF, PDB', '0.987, 0.775', 'Protein Data Bank', '0.717']
-    output = ('mmCIF', 'Protein Data Bank', 'mmCIF', 0.987)
-    assert select_names(*in_list) == output
+    output = pd.Series(['mmCIF', 'Protein Data Bank', 'mmCIF', 0.987],
+                       index=idx)
+    assert_series_equal(select_names(*in_list), output)
 
     # Equal probability, favor full name
     in_list = ['PDB', '0.963', 'Protein Data Bank', '0.963']
-    output = ('PDB', 'Protein Data Bank', 'Protein Data Bank', 0.963)
-    assert select_names(*in_list) == output
+    output = pd.Series(
+        ['PDB', 'Protein Data Bank', 'Protein Data Bank', 0.963], index=idx)
+    assert_series_equal(select_names(*in_list), output)
 
 
 # ---------------------------------------------------------------------------
@@ -332,16 +339,15 @@ def wrangle_names(df: pd.DataFrame) -> pd.DataFrame:
     Return: Dataframe with 4 new columns
     """
 
-    # new_cols = ['best_common', 'best_full', 'best_name', 'best_name_prob']
+    new_cols = ['best_common', 'best_full', 'best_name', 'best_name_prob']
 
-    # df[new_cols] = df.apply(lambda x: list(
-    #     select_names(x['common_name'], x['common_prob'], x['full_name'], x[
-    #         'full_prob'])),
-    #                         axis=1)
-    
-    for row in df.iterrows():
+    df[new_cols] = df.apply(lambda x: list(
+        select_names(x['common_name'], x['common_prob'], x['full_name'], x[
+            'full_prob'])),
+                            axis=1,
+                            result_type='expand')
 
-    return df
+    return df.reset_index(drop=True)
 
 
 # ---------------------------------------------------------------------------
@@ -352,18 +358,23 @@ def test_wrangle_names(raw_data: pd.DataFrame) -> None:
 
     out_df = wrangle_names(in_df)
 
-    best_common = pd.Series(
-        ['mmCIF', '', 'TwoURLS', 'LotsaURLS', 'PDB', 'PDB', 'PDB', ''])
+    best_common = pd.Series([
+        'mmCIF', '', 'LDB2000', 'TwoURLS', 'LotsaURLS', 'PDB', 'PDB', 'PDB', ''
+    ],
+                            name='best_common')
     best_full = pd.Series([
-        'Protein Data Bank', 'SBASE', '', '', 'Protein Data Bank',
+        'Protein Data Bank', 'SBASE', '', '', '', 'Protein Data Bank',
         'Protein Data Bank', 'Protein Data Bank', ''
-    ])
+    ],
+                          name='best_full')
     best_overall = pd.Series([
-        'mmcIF', 'SBASE', 'TwoURLS', 'LotsaURLS', 'Protein Data Bank', 'PDB',
-        'Protein Data Bank', ''
-    ])
+        'mmCIF', 'SBASE', 'LDB2000', 'TwoURLS', 'LotsaURLS',
+        'Protein Data Bank', 'PDB', 'Protein Data Bank', ''
+    ],
+                             name='best_name')
     best_prob = pd.Series(
-        [0.987, 0.648, 0.997, 0.998, 0.996, 0.964, 0.983, 0.984, 0])
+        [0.987, 0.648, 0.997, 0.998, 0.996, 0.964, 0.983, 0.984, 0],
+        name='best_name_prob')
 
     assert_series_equal(out_df['best_common'], best_common)
     assert_series_equal(out_df['best_full'], best_full)
