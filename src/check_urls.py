@@ -303,6 +303,39 @@ def fixture_testing_session() -> requests.Session:
 
 
 # ---------------------------------------------------------------------------
+def remove_missing_urls(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Remove rows that do not have any URLs
+
+    Parameters:
+    `df`: Raw dataframe
+
+    Return: Dataframe with no missing URLs
+    """
+
+    return df.dropna(subset=['extracted_url'])
+
+
+# ---------------------------------------------------------------------------
+def test_remove_missing_urls() -> None:
+    """ Test remove_missing_urls() """
+
+    in_df = pd.DataFrame(
+        [[123, 'Some text', 'https://www.google.com, http://google.com'],
+         [789, 'Foo', 'https://www.amazon.com/afbadfbnvbadfbaefbnaegn'],
+         [147, 'Blah', '']],
+        columns=['ID', 'text', 'extracted_url'])
+
+    out_df = pd.DataFrame(
+        [[123, 'Some text', 'https://www.google.com, http://google.com'],
+         [789, 'Foo', 'https://www.amazon.com/afbadfbnvbadfbaefbnaegn'],
+         [147, 'Blah', '']],
+        columns=['ID', 'text', 'extracted_url'])
+
+    assert_frame_equal(remove_missing_urls(in_df), out_df)
+
+
+# ---------------------------------------------------------------------------
 def expand_url_col(df: pd.DataFrame) -> pd.DataFrame:
     """
     Expand the URL column, by creating a row per URL.
@@ -871,7 +904,7 @@ def main() -> None:
     session = get_session(args.num_tries, args.backoff)
 
     logging.debug('Reading input file: %s.', args.file.name)
-    df = pd.read_csv(args.file)
+    df = remove_missing_urls(pd.read_csv(args.file))
 
     if args.partial:
         part_df = pd.read_csv(args.partial)
