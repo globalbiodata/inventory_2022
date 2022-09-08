@@ -10,11 +10,11 @@ from itertools import chain
 from typing import Dict, Iterator, List, NamedTuple, TextIO, Union
 
 import pandas as pd
-from pandas._testing.asserters import assert_frame_equal
 import pytest
 from pandas.testing import assert_series_equal
 
 from inventory_utils.custom_classes import CustomHelpFormatter
+from inventory_utils.wrangling import join_commas
 
 pd.options.mode.chained_assignment = None
 
@@ -27,6 +27,9 @@ class Args(NamedTuple):
     min_urls: int
     max_urls: int
     min_prob: float
+    common: bool
+    full: bool
+    url: bool
 
 
 # ---------------------------------------------------------------------------
@@ -41,38 +44,54 @@ def get_args() -> Args:
                      ' summarize'),
         formatter_class=CustomHelpFormatter)
 
-    parser.add_argument('file',
+    inputs = parser.add_argument_group('Inputs and Outputs')
+    filters = parser.add_argument_group('Parameters for Filtering')
+    dedupe = parser.add_argument_group('Fields to Match for Deduplication '
+                                       '(not mutually-exclusive)')
+
+    inputs.add_argument('file',
                         metavar='FILE',
                         type=argparse.FileType('rt', encoding='ISO-8859-1'),
                         help='CSV file of predictions and metadata')
-    parser.add_argument('-o',
+    inputs.add_argument('-o',
                         '--out-dir',
                         metavar='DIR',
                         type=str,
                         default='out/',
                         help='Output directory')
-    parser.add_argument('-nu',
-                        '--min-urls',
-                        metavar='INT',
-                        type=int,
-                        default=1,
-                        help=('Minimum number of URLs per resource.'
-                              ' Resources with less discarded.'))
-    parser.add_argument('-xu',
-                        '--max-urls',
-                        metavar='INT',
-                        type=int,
-                        default=2,
-                        help=('Maximum number of URLs per resource.'
-                              ' Resources with more are discarded.'
-                              ' (0 = No maximum)'))
-    parser.add_argument('-np',
-                        '--min_prob',
-                        metavar='PROB',
-                        type=float,
-                        default=0.95,
-                        help=('Minimum probability of predicted resource name.'
-                              ' Anything below will be flagged for review.'))
+    filters.add_argument('-nu',
+                         '--min-urls',
+                         metavar='INT',
+                         type=int,
+                         default=1,
+                         help=('Minimum number of URLs per resource.'
+                               ' Resources with less discarded.'))
+    filters.add_argument('-xu',
+                         '--max-urls',
+                         metavar='INT',
+                         type=int,
+                         default=2,
+                         help=('Maximum number of URLs per resource.'
+                               ' Resources with more are discarded.'
+                               ' (0 = No maximum)'))
+    filters.add_argument(
+        '-np',
+        '--min_prob',
+        metavar='PROB',
+        type=float,
+        default=0.95,
+        help=('Minimum probability of predicted resource name.'
+              ' Anything below will be flagged for review.'))
+
+    dedupe.add_argument('--match-common',
+                        help='Match on common name, even if not best name',
+                        action='store_true')
+    dedupe.add_argument('--match-full',
+                        help='Match on full name, even if not best name',
+                        action='store_true')
+    dedupe.add_argument('--match-url',
+                        help='Match on URL',
+                        action='store_true')
 
     args = parser.parse_args()
 
@@ -80,7 +99,8 @@ def get_args() -> Args:
         parser.error(f'--min-urls cannot be less than 0; got {args.min_urls}')
 
     return Args(args.file, args.out_dir, args.min_urls, args.max_urls,
-                args.min_prob)
+                args.min_prob, args.match_common, args.match_full,
+                args.match_url)
 
 
 # ---------------------------------------------------------------------------
@@ -343,7 +363,11 @@ def test_select_names() -> None:
 
 
 # ---------------------------------------------------------------------------
-def wrangle_names(df: pd.DataFrame) -> pd.DataFrame:
+def wrangle_names(df: pd.DataFrame,
+                  common_col: str = 'common_name',
+                  common_prob_col: str = 'common_prob',
+                  full_name_col: str = 'full_name',
+                  full_prob_col: str = 'full_prob') -> pd.DataFrame:
     """
     Place best common name, best full name, best overall name, and best name
     probability in new columns
@@ -360,8 +384,8 @@ def wrangle_names(df: pd.DataFrame) -> pd.DataFrame:
     ]
 
     df[new_cols] = df.apply(lambda x: list(
-        select_names(x['common_name'], x['common_prob'], x['full_name'], x[
-            'full_prob'])),
+        select_names(x[common_col], x[common_prob_col], x[full_name_col], x[
+            full_prob_col])),
                             axis=1,
                             result_type='expand')
 
@@ -437,16 +461,122 @@ def test_flag_for_review(raw_data: pd.DataFrame) -> None:
 
 
 # ---------------------------------------------------------------------------
-def deduplicate(df: pd.DataFrame) -> pd.DataFrame:
+def filter_names(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Deduplicate the resource dataframe, by finding resources with the same
+    Remove articles for which no names were predicted
+
+    Parameters:
+    `df`: Input dataframe
+
+    Return: Dataframe with rows without names are removed
+    """
+
+    return df[df['best_name'] != '']
+
+
+# ---------------------------------------------------------------------------
+def test_filter_names(raw_data: pd.DataFrame) -> None:
+    """ Test filter_names() """
+
+    in_df = flag_for_review(wrangle_names(filter_urls(raw_data, 0, 0)), 0.99)
+
+    # Article ID 963 is the only article without any predicted names
+    remaining_article_ids = pd.Series(
+        ['123', '456', '789', '147', '258', '369', '741', '852'], name='ID')
+
+    return_df = filter_names(in_df)
+
+    assert (in_df.columns == return_df.columns).all()
+    assert_series_equal(return_df['ID'], remaining_article_ids)
+
+
+# ---------------------------------------------------------------------------
+def deduplicate(df: pd.DataFrame, thresh: float, common: bool, full: bool,
+                url: bool) -> pd.DataFrame:
+    """
+    Deduplicate the resource dataframe by finding resources with the same
     names.
-    
+
     Parameters:
     `df`: Dataframe that has gone through URL filtering and name wrangling
-    
+    `thresh`: Threshold probability for which a name can be used for
+    deduplication by matching
+    `common`: Use common name for matching, if above `thresh`
+    `full`: Use full name for matching, if above `thresh`
+    `url`: Use URLs for matching
+
     Return: Deduplicated dataframe
     """
+
+    df = df.drop(
+        ['text', 'common_name', 'common_prob', 'full_name', 'full_prob'],
+        axis='columns')
+    df['best_common_prob'] = df['best_common_prob'].astype(str)
+    df['best_full_prob'] = df['best_full_prob'].astype(str)
+    df['best_name_prob'] = df['best_name_prob'].astype(str)
+
+    # Do not deduplicate/aggregate rows flagged for review
+    low_df = df[df['best_name_prob'].astype(float) < thresh]
+    high_df = df[df['best_name_prob'].astype(float) >= thresh]
+
+    if not any([common, full, url]):
+        duplicate_name = high_df.duplicated('best_name', keep=False)
+
+        unique_name_df = high_df[duplicate_name == False]
+        same_name_df = high_df[duplicate_name == True]
+        same_name_df['sum_citations'] = 0
+
+        same_name_df = (same_name_df.groupby(['best_name']).agg({
+            'ID':
+            join_commas,
+            'extracted_url':
+            join_commas,
+            'extracted_url_status':
+            join_commas,
+            'extracted_url_country':
+            join_commas,
+            'extracted_url_coordinates':
+            join_commas,
+            'best_common':
+            join_commas,
+            'best_common_prob':
+            join_commas,
+            'best_full':
+            join_commas,
+            'best_full_prob':
+            join_commas,
+            'confidence':
+            join_commas,
+            'sum_citations':
+            len
+        }).reset_index())
+
+        same_name_df = wrangle_names(same_name_df, 'best_common',
+                                     'best_common_prob', 'best_full',
+                                     'best_full_prob')
+
+        unique_name_df['sum_citations'] = 1
+        low_df['sum_citations'] = 1
+
+        out_df = pd.concat([low_df, unique_name_df, same_name_df])
+
+        return out_df.reset_index(drop=True)
+
+
+# ---------------------------------------------------------------------------
+def test_deduplicate(raw_data: pd.DataFrame) -> None:
+    """ Test deduplicate() """
+
+    in_df = filter_names(
+        flag_for_review(wrangle_names(filter_urls(raw_data, 1, 2)), 0.9))
+
+    out_ids = pd.Series(['456', '123', '147', '741', '369, 852'], name='ID')
+    out_citations = pd.Series([1, 1, 1, 1, 2], name='sum_citations')
+
+    return_df = deduplicate(in_df, 0.9, False, False, False)
+
+    assert_series_equal(return_df['ID'], out_ids)
+    assert_series_equal(return_df['sum_citations'], out_citations)
 
 
 # ---------------------------------------------------------------------------
