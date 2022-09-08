@@ -7,14 +7,14 @@ Authors: Kenneth Schackart
 import argparse
 import os
 from itertools import chain
-from typing import Dict, Iterator, List, NamedTuple, TextIO, Union
+from typing import Dict, Iterator, List, NamedTuple, TextIO, Tuple, Union
 
+import numpy as np
 import pandas as pd
 import pytest
 from pandas.testing import assert_series_equal
 
 from inventory_utils.custom_classes import CustomHelpFormatter
-from inventory_utils.wrangling import join_commas
 
 pd.options.mode.chained_assignment = None
 
@@ -27,27 +27,35 @@ class Args(NamedTuple):
     min_urls: int
     max_urls: int
     min_prob: float
-    common: bool
-    full: bool
-    url: bool
+
+
+# ---------------------------------------------------------------------------
+class FilterResults(NamedTuple):
+    """
+    Result of filtering
+
+    `df`: Filtered `DataFrame`
+    `under_urls`: Number of rows with too few URLs
+    `over_urls`: Number of rows with too many URLs
+    `no_names`: Number of rows with no predicted names
+    `review`: Number of rows flagged for review
+    """
+    df: pd.DataFrame
+    under_urls: int
+    over_urls: int
+    no_names: int
+    review: int
 
 
 # ---------------------------------------------------------------------------
 def get_args() -> Args:
     """ Parse command-line arguments """
 
-    parser = argparse.ArgumentParser(
-        description=('Finalize the inventory:'
-                     ' filter out bad predictions,'
-                     ' deduplicate,'
-                     ' aggregate,'
-                     ' summarize'),
-        formatter_class=CustomHelpFormatter)
+    parser = argparse.ArgumentParser(description=('Filter the inventory'),
+                                     formatter_class=CustomHelpFormatter)
 
     inputs = parser.add_argument_group('Inputs and Outputs')
     filters = parser.add_argument_group('Parameters for Filtering')
-    dedupe = parser.add_argument_group('Fields to Match for Deduplication '
-                                       '(not mutually-exclusive)')
 
     inputs.add_argument('file',
                         metavar='FILE',
@@ -83,24 +91,13 @@ def get_args() -> Args:
         help=('Minimum probability of predicted resource name.'
               ' Anything below will be flagged for review.'))
 
-    dedupe.add_argument('--match-common',
-                        help='Match on common name, even if not best name',
-                        action='store_true')
-    dedupe.add_argument('--match-full',
-                        help='Match on full name, even if not best name',
-                        action='store_true')
-    dedupe.add_argument('--match-url',
-                        help='Match on URL',
-                        action='store_true')
-
     args = parser.parse_args()
 
     if args.min_urls < 0:
         parser.error(f'--min-urls cannot be less than 0; got {args.min_urls}')
 
     return Args(args.file, args.out_dir, args.min_urls, args.max_urls,
-                args.min_prob, args.match_common, args.match_full,
-                args.match_url)
+                args.min_prob)
 
 
 # ---------------------------------------------------------------------------
@@ -164,7 +161,7 @@ def fixture_raw_data() -> pd.DataFrame:
 
 # ---------------------------------------------------------------------------
 def filter_urls(df: pd.DataFrame, min_urls: int,
-                max_urls: int) -> pd.DataFrame:
+                max_urls: int) -> Tuple[pd.DataFrame, int, int]:
     """
     Filter dataframe to only include rows with
     `min_urls` <= URLs <= `max_urls`.
@@ -174,7 +171,8 @@ def filter_urls(df: pd.DataFrame, min_urls: int,
     `min_urls`: Minimum number of URLS per row/article (0=no min)
     `max_urls`: Maximum number of URLs per row/article (0=no max)
 
-    Return: Filtered dataframe
+    Return: Filtered dataframe, number of no URLs, number of too
+    many URLs
     """
     df['url_count'] = df['extracted_url'].map(lambda x: len(x.split(', ')))
 
@@ -182,15 +180,18 @@ def filter_urls(df: pd.DataFrame, min_urls: int,
     df['url_count'][no_urls] = 0
 
     enough_urls = min_urls <= df['url_count'].values
+    under_urls = sum([val is np.bool_(False) for val in list(enough_urls)])
     out_df = df[enough_urls]
 
+    over_urls = 0
     if max_urls:
         not_too_many_urls = out_df['url_count'].values <= max_urls
+        over_urls = sum([val is np.bool_(False) for val in not_too_many_urls])
         out_df = out_df[not_too_many_urls]
 
     out_df = out_df.drop(['url_count'], axis=1)
 
-    return out_df
+    return out_df, under_urls, over_urls
 
 
 # ---------------------------------------------------------------------------
@@ -200,22 +201,22 @@ def test_filter_urls(raw_data: pd.DataFrame) -> None:
     original_cols = raw_data.columns
 
     # Doesn't remove any rows; no min and no max
-    out_df = filter_urls(raw_data, 0, 0)
+    out_df, _, _ = filter_urls(raw_data, 0, 0)
     assert len(out_df) == original_row_count
     assert (out_df.columns == original_cols).all()
 
     # Removes row with 4 URLs; no min
-    out_df = filter_urls(raw_data, 0, 3)
+    out_df, _, _ = filter_urls(raw_data, 0, 3)
     assert len(out_df) == original_row_count - 1
     assert (out_df.columns == original_cols).all()
 
     # Removes row with no URLs; no max
-    out_df = filter_urls(raw_data, 1, 0)
+    out_df, _, _ = filter_urls(raw_data, 1, 0)
     assert len(out_df) == original_row_count - 1
     assert (out_df.columns == original_cols).all()
 
     # Removes row with 0 and 4 URLs
-    out_df = filter_urls(raw_data, 1, 3)
+    out_df, _, _ = filter_urls(raw_data, 1, 3)
     assert len(out_df) == original_row_count - 2
     assert (out_df.columns == original_cols).all()
 
@@ -396,7 +397,7 @@ def wrangle_names(df: pd.DataFrame,
 def test_wrangle_names(raw_data: pd.DataFrame) -> None:
     """ Test wrangle_names() """
 
-    in_df = filter_urls(raw_data, 0, 0)
+    in_df, _, _ = filter_urls(raw_data, 0, 0)
 
     out_df = wrangle_names(in_df)
 
@@ -446,7 +447,8 @@ def flag_for_review(df: pd.DataFrame, thresh: float) -> pd.DataFrame:
 def test_flag_for_review(raw_data: pd.DataFrame) -> None:
     """ Test flag_for_review() """
 
-    in_df = wrangle_names(filter_urls(raw_data, 0, 0))
+    filt_df, _, _ = filter_urls(raw_data, 0, 0)
+    in_df = wrangle_names(filt_df)
 
     thresh = 0.99
     confidence = pd.Series([
@@ -478,7 +480,8 @@ def filter_names(df: pd.DataFrame) -> pd.DataFrame:
 def test_filter_names(raw_data: pd.DataFrame) -> None:
     """ Test filter_names() """
 
-    in_df = flag_for_review(wrangle_names(filter_urls(raw_data, 0, 0)), 0.99)
+    filt_df, _, _ = filter_urls(raw_data, 0, 0)
+    in_df = flag_for_review(wrangle_names(filt_df), 0.99)
 
     # Article ID 963 is the only article without any predicted names
     remaining_article_ids = pd.Series(
@@ -491,92 +494,45 @@ def test_filter_names(raw_data: pd.DataFrame) -> None:
 
 
 # ---------------------------------------------------------------------------
-def deduplicate(df: pd.DataFrame, thresh: float, common: bool, full: bool,
-                url: bool) -> pd.DataFrame:
+def filter_df(df: pd.DataFrame, min_urls: int, max_urls: int,
+              min_prob: float) -> FilterResults:
     """
-    Deduplicate the resource dataframe by finding resources with the same
-    names.
+    Filter dataframe based on URLs and names
 
     Parameters:
-    `df`: Dataframe that has gone through URL filtering and name wrangling
-    `thresh`: Threshold probability for which a name can be used for
-    deduplication by matching
-    `common`: Use common name for matching, if above `thresh`
-    `full`: Use full name for matching, if above `thresh`
-    `url`: Use URLs for matching
+    `df`: Input dataframe
+    `min_urls`: Minimum number of URLs
+    `max_urls`: Maximum number of URLs
+    `min_prob`: Minimum probability of best name, flag those below
 
-    Return: Deduplicated dataframe
+    Return: `FilterResults` object with dataframe and filter stats
     """
 
-    df = df.drop(
-        ['text', 'common_name', 'common_prob', 'full_name', 'full_prob'],
-        axis='columns')
-    df['best_common_prob'] = df['best_common_prob'].astype(str)
-    df['best_full_prob'] = df['best_full_prob'].astype(str)
-    df['best_name_prob'] = df['best_name_prob'].astype(str)
+    orig_rows = len(df)
 
-    # Do not deduplicate/aggregate rows flagged for review
-    low_df = df[df['best_name_prob'].astype(float) < thresh]
-    high_df = df[df['best_name_prob'].astype(float) >= thresh]
+    url_filt_df, under_urls, over_urls = filter_urls(df, min_urls, max_urls)
 
-    if not any([common, full, url]):
-        duplicate_name = high_df.duplicated('best_name', keep=False)
+    name_filt_df = filter_names(flag_for_review(wrangle_names(df), min_prob))
+    num_bad_names = orig_rows - len(name_filt_df)
 
-        unique_name_df = high_df[duplicate_name == False]
-        same_name_df = high_df[duplicate_name == True]
-        same_name_df['sum_citations'] = 0
+    num_review = sum(name_filt_df['confidence'] == 'manual_review')
 
-        same_name_df = (same_name_df.groupby(['best_name']).agg({
-            'ID':
-            join_commas,
-            'extracted_url':
-            join_commas,
-            'extracted_url_status':
-            join_commas,
-            'extracted_url_country':
-            join_commas,
-            'extracted_url_coordinates':
-            join_commas,
-            'best_common':
-            join_commas,
-            'best_common_prob':
-            join_commas,
-            'best_full':
-            join_commas,
-            'best_full_prob':
-            join_commas,
-            'confidence':
-            join_commas,
-            'sum_citations':
-            len
-        }).reset_index())
+    out_df = pd.merge(url_filt_df, name_filt_df, how='inner', on='ID')
 
-        same_name_df = wrangle_names(same_name_df, 'best_common',
-                                     'best_common_prob', 'best_full',
-                                     'best_full_prob')
-
-        unique_name_df['sum_citations'] = 1
-        low_df['sum_citations'] = 1
-
-        out_df = pd.concat([low_df, unique_name_df, same_name_df])
-
-        return out_df.reset_index(drop=True)
+    return FilterResults(out_df, under_urls, over_urls, num_bad_names,
+                         num_review)
 
 
 # ---------------------------------------------------------------------------
-def test_deduplicate(raw_data: pd.DataFrame) -> None:
-    """ Test deduplicate() """
+def test_filter_df(raw_data: pd.DataFrame) -> None:
+    """ Test filter_df() """
 
-    in_df = filter_names(
-        flag_for_review(wrangle_names(filter_urls(raw_data, 1, 2)), 0.9))
+    filt_results = filter_df(raw_data, 1, 2, 0.9)
 
-    out_ids = pd.Series(['456', '123', '147', '741', '369, 852'], name='ID')
-    out_citations = pd.Series([1, 1, 1, 1, 2], name='sum_citations')
-
-    return_df = deduplicate(in_df, 0.9, False, False, False)
-
-    assert_series_equal(return_df['ID'], out_ids)
-    assert_series_equal(return_df['sum_citations'], out_citations)
+    assert filt_results.under_urls == 1
+    assert filt_results.over_urls == 1
+    assert filt_results.no_names == 1
+    assert filt_results.review == 1
 
 
 # ---------------------------------------------------------------------------
@@ -615,7 +571,25 @@ def main() -> None:
 
     outfile = make_filename(out_dir, args.file.name)
 
-    print(f'Done. Wrote output to {outfile}.')
+    in_df = pd.read_csv(args.file).fillna('')
+    orig_rows = len(in_df)
+
+    filt_results = filter_df(in_df, args.min_urls, args.max_urls,
+                             args.min_prob)
+
+    end_rows = len(filt_results.df)
+
+    print(f'Done filtering results:\n'
+          f'\tOriginal Number of articles: {orig_rows}\n'
+          f'\t- Too few URLs: {filt_results.under_urls}\n'
+          f'\t- Too many URLs: {filt_results.over_urls}\n'
+          f'\t- Articles with no name: {filt_results.no_names}\n'
+          f'\tNumber remaining articles: {end_rows}\n'
+          f'\tNumber marked for review: {filt_results.review}')
+
+    filt_results.df.to_csv(outfile, index=False)
+
+    print(f'Wrote output to {outfile}.')
 
 
 # ---------------------------------------------------------------------------
