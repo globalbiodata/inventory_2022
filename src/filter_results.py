@@ -174,6 +174,9 @@ def filter_urls(df: pd.DataFrame, min_urls: int,
     Return: Filtered dataframe, number of no URLs, number of too
     many URLs
     """
+
+    df = df.copy()
+
     df['url_count'] = df['extracted_url'].map(lambda x: len(x.split(', ')))
 
     no_urls = df['extracted_url'].values == ''
@@ -189,7 +192,7 @@ def filter_urls(df: pd.DataFrame, min_urls: int,
         over_urls = sum([val is np.bool_(False) for val in not_too_many_urls])
         out_df = out_df[not_too_many_urls]
 
-    out_df = out_df.drop(['url_count'], axis=1)
+    out_df.drop(['url_count'], axis='columns', inplace=True)
 
     return out_df, under_urls, over_urls
 
@@ -517,7 +520,7 @@ def filter_df(df: pd.DataFrame, min_urls: int, max_urls: int,
 
     num_review = sum(name_filt_df['confidence'] == 'manual_review')
 
-    out_df = pd.merge(url_filt_df, name_filt_df, how='inner', on='ID')
+    out_df = pd.merge(url_filt_df, name_filt_df, how='inner')
 
     return FilterResults(out_df, under_urls, over_urls, num_bad_names,
                          num_review)
