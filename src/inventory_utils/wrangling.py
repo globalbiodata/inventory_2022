@@ -318,5 +318,28 @@ def test_convert_to_tags() -> None:
 
 
 # ---------------------------------------------------------------------------
+def join_commas(ls: List[str]) -> str:
+    """
+    Create a string by placing a comma and space between each element in a 
+    list of strings.
+
+    Parameters
+    `ls`: List of strings
+
+    Return: Joined string
+    """
+
+    return ', '.join(ls)
+
+
+# ---------------------------------------------------------------------------
+def test_join_commas() -> None:
+    """ Test join_commas() """
+
+    assert join_commas(['foo']) == 'foo'
+    assert join_commas(['foo', 'bar', 'baz']) == 'foo, bar, baz'
+
+
+# ---------------------------------------------------------------------------
 if __name__ == '__main__':
     sys.exit('This file is a module, and is not meant to be run.')

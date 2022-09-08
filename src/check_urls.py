@@ -25,6 +25,7 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 from inventory_utils.custom_classes import CustomHelpFormatter
+from inventory_utils.wrangling import join_commas
 
 # ---------------------------------------------------------------------------
 API_REQ_DICT = {
@@ -823,9 +824,6 @@ def regroup_df(df: pd.DataFrame) -> pd.DataFrame:
     df['extracted_url_status'] = df['extracted_url_status'].astype(str)
     df['extracted_url'] = df['extracted_url'].astype(str)
     df['wayback_url'] = df['wayback_url'].astype(str)
-
-    def join_commas(x: List[str]) -> str:
-        return ', '.join(x)
 
     out_df = (df.groupby(['ID', 'text']).agg({
         'common_name': 'first',
