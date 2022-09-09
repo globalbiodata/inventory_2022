@@ -123,7 +123,7 @@ Once classification and NER have been performed, other information can be gather
 
 ## Checking URLs
 
-`check_urls.py` checks each extracted URL by submitting a request. The status of the request (either a status code or the returned error message if an exception occurs) is recorded in a new column labeled extracted_url_status.
+`check_urls.py` checks each extracted URL by submitting a request. The status of the request (either a status code or the returned error message if an exception occurs) is recorded in a new column labeled extracted_url_status. Rows without URLs are removed, since the inventory requires a URL to identify the resource.
 
 The number of attempts to request the URL can be modified with the `-n|--num-tries` flag. To avoid exceeding the allowable number of attempts in a certain period of time, the `-b|--backoff` flag is used, where 0 adds no wait time and 1 adds the most wait time.
 
@@ -142,6 +142,21 @@ Additionally, a `-v|--verbose` flag is available for debugging.
 ```
 
 So with a back off factor of 0.1, it will sleep for [0.0s, 0.2s, 0.4s, ...]. More information can be found in the [urllib3 documentation](https://urllib3.readthedocs.io/en/latest/reference/urllib3.util.html#module-urllib3.util.retry)
+
+## Cleaning and Filtering
+
+Once all data and metadata are collected, the inventory is pared down with filtering.
+Some parameters for filtering are removing rows with too few URLs (< `-nu|--min-urls`), or too many URLS (> `-xu|--max-urls`). Min URLs is not likely to be used, since articles must have at least 1 URL to pass the URL checking step. Maximum URLs is useful for removing articles that are citing several resources, so predicted resource name, *etc.* are unlikely to be meaningful.
+
+Additionally, this step sorts out the predicted names. If no common or full name could be predicted, the article is removed. The common name with the highest probability is placed in the "best_common" column, similarly with full names. Of the best common and best full names, the one with the highest probability is placed in the new "best_name" column (favoring full name in case of a tie). This is the final predicted resource name. If the best name has a probability below `-np|--min-prob` that row is flagged for manual review in the new "confidence" column.
+
+The filtered data are output to `-o|--out-dir`, and a summary of the filtering process is output to `stdout`, such as how many articles were removed on each filtering criteria. Note that an article can be removed for several reasons, such as both no URL and no name, in which case it will be counted twice in the summary.
+
+## Deduplication
+
+Deduplication can be performed on several fields. By default, deduplication occurs on the best predicted name; observations with the same best name (with probability above `-np|--min-prob`) are aggregated into a single row. Optionally, deduplication can also occur on any of: common name, full name, or URL (not mutually exclusive).
+
+During deduplication, the texts are dropped, and IDs are concatenated into a list.
 
 # Manual Workflow Examples
 
