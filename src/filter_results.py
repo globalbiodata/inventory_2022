@@ -236,8 +236,8 @@ def make_dict(keys: List, values: Union[List, Iterator[float]]) -> Dict:
     Return: Dictionary
     """
 
-    return dict([(key, value) for key, value in zip(keys, values)
-                 if len(key) != 1])
+    return dict([(key, value) if len(key) != 1 else ('', 0)
+                 for key, value in zip(keys, values)])
 
 
 # ---------------------------------------------------------------------------
@@ -247,7 +247,7 @@ def test_make_dict() -> None:
     names = ['mmCIF', 'PDB', 'A']
     probs = [0.987, 0.775, 0.95]
 
-    assert make_dict(names, probs) == {'mmCIF': 0.987, 'PDB': 0.775}
+    assert make_dict(names, probs) == {'mmCIF': 0.987, 'PDB': 0.775, '': 0}
 
 
 # ---------------------------------------------------------------------------
@@ -364,6 +364,11 @@ def test_select_names() -> None:
     output = pd.Series(
         ['PDB', 0.963, 'Protein Data Bank', 0.963, 'Protein Data Bank', 0.963],
         index=idx)
+    assert_series_equal(select_names(*in_list), output)
+
+    # Single letter name
+    in_list = ['mmCIF, A', '0.987, 0.99', 'F', '0.717']
+    output = pd.Series(['mmCIF', 0.987, '', 0, 'mmCIF', 0.987], index=idx)
     assert_series_equal(select_names(*in_list), output)
 
 
