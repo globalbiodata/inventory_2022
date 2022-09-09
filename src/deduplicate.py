@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Purpose: Finalize inventory by deduplicating and filtering
+Purpose: Finalize inventory by deduplicating
 Authors: Kenneth Schackart
 """
 
@@ -34,15 +34,10 @@ def get_args() -> Args:
     """ Parse command-line arguments """
 
     parser = argparse.ArgumentParser(
-        description=('Finalize the inventory:'
-                     ' filter out bad predictions,'
-                     ' deduplicate,'
-                     ' aggregate,'
-                     ' summarize'),
+        description=('Finalize the inventory by deduplicating'),
         formatter_class=CustomHelpFormatter)
 
     inputs = parser.add_argument_group('Inputs and Outputs')
-    filters = parser.add_argument_group('Parameters for Filtering')
     dedupe = parser.add_argument_group('Fields to Match for Deduplication '
                                        '(not mutually-exclusive)')
 
@@ -56,29 +51,6 @@ def get_args() -> Args:
                         type=str,
                         default='out/',
                         help='Output directory')
-    filters.add_argument('-nu',
-                         '--min-urls',
-                         metavar='INT',
-                         type=int,
-                         default=1,
-                         help=('Minimum number of URLs per resource.'
-                               ' Resources with less discarded.'))
-    filters.add_argument('-xu',
-                         '--max-urls',
-                         metavar='INT',
-                         type=int,
-                         default=2,
-                         help=('Maximum number of URLs per resource.'
-                               ' Resources with more are discarded.'
-                               ' (0 = No maximum)'))
-    filters.add_argument(
-        '-np',
-        '--min_prob',
-        metavar='PROB',
-        type=float,
-        default=0.95,
-        help=('Minimum probability of predicted resource name.'
-              ' Anything below will be flagged for review.'))
 
     dedupe.add_argument('--match-common',
                         help='Match on common name, even if not best name',
@@ -86,6 +58,12 @@ def get_args() -> Args:
     dedupe.add_argument('--match-full',
                         help='Match on full name, even if not best name',
                         action='store_true')
+    dedupe.add_argument('-np',
+                        '--min-prob',
+                        metavar='THRESH',
+                        type=float,
+                        help=('Minimum probability '
+                              'for matching on name'))
     dedupe.add_argument('--match-url',
                         help='Match on URL',
                         action='store_true')
