@@ -367,7 +367,7 @@ def test_select_names() -> None:
     assert_series_equal(select_names(*in_list), output)
 
     # Single letter name
-    in_list = ['mmCIF, A', '0.987, 0.99', 'F', '0.717']
+    in_list = ['mmCIF, A', '0.987, 0.99', 'F, G', '0.717, 0.912']
     output = pd.Series(['mmCIF', 0.987, '', 0, 'mmCIF', 0.987], index=idx)
     assert_series_equal(select_names(*in_list), output)
 
