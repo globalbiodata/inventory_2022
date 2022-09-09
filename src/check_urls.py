@@ -6,14 +6,17 @@ Authors: Kenneth Schackart
 
 import argparse
 import logging
+import math
 import multiprocessing as mp
 import os
 import re
 import socket
+from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 from multiprocessing.pool import Pool
 from typing import List, NamedTuple, Optional, OrderedDict, TextIO, Union, cast
 
+import numpy as np
 import pandas as pd
 import pytest
 import requests
@@ -22,6 +25,7 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 from inventory_utils.custom_classes import CustomHelpFormatter
+from inventory_utils.wrangling import join_commas
 
 # ---------------------------------------------------------------------------
 API_REQ_DICT = {
@@ -41,11 +45,13 @@ Fill in template with `API_REQ_DICT[api].format(ip)`
 class Args(NamedTuple):
     """ Command-line arguments """
     file: TextIO
+    partial: TextIO
     out_dir: str
+    verbose: bool
+    cores: Optional[int]
+    chunk_size: Optional[int]
     num_tries: int
     backoff: float
-    cores: Optional[int]
-    verbose: bool
 
 
 # ---------------------------------------------------------------------------
@@ -77,6 +83,20 @@ class IPLocation(NamedTuple):
 
 
 # ---------------------------------------------------------------------------
+@pytest.fixture(name='in_dataframe')
+def fixture_in_dataframe() -> requests.Session:
+    """ A minimal example of input dataframe, not all columns present """
+
+    in_df = pd.DataFrame([[123, 'Some text', 'http://google.com'],
+                          [456, 'More text', 'http://google.com'],
+                          [789, 'Third text', 'http://foo.com'],
+                          [147, 'Fourth text', 'http://baz.net/']],
+                         columns=['ID', 'text', 'extracted_url'])
+
+    return in_df
+
+
+# ---------------------------------------------------------------------------
 def get_args() -> Args:
     """ Parse command-line arguments """
 
@@ -85,38 +105,61 @@ def get_args() -> Args:
                      'see if snapshot is in WayBack Machine'),
         formatter_class=CustomHelpFormatter)
 
-    parser.add_argument('file',
+    inputs = parser.add_argument_group('Inputs and Outputs')
+    runtime_params = parser.add_argument_group('Runtime Parameters')
+    url_checking = parser.add_argument_group('URL Requesting')
+
+    inputs.add_argument('file',
                         metavar='FILE',
                         type=argparse.FileType('rt', encoding='ISO-8859-1'),
                         help='CSV File with extracted_url column')
-    parser.add_argument('-o',
+    inputs.add_argument('-p',
+                        '--partial',
+                        metavar='FILE',
+                        type=argparse.FileType('rt', encoding='ISO-8859-1'),
+                        help='Partially completed output file')
+    inputs.add_argument('-o',
                         '--out-dir',
                         metavar='DIR',
                         type=str,
                         default='out/',
                         help='Output directory')
-    parser.add_argument('-n',
-                        '--num-tries',
-                        metavar='INT',
-                        type=int,
-                        default=3,
-                        help='Number of tries for checking URL')
-    parser.add_argument('-b',
-                        '--backoff',
-                        metavar='[0-1]',
-                        type=float,
-                        default=0.5,
-                        help='Back-off Factor for retries')
-    parser.add_argument('-c',
-                        '--cores',
-                        metavar='CORE',
-                        type=int,
-                        help=('Number of cores for parallel '
-                              'processing (default: all)'))
-    parser.add_argument('-v',
-                        '--verbose',
-                        action='store_true',
-                        help=('Run with debugging messages'))
+
+    runtime_params.add_argument('-v',
+                                '--verbose',
+                                action='store_true',
+                                help=('Run with debugging messages'))
+    runtime_params.add_argument('-c',
+                                '--cores',
+                                metavar='CORE',
+                                type=int,
+                                help=('Number of cores for multi-'
+                                      'processing. -c <= 0 will use'
+                                      ' -c less than all available. '
+                                      'If not supplied, threading is used '
+                                      'instead of multiprocessing. '
+                                      '(default: threading)'))
+    runtime_params.add_argument('-s',
+                                '--chunk-size',
+                                metavar='INT',
+                                type=int,
+                                help=('Number of rows '
+                                      'to process at a time. Output '
+                                      'is appended after each chunk. '
+                                      '(default: all)'))
+
+    url_checking.add_argument('-n',
+                              '--num-tries',
+                              metavar='INT',
+                              type=int,
+                              default=3,
+                              help='Number of tries for checking URL')
+    url_checking.add_argument('-b',
+                              '--backoff',
+                              metavar='[0-1]',
+                              type=float,
+                              default=0.5,
+                              help='Back-off Factor for retries')
 
     args = parser.parse_args()
 
@@ -127,8 +170,93 @@ def get_args() -> Args:
     if not args.num_tries >= 0:
         parser.error(f'--num-tries ({args.num_tries}) must be at least 1')
 
-    return Args(args.file, args.out_dir, args.num_tries, args.backoff,
-                args.cores, args.verbose)
+    return Args(args.file, args.partial, args.out_dir, args.verbose,
+                args.cores, args.chunk_size, args.num_tries, args.backoff)
+
+
+# ---------------------------------------------------------------------------
+def remove_partial(all_df: pd.DataFrame,
+                   partial_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Remove rows in `all_df` that are in `partial_df`, since their URLs have
+    already been checked.
+
+    Parameters:
+    `all_df`: Input dataframe containing all rows
+    `partial_df`: Dataframe of rows that have been checked
+
+    Return: Dataframe without rows from `partial_df`
+    """
+
+    logging.debug('Removing articles present in the partially processed'
+                  ' output file.')
+    out_df = all_df.copy()
+    processed_ids = partial_df['ID']
+
+    logging.debug('Removing %d articles.', len(processed_ids))
+    out_df = out_df[~out_df['ID'].isin(processed_ids)]
+    out_df.reset_index(inplace=True, drop=True)
+
+    return out_df
+
+
+# ---------------------------------------------------------------------------
+def test_remove_partial(in_dataframe) -> None:
+    """ Test remove_partial() """
+
+    part_df = pd.DataFrame(
+        [[456, 'More text', 'http://google.com', 200],
+         [789, 'Third text', 'http://foo.com', 404]],
+        columns=['ID', 'text', 'extracted_url', 'extracted_url_status'])
+
+    out_df = pd.DataFrame([[123, 'Some text', 'http://google.com'],
+                           [147, 'Fourth text', 'http://baz.net/']],
+                          columns=['ID', 'text', 'extracted_url'])
+
+    assert_frame_equal(remove_partial(in_dataframe, part_df), out_df)
+
+
+# ---------------------------------------------------------------------------
+def chunk_df(df: pd.DataFrame,
+             chunk_size: Optional[int]) -> List[pd.DataFrame]:
+    """
+    Separate input dataframe into a list of dataframes, each with `chunk_size`
+    rows.
+
+    Parameters:
+    `df`: Input dataframe
+    `chunk_size`: Maximum number of rows per chunk
+
+    Return: List of dataframes
+    """
+
+    if not chunk_size:
+        return [df]
+
+    logging.debug('Splitting data into %d-row chunks', chunk_size)
+    chunks = []
+    num_chunks = math.ceil(len(df) / chunk_size)
+    for chunk in np.array_split(df, num_chunks):
+        chunks.append(chunk)
+
+    return chunks
+
+
+# ---------------------------------------------------------------------------
+def test_chunk_df(in_dataframe) -> None:
+    """ Test chunk_df() """
+
+    chunks = chunk_df(in_dataframe, None)
+    assert len(chunks) == 1
+
+    chunks = chunk_df(in_dataframe, 2)
+    assert len(chunks) == 2
+
+    chunks = chunk_df(in_dataframe, 1)
+    assert len(chunks) == 4
+
+    chunks = chunk_df(in_dataframe, 3)
+    assert len(chunks) == 2
 
 
 # ---------------------------------------------------------------------------
@@ -144,7 +272,9 @@ def get_session(tries: int, backoff: float = 0) -> requests.Session:
     """
 
     session = requests.Session()
-    retry = Retry(total=tries, backoff_factor=backoff)
+
+    # total arg is provided as number of retries, so subtract one
+    retry = Retry(total=tries - 1, backoff_factor=backoff)
     adapter = HTTPAdapter(max_retries=retry)
     session.mount('http://', adapter)
     session.mount('https://', adapter)
@@ -162,7 +292,7 @@ def test_get_session() -> None:
     assert isinstance(session.adapters, OrderedDict)
     assert isinstance(session.adapters['http://'], HTTPAdapter)
     assert isinstance(session.adapters['http://'].max_retries, Retry)
-    assert session.adapters['http://'].max_retries.total == 3
+    assert session.adapters['http://'].max_retries.total == 2
 
 
 # ---------------------------------------------------------------------------
@@ -171,6 +301,39 @@ def fixture_testing_session() -> requests.Session:
     """ A basic session used for testing requests """
 
     return get_session(1, 0)
+
+
+# ---------------------------------------------------------------------------
+def remove_missing_urls(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Remove rows that do not have any URLs
+
+    Parameters:
+    `df`: Raw dataframe
+
+    Return: Dataframe with no missing URLs
+    """
+
+    return df.dropna(subset=['extracted_url'])
+
+
+# ---------------------------------------------------------------------------
+def test_remove_missing_urls() -> None:
+    """ Test remove_missing_urls() """
+
+    in_df = pd.DataFrame(
+        [[123, 'Some text', 'https://www.google.com, http://google.com'],
+         [789, 'Foo', 'https://www.amazon.com/afbadfbnvbadfbaefbnaegn'],
+         [147, 'Blah', '']],
+        columns=['ID', 'text', 'extracted_url'])
+
+    out_df = pd.DataFrame(
+        [[123, 'Some text', 'https://www.google.com, http://google.com'],
+         [789, 'Foo', 'https://www.amazon.com/afbadfbnvbadfbaefbnaegn'],
+         [147, 'Blah', '']],
+        columns=['ID', 'text', 'extracted_url'])
+
+    assert_frame_equal(remove_missing_urls(in_df), out_df)
 
 
 # ---------------------------------------------------------------------------
@@ -212,20 +375,24 @@ def test_expand_url_col() -> None:
 
 
 # ---------------------------------------------------------------------------
-def get_pool(cores: Optional[int]) -> Pool:
+def get_pool(cores: int) -> Pool:
     """
     Get Pool for multiprocessing.
 
     Parameters:
-    `cores`: Number of CPUs to use, if not specified detect number available
+    `cores`: Number of cores to use. If `cores` >= 1 , use `cores`.
+    If `cores` <= 0, use available cores - |`cores`|
 
     Return:
-    `Pool` using `cores` or number of available cores
+    multiprocessing `Pool`
     """
 
-    n_cores = cores if cores else mp.cpu_count()
+    if cores <= 0:
+        n_cores = mp.cpu_count() - abs(cores)
+    else:
+        n_cores = cores
 
-    logging.debug('Running with %d processes', n_cores)
+    logging.debug('Running with %d cores', n_cores)
 
     return mp.Pool(n_cores)  # pylint: disable=consider-using-with
 
@@ -372,7 +539,10 @@ def get_location(url: str) -> IPLocation:
     """
 
     logging.debug('Attempting to determine IP address of %s', url)
-    ip = socket.gethostbyname(extract_domain(url))
+    try:
+        ip = socket.gethostbyname(extract_domain(url))
+    except socket.gaierror:
+        ip = ''
 
     if not ip:
         logging.debug('IP address for %s could not be determined', url)
@@ -432,6 +602,7 @@ def check_url(url: str, session: requests.Session) -> URLStatus:
     return URLStatus(url, status, location.country, location.coordinates)
 
 
+@pytest.mark.slow
 # ---------------------------------------------------------------------------
 def test_check_url(testing_session: requests.Session) -> None:
     """ Test check_url() """
@@ -530,11 +701,15 @@ def check_wayback(url: str) -> str:
     Return: WayBack snapshot URL or "no_wayback"
     """
 
-    # Not using try-except because if there is an exception it is not
+    # Not try-except because if there is an exception it is not
     # because there is not an archived version, it means the API
     # has changed. The code must be updated then.
     r = requests.get(f'http://archive.org/wayback/available?url={url}',
                      headers={'User-agent': 'biodata_resource_inventory'})
+
+    if r.status_code in [504, 503]:
+        print('WARNING: WayBack Machine is not responding')
+        return 'wayback is down'
 
     returned_dict = cast(dict, r.json())
     snapshots = cast(dict, returned_dict.get('archived_snapshots'))
@@ -547,6 +722,7 @@ def check_wayback(url: str) -> str:
     return snapshot.get('url', 'no_wayback')
 
 
+@pytest.mark.slow
 # ---------------------------------------------------------------------------
 def test_check_wayback() -> None:
     """ Test check_wayback() """
@@ -576,26 +752,37 @@ def check_urls(df: pd.DataFrame, cores: Optional[int],
     """
 
     check_url_part = partial(check_url, session=session)
+    out_df = df.copy()
 
-    with get_pool(cores) as pool:
-        logging.debug('Checking extracted URL statuses. ' 'Max attempts: %d. ')
+    if cores is not None:
+        logging.debug('Starting multiple processes.')
+        with get_pool(cores) as pool:
+            logging.debug('Checking extracted URL statuses. ')
 
-        url_statuses = pool.map_async(check_url_part,
-                                      df['extracted_url']).get()
+            url_statuses = pool.map_async(check_url_part,
+                                          out_df['extracted_url']).get()
+    else:
+        logging.debug('Starting thread pool.')
+        with ThreadPoolExecutor() as executor:
+            logging.debug('Checking extracted URL statuses. ')
 
-        df = merge_url_statuses(df, url_statuses)
+            url_statuses = list(
+                executor.map(check_url_part, out_df['extracted_url']))
 
-        logging.debug('Finished checking extracted URLs.')
-        logging.debug('Checking for snapshots of extracted URLs '
-                      'on WayBack Machine.')
+    out_df = merge_url_statuses(out_df, url_statuses)
 
-        df['wayback_url'] = df['extracted_url'].map(check_wayback)
+    logging.debug('Finished checking extracted URLs.')
+    logging.debug('Checking for snapshots of extracted URLs '
+                  'on WayBack Machine.')
 
-        logging.debug('Finished checking WayBack Machine.')
+    out_df['wayback_url'] = out_df['extracted_url'].map(check_wayback)
 
-    return df
+    logging.debug('Finished checking WayBack Machine.')
+
+    return out_df
 
 
+@pytest.mark.slow
 # ---------------------------------------------------------------------------
 def test_check_urls(testing_session: requests.Session) -> None:
     """ Test check_urls() """
@@ -606,17 +793,20 @@ def test_check_urls(testing_session: requests.Session) -> None:
          [789, 'Foo', 'https://www.amazon.com/afbadfbnvbadfbaefbnaegn']],
         columns=['ID', 'text', 'extracted_url'])
 
-    returned_df = check_urls(in_df, None, testing_session)
-    returned_df.sort_values('ID', inplace=True)
+    # Check that it can run with either threading or multiprocessing
+    # cores == None -> threading
+    # cores == 0 or -1 -> multiprocessing
+    for cores in [None, 0, -1]:
+        returned_df = check_urls(in_df, cores, testing_session)
 
-    # Correct number of rows
-    assert len(returned_df) == 3
+        # Correct number of rows
+        assert len(returned_df) == 3
 
-    # Correct columns
-    assert all(x == y for x, y in zip(returned_df.columns, [
-        'ID', 'text', 'extracted_url', 'extracted_url_status',
-        'extracted_url_country', 'extracted_url_coordinates', 'wayback_url'
-    ]))
+        # Correct columns
+        assert (returned_df.columns == [
+            'ID', 'text', 'extracted_url', 'extracted_url_status',
+            'extracted_url_country', 'extracted_url_coordinates', 'wayback_url'
+        ]).all()
 
 
 # ---------------------------------------------------------------------------
@@ -634,9 +824,6 @@ def regroup_df(df: pd.DataFrame) -> pd.DataFrame:
     df['extracted_url_status'] = df['extracted_url_status'].astype(str)
     df['extracted_url'] = df['extracted_url'].astype(str)
     df['wayback_url'] = df['wayback_url'].astype(str)
-
-    def join_commas(x):
-        return ', '.join(x)
 
     out_df = (df.groupby(['ID', 'text']).agg({
         'common_name': 'first',
@@ -710,21 +897,31 @@ def main() -> None:
     if not os.path.isdir(out_dir):
         os.makedirs(out_dir)
 
+    outfile = make_filename(out_dir, args.file.name)
+
     session = get_session(args.num_tries, args.backoff)
 
     logging.debug('Reading input file: %s.', args.file.name)
-    df = pd.read_csv(args.file)
+    df = remove_missing_urls(pd.read_csv(args.file))
 
-    df = expand_url_col(df)
-    df = check_urls(df, args.cores, session)
+    if args.partial:
+        part_df = pd.read_csv(args.partial)
+        df = remove_partial(df, part_df)
+        part_df.to_csv(outfile, index=False)
 
-    print(df)
-    df = regroup_df(df)
+    for i, chunk in enumerate(chunk_df(df, args.chunk_size)):
+        logging.debug('Processing chunk %d (%d articles).', i + 1, len(chunk))
+        df = expand_url_col(chunk)
+        df = check_urls(df, args.cores, session)
+        df = regroup_df(df)
 
-    print(df)
+        logging.debug('Writing intermediate output to %s.', outfile)
+        df.to_csv(outfile,
+                  index=False,
+                  mode='a',
+                  header=not os.path.exists(outfile))
 
-    outfile = make_filename(out_dir, args.file.name)
-    df.to_csv(outfile, index=False)
+    session.close()
 
     print(f'Done. Wrote output to {outfile}.')
 

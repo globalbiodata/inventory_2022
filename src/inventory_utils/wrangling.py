@@ -230,13 +230,15 @@ def preprocess_data(file: TextIO) -> pd.DataFrame:
     a `pd.DataFrame` of preprocessed data
     """
 
-    df = pd.read_csv(file)
+    df = pd.read_csv(file, dtype=str)
 
-    if not all(map(lambda c: c in df.columns, ['title', 'abstract'])):
+    if not all(map(lambda c: c in df.columns, ['id', 'title', 'abstract'])):
         sys.exit(f'Data file {file.name} must contain columns '
                  'labeled "title" and "abstract".')
 
     df.fillna('', inplace=True)
+    df = df[~df.duplicated('id')]
+    df = df[df['id'] != '']
 
     for col in ['title', 'abstract']:
         df[col] = df[col].apply(strip_xml)
@@ -251,19 +253,22 @@ def preprocess_data(file: TextIO) -> pd.DataFrame:
 def test_preprocess_data() -> None:
     """ Test preprocess_data() """
 
-    in_fh = io.StringIO('title,abstract\n'
-                        'A Descriptive Title,A <i>detailed</i> abstract.\n'
-                        'Another title,Another abstract.')
+    in_fh = io.StringIO('id,title,abstract\n'
+                        '123,A Descriptive Title,A <i>detailed</i> abstract.\n'
+                        '456,Another title,Another abstract.\n'
+                        '456,Another title,Another abstract.\n'
+                        ',This one should go,now\n')
 
-    out_df = pd.DataFrame([[
-        'A Descriptive Title', 'A detailed abstract.',
-        'A Descriptive Title. A detailed abstract.'
-    ],
-                           [
-                               'Another title', 'Another abstract.',
-                               'Another title. Another abstract.'
-                           ]],
-                          columns=['title', 'abstract', 'title_abstract'])
+    out_df = pd.DataFrame(
+        [[
+            '123', 'A Descriptive Title', 'A detailed abstract.',
+            'A Descriptive Title. A detailed abstract.'
+        ],
+         [
+             '456', 'Another title', 'Another abstract.',
+             'Another title. Another abstract.'
+         ]],
+        columns=['id', 'title', 'abstract', 'title_abstract'])
 
     assert_frame_equal(preprocess_data(in_fh), out_df)
 
@@ -315,6 +320,29 @@ def test_convert_to_tags() -> None:
 
     assert exp_pred == res_pred
     assert exp_labels == res_labels
+
+
+# ---------------------------------------------------------------------------
+def join_commas(ls: List[str]) -> str:
+    """
+    Create a string by placing a comma and space between each element in a 
+    list of strings.
+
+    Parameters
+    `ls`: List of strings
+
+    Return: Joined string
+    """
+
+    return ', '.join(ls)
+
+
+# ---------------------------------------------------------------------------
+def test_join_commas() -> None:
+    """ Test join_commas() """
+
+    assert join_commas(['foo']) == 'foo'
+    assert join_commas(['foo', 'bar', 'baz']) == 'foo, bar, baz'
 
 
 # ---------------------------------------------------------------------------
