@@ -434,7 +434,7 @@ def request_url(url: str, session: requests.Session) -> Union[int, str]:
     """
 
     try:
-        r = session.head(url)
+        r = session.head(url, timeout=5)
     except requests.exceptions.RequestException as err:
         return str(err)
 
