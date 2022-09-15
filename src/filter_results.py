@@ -236,17 +236,18 @@ def make_dict(keys: List, values: Union[List, Iterator[float]]) -> Dict:
     Return: Dictionary
     """
 
-    return dict(zip(keys, values))
+    return dict([(key, value) if len(key) != 1 else ('', 0)
+                 for key, value in zip(keys, values)])
 
 
 # ---------------------------------------------------------------------------
 def test_make_dict() -> None:
     """ Test make_dict() """
 
-    names = ['mmCIF', 'PDB']
-    probs = [0.987, 0.775]
+    names = ['mmCIF', 'PDB', 'A']
+    probs = [0.987, 0.775, 0.95]
 
-    assert make_dict(names, probs) == {'mmCIF': 0.987, 'PDB': 0.775}
+    assert make_dict(names, probs) == {'mmCIF': 0.987, 'PDB': 0.775, '': 0}
 
 
 # ---------------------------------------------------------------------------
@@ -363,6 +364,11 @@ def test_select_names() -> None:
     output = pd.Series(
         ['PDB', 0.963, 'Protein Data Bank', 0.963, 'Protein Data Bank', 0.963],
         index=idx)
+    assert_series_equal(select_names(*in_list), output)
+
+    # Single letter name
+    in_list = ['mmCIF, A', '0.987, 0.99', 'F, G', '0.717, 0.912']
+    output = pd.Series(['mmCIF', 0.987, '', 0, 'mmCIF', 0.987], index=idx)
     assert_series_equal(select_names(*in_list), output)
 
 
@@ -520,7 +526,7 @@ def filter_df(df: pd.DataFrame, min_urls: int, max_urls: int,
 
     num_review = sum(name_filt_df['confidence'] == 'manual_review')
 
-    out_df = pd.merge(url_filt_df, name_filt_df, how='inner')
+    out_df = pd.merge(url_filt_df, name_filt_df, how='inner', on='ID')
 
     return FilterResults(out_df, under_urls, over_urls, num_bad_names,
                          num_review)
@@ -574,7 +580,7 @@ def main() -> None:
 
     outfile = make_filename(out_dir, args.file.name)
 
-    in_df = pd.read_csv(args.file).fillna('')
+    in_df = pd.read_csv(args.file).fillna('').drop_duplicates(['ID'])
     orig_rows = len(in_df)
 
     filt_results = filter_df(in_df, args.min_urls, args.max_urls,
