@@ -27,6 +27,12 @@ extract_url_dir: 'out/original_query/url_extraction'
 ## URL Checking
 check_url_dir: 'out/original_query/url_checking'
 
+## Filtering
+filtered_results_dir: 'out/original_query/filtered_results'
+
+## Deduplicating
+deduplicated_dir: 'out/original_query/deduplicated_results'
+
 # Input files
 classif_data: 'data/manual_classifications.csv'
 ner_data: 'data/manual_ner_extraction.csv'
@@ -49,3 +55,8 @@ ner_criteria_metric: 'precision'
 # Number of epochs
 classif_epochs: 10
 ner_epochs: 10
+
+# Filtering parameters
+min_urls: 1
+max_urls: 2
+manual_review_prob: 0.95

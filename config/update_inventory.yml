@@ -20,3 +20,14 @@ extract_url_dir: 'out/new_query/url_extraction'
 
 ## URL Checking
 check_url_dir: 'out/new_query/url_checking'
+
+## Filtering
+filtered_results_dir: 'out/new_query/filtered_results'
+
+## Deduplicating
+deduplicated_dir: 'out/new_query/deduplicated_results'
+
+# Filtering parameters
+min_urls: 1
+max_urls: 2
+manual_review_prob: 0.95
