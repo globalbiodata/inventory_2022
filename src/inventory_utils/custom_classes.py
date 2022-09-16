@@ -1,5 +1,9 @@
 """
-Purpose: Module of custom classes
+Custom Classes
+~~~
+
+Custom classes for the Biodata Resource Inventory.
+
 Authors: Kenneth Schackart
 """
 

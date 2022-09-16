@@ -1,5 +1,9 @@
 """
-Purpose: Module with functions that modify or detect the runtime
+Runtime
+~~~
+
+Functions that modify or detect the runtime.
+
 Authors: Ana-Maria Istrate and Kenneth Schackart
 """
 

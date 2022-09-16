@@ -1,5 +1,9 @@
 """
-Purpose: Module with functions used for calculating and extracting metrics
+Metrics
+~~~
+
+Functions used for calculating and extracting model performance metrics.
+
 Authors: Ana-Maria Istrate and Kenneth Schackart
 """
 

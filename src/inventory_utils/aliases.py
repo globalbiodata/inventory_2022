@@ -1,5 +1,9 @@
 """
-Purpose: Module of custom type aliases
+Aliases
+~~~
+
+Typing aliases for simplified type annotations.
+
 Authors: Kenneth Schackart
 """
 

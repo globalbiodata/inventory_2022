@@ -1,5 +1,10 @@
 """
-Purpose: Preprocess and tokenize data, create DataLoader
+NER Data Handler
+~~~
+
+Functions for creating a dataloader for the NER task,
+which includes preprocessing and tokenization.
+
 Authors: Ana-Maria Istrate and Kenneth Schackart
 """
 

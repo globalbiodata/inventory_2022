@@ -1,5 +1,10 @@
 """
-Purpose: Module of constants
+Constants
+~~~
+
+Constants that are used throughout the Biodata Resource Inventory.
+
+
 Authors: Ana-Maria Istrate and Kenneth Schackart
 """
 
