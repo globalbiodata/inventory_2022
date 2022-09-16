@@ -236,8 +236,11 @@ def make_dict(keys: List, values: Union[List, Iterator[float]]) -> Dict:
     Return: Dictionary
     """
 
-    return dict([(key, value) if len(key) != 1 else ('', 0)
-                 for key, value in zip(keys, values)])
+    # Replace single character keys (names) with empty string
+    keys = [key if len(key) != 1 else '' for key in keys]
+
+    # Assign zero probability (value) to empty strings
+    return {key: value if key != '' else 0 for key, value in zip(keys, values)}
 
 
 # ---------------------------------------------------------------------------
@@ -526,7 +529,8 @@ def filter_df(df: pd.DataFrame, min_urls: int, max_urls: int,
 
     num_review = sum(name_filt_df['confidence'] == 'manual_review')
 
-    out_df = pd.merge(url_filt_df, name_filt_df, how='inner', on='ID')
+    # out_df = pd.merge(url_filt_df, name_filt_df, how='inner', on='ID')
+    out_df = pd.merge(url_filt_df, name_filt_df, how='inner')
 
     return FilterResults(out_df, under_urls, over_urls, num_bad_names,
                          num_review)
