@@ -63,7 +63,6 @@ def make_filenames(outdir: str) -> Tuple[str, str]:
     Make filenames for output csv file and last date text file
 
     Parameters:
-    ~~~
     `outdir`: Output directory
 
     Return: Tuple of csv and txt filenames
