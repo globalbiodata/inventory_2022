@@ -332,7 +332,7 @@ def test_convert_to_tags() -> None:
 # ---------------------------------------------------------------------------
 def join_commas(ls: List[str]) -> str:
     """
-    Create a string by placing a comma and space between each element in a 
+    Create a string by placing a comma and space between each element in a
     list of strings.
 
     Parameters
