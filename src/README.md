@@ -162,7 +162,7 @@ During deduplication, the texts are dropped, and IDs are concatenated into a lis
 
 Here, you can find an example of how to run the entire workflow(s) manually from the command-line. This should not be necessary, since there are Snakemake pipelines to automate, and notebooks to guide, the process (see [../README.md](../README.md)). What is shown here is essentially what is run by the Snakemake pipelines. This may be useful for debugging.
 
-*All commands shown here should be run from the root of the repository* (not from the `src/` folder)
+*All commands shown here should be run from the root of the repository* (not from the `src/` folder).
 
 ## Training and Prediction
 
