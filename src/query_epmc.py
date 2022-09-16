@@ -161,7 +161,8 @@ def run_query(query: str, from_date: str, to_date: str) -> pd.DataFrame:
 
     while results_json.get('nextPageUrl') is not None:
         results = requests.get(results_json['nextPageUrl'])
-        if results.status_code != requests.codes.ok:  # pylint: disable=no-member
+        status = results.status_code
+        if status != requests.codes.ok:  # pylint: disable=no-member
             results.raise_for_status()
 
         results_json = cast(dict, results.json())
