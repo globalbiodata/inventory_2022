@@ -6,7 +6,6 @@ Authors: Kenneth Schackart
 
 import argparse
 import logging
-import math
 import multiprocessing as mp
 import os
 import re
@@ -16,7 +15,6 @@ from functools import partial
 from multiprocessing.pool import Pool
 from typing import List, NamedTuple, Optional, OrderedDict, TextIO, Union, cast
 
-import numpy as np
 import pandas as pd
 import pytest
 import requests
@@ -25,7 +23,7 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 from inventory_utils.custom_classes import CustomHelpFormatter
-from inventory_utils.wrangling import join_commas
+from inventory_utils.wrangling import chunk_rows, join_commas
 
 # ---------------------------------------------------------------------------
 API_REQ_DICT = {
@@ -214,49 +212,6 @@ def test_remove_partial(in_dataframe) -> None:
                           columns=['ID', 'text', 'extracted_url'])
 
     assert_frame_equal(remove_partial(in_dataframe, part_df), out_df)
-
-
-# ---------------------------------------------------------------------------
-def chunk_df(df: pd.DataFrame,
-             chunk_size: Optional[int]) -> List[pd.DataFrame]:
-    """
-    Separate input dataframe into a list of dataframes, each with `chunk_size`
-    rows.
-
-    Parameters:
-    `df`: Input dataframe
-    `chunk_size`: Maximum number of rows per chunk
-
-    Return: List of dataframes
-    """
-
-    if not chunk_size:
-        return [df]
-
-    logging.debug('Splitting data into %d-row chunks', chunk_size)
-    chunks = []
-    num_chunks = math.ceil(len(df) / chunk_size)
-    for chunk in np.array_split(df, num_chunks):
-        chunks.append(chunk)
-
-    return chunks
-
-
-# ---------------------------------------------------------------------------
-def test_chunk_df(in_dataframe) -> None:
-    """ Test chunk_df() """
-
-    chunks = chunk_df(in_dataframe, None)
-    assert len(chunks) == 1
-
-    chunks = chunk_df(in_dataframe, 2)
-    assert len(chunks) == 2
-
-    chunks = chunk_df(in_dataframe, 1)
-    assert len(chunks) == 4
-
-    chunks = chunk_df(in_dataframe, 3)
-    assert len(chunks) == 2
 
 
 # ---------------------------------------------------------------------------
@@ -909,7 +864,7 @@ def main() -> None:
         df = remove_partial(df, part_df)
         part_df.to_csv(outfile, index=False)
 
-    for i, chunk in enumerate(chunk_df(df, args.chunk_size)):
+    for i, chunk in enumerate(chunk_rows(df, args.chunk_size)):
         logging.debug('Processing chunk %d (%d articles).', i + 1, len(chunk))
         df = expand_url_col(chunk)
         df = check_urls(df, args.cores, session)
