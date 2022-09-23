@@ -44,7 +44,7 @@ split_ratios: '0.8 0.1 0.1'
 
 # Metrics used for choosing best model/epoch
 class_criteria_metric: 'precision'
-ner_criteria_metric: 'precision'
+ner_criteria_metric: 'f1'
 
 # Number of epochs
 classif_epochs: 10
