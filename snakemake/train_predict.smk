@@ -207,7 +207,7 @@ rule train_ner:
 rule find_best_ner:
     input:
         expand(
-            "{d}/{model}/train_stats.csv",
+            "{d}/{model}/checkpt.pt",
             d=config["ner_train_outdir"],
             model=model_df.index,
         ),
