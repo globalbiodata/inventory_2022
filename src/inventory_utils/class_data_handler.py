@@ -1,5 +1,10 @@
 """
-Purpose: Preprocess and tokenize data, create DataLoader
+Classification Data Handler
+~~~
+
+Functions for creating a dataloader for the classification task,
+which includes preprocessing and tokenization.
+
 Authors: Ana-Maria Istrate and Kenneth Schackart
 """
 

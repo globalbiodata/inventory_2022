@@ -1,5 +1,9 @@
 """
-Purpose: Module with functions related to reading and writing files
+Filing
+~~~
+
+Functions related to reading and writing files.
+
 Authors: Kenneth Schackart
 """
 

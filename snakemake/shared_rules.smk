@@ -76,3 +76,45 @@ rule check_urls:
             -o {params.out_dir} \
             {input}
         """
+
+
+# Filter the inventory
+rule filter_results:
+    input:
+        config["check_url_dir"] + "/predictions.csv",
+    output:
+        config["filtered_results_dir"] + "/predictions.csv",
+    params:
+        out_dir=config["filtered_results_dir"],
+        min_urls=config["min_urls"],
+        max_urls=config["max_urls"],
+        min_prob=config["manual_review_prob"],
+    log:
+        config["filtered_results_dir"] + "/log.txt",
+    shell:
+        """
+        (python3 src/filter_results \
+            -nu {params.min_urls} \
+            -xu {params.max_urls} \
+            -np {params.min_prob} \
+            -o {params.out_dir} \
+            {input}) 2>&1 | tee {log}
+        """
+
+
+# Deduplicate the inventory
+rule deduplicat_results:
+    input:
+        config["filtered_results_dir"] + "/predictions.csv",
+    output:
+        config["deduplicated_dir"] + "/predictions.csv",
+    params:
+        out_dir=config["deduplicated_dir"],
+    log:
+        config["deduplicated_dir"] + "/log.txt",
+    shell:
+        """
+        (python3 src/deduplicate.py \
+            -o {params.out_dir} \
+            {input}) 2>&1 | tee {log}
+        """

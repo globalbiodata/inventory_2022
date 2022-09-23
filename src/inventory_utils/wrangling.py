@@ -1,13 +1,20 @@
 """
-Purpose: Module with functions for wrangling data
+Wrangling
+~~~
+
+Functions for wrangling, cleaning, and splitting data.
+
 Authors: Ana-Maria Istrate and Kenneth Schackart
 """
 
 import io
+import logging
+import math
 import re
 import sys
-from typing import List, TextIO, Tuple
+from typing import List, Optional, TextIO, Tuple, Union
 
+import numpy as np
 import pandas as pd
 import pytest
 from numpy import array
@@ -325,7 +332,7 @@ def test_convert_to_tags() -> None:
 # ---------------------------------------------------------------------------
 def join_commas(ls: List[str]) -> str:
     """
-    Create a string by placing a comma and space between each element in a 
+    Create a string by placing a comma and space between each element in a
     list of strings.
 
     Parameters
@@ -343,6 +350,59 @@ def test_join_commas() -> None:
 
     assert join_commas(['foo']) == 'foo'
     assert join_commas(['foo', 'bar', 'baz']) == 'foo, bar, baz'
+
+
+# ---------------------------------------------------------------------------
+def chunk_rows(
+        in_item: Union[pd.DataFrame, pd.Series],
+        chunk_size: Optional[int]) -> List[Union[pd.DataFrame, pd.Series]]:
+    """
+    Separate input dataframe or series into a list of dataframes (or series),
+    each with ~`chunk_size` rows.
+
+    Parameters:
+    `in_item`: Input dataframe or series
+    `chunk_size`: Maximum number of rows per chunk
+
+    Return: List of dataframes or series
+    """
+
+    if not chunk_size:
+        return [in_item]
+
+    logging.debug('Splitting data into ~%d-row chunks', chunk_size)
+    chunks = []
+    num_chunks = math.ceil(len(in_item) / chunk_size)
+    for chunk in np.array_split(in_item, num_chunks):
+        chunks.append(chunk)
+
+    return chunks
+
+
+# ---------------------------------------------------------------------------
+def test_chunk_df() -> None:
+    """ Test chunk_df() """
+
+    in_df = pd.DataFrame([['foo', 'bar'], ['baz', 'qux'], ['quux', 'quuz'],
+                          ['corge', 'grault']],
+                         columns=['col_a', 'col_b'])
+
+    # Return whole dataframe if no chunk size
+    chunks = chunk_rows(in_df, None)
+    assert len(chunks) == 1
+
+    chunks = chunk_rows(in_df, 2)
+    assert len(chunks) == 2
+
+    chunks = chunk_rows(in_df, 1)
+    assert len(chunks) == 4
+
+    chunks = chunk_rows(in_df, 3)
+    assert len(chunks) == 2
+
+    # Also handles pd.Series
+    chunks = chunk_rows(in_df['col_a'], 2)
+    assert len(chunks) == 2
 
 
 # ---------------------------------------------------------------------------

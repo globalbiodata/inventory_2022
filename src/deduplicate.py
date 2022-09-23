@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
 """
-Purpose: Finalize inventory by deduplicating and filtering
+Purpose: Finalize inventory by deduplicating
 Authors: Kenneth Schackart
 """
 
 import argparse
 import os
-from typing import NamedTuple, TextIO
+from typing import NamedTuple, Optional, TextIO
 
 import pandas as pd
 import pytest
 from pandas.testing import assert_series_equal
 
+from filter_results import wrangle_names
 from inventory_utils.custom_classes import CustomHelpFormatter
 from inventory_utils.wrangling import join_commas
-from filter_results import wrangle_names
 
 pd.options.mode.chained_assignment = None
 
@@ -26,6 +26,7 @@ class Args(NamedTuple):
     out_dir: str
     common: bool
     full: bool
+    thresh: Optional[float]
     url: bool
 
 
@@ -34,15 +35,10 @@ def get_args() -> Args:
     """ Parse command-line arguments """
 
     parser = argparse.ArgumentParser(
-        description=('Finalize the inventory:'
-                     ' filter out bad predictions,'
-                     ' deduplicate,'
-                     ' aggregate,'
-                     ' summarize'),
+        description=('Finalize the inventory by deduplicating'),
         formatter_class=CustomHelpFormatter)
 
     inputs = parser.add_argument_group('Inputs and Outputs')
-    filters = parser.add_argument_group('Parameters for Filtering')
     dedupe = parser.add_argument_group('Fields to Match for Deduplication '
                                        '(not mutually-exclusive)')
 
@@ -56,29 +52,6 @@ def get_args() -> Args:
                         type=str,
                         default='out/',
                         help='Output directory')
-    filters.add_argument('-nu',
-                         '--min-urls',
-                         metavar='INT',
-                         type=int,
-                         default=1,
-                         help=('Minimum number of URLs per resource.'
-                               ' Resources with less discarded.'))
-    filters.add_argument('-xu',
-                         '--max-urls',
-                         metavar='INT',
-                         type=int,
-                         default=2,
-                         help=('Maximum number of URLs per resource.'
-                               ' Resources with more are discarded.'
-                               ' (0 = No maximum)'))
-    filters.add_argument(
-        '-np',
-        '--min_prob',
-        metavar='PROB',
-        type=float,
-        default=0.95,
-        help=('Minimum probability of predicted resource name.'
-              ' Anything below will be flagged for review.'))
 
     dedupe.add_argument('--match-common',
                         help='Match on common name, even if not best name',
@@ -86,17 +59,20 @@ def get_args() -> Args:
     dedupe.add_argument('--match-full',
                         help='Match on full name, even if not best name',
                         action='store_true')
+    dedupe.add_argument('-np',
+                        '--min-prob',
+                        metavar='THRESH',
+                        type=float,
+                        help=('Minimum probability '
+                              'for matching on name'))
     dedupe.add_argument('--match-url',
                         help='Match on URL',
                         action='store_true')
 
     args = parser.parse_args()
 
-    if args.min_urls < 0:
-        parser.error(f'--min-urls cannot be less than 0; got {args.min_urls}')
-
     return Args(args.file, args.out_dir, args.match_common, args.match_full,
-                args.match_url)
+                args.min_prob, args.match_url)
 
 
 # ---------------------------------------------------------------------------
@@ -174,9 +150,12 @@ def deduplicate(df: pd.DataFrame, thresh: float, common: bool, full: bool,
     df = df.drop(
         ['text', 'common_name', 'common_prob', 'full_name', 'full_prob'],
         axis='columns')
-    df['best_common_prob'] = df['best_common_prob'].astype(str)
-    df['best_full_prob'] = df['best_full_prob'].astype(str)
-    df['best_name_prob'] = df['best_name_prob'].astype(str)
+    all_columns = df.columns
+    df[all_columns] = df[all_columns].fillna('').astype(str)
+    # df['ID'] = df['ID'].astype(str)
+    # df['best_common_prob'] = df['best_common_prob'].astype(str)
+    # df['best_full_prob'] = df['best_full_prob'].astype(str)
+    # df['best_name_prob'] = df['best_name_prob'].astype(str)
 
     # Do not deduplicate/aggregate rows flagged for review
     low_df = df[df['best_name_prob'].astype(float) < thresh]
@@ -188,6 +167,8 @@ def deduplicate(df: pd.DataFrame, thresh: float, common: bool, full: bool,
         unique_name_df = high_df[~duplicate_name]
         same_name_df = high_df[duplicate_name]
         same_name_df['sum_citations'] = 0
+        all_columns = df.columns
+        # df[all_columns] = df[all_columns].astype(str)
 
         same_name_df = (same_name_df.groupby(['best_name']).agg({
             'ID':
@@ -273,7 +254,14 @@ def main() -> None:
     if not os.path.isdir(out_dir):
         os.makedirs(out_dir)
 
+    thresh = args.thresh if args.thresh else 0
+
+    out_df = deduplicate(pd.read_csv(args.file, dtype=str), thresh,
+                         args.common, args.full, args.url)
+
     outfile = make_filename(out_dir, args.file.name)
+
+    out_df.to_csv(outfile, index=False)
 
     print(f'Done. Wrote output to {outfile}.')
 

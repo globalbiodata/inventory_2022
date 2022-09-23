@@ -8,7 +8,7 @@ import argparse
 import os
 import re
 from collections import defaultdict
-from typing import NamedTuple, TextIO, Tuple, cast
+from typing import NamedTuple, Optional, TextIO, Tuple, cast
 
 import pandas as pd
 import pycountry
@@ -16,6 +16,7 @@ import requests
 from pandas.testing import assert_series_equal
 
 from inventory_utils.custom_classes import CustomHelpFormatter
+from inventory_utils.wrangling import chunk_rows
 
 
 # ---------------------------------------------------------------------------
@@ -23,6 +24,7 @@ class Args(NamedTuple):
     """ Command-line arguments """
     file: TextIO
     out_dir: str
+    chunk_size: Optional[int]
 
 
 # ---------------------------------------------------------------------------
@@ -43,10 +45,16 @@ def get_args() -> Args:
                         type=str,
                         default='out/',
                         help='Output directory')
+    parser.add_argument('-s',
+                        '--chunk-size',
+                        metavar='INT',
+                        type=int,
+                        help=('Number of rows '
+                              'to process at a time.'))
 
     args = parser.parse_args()
 
-    return Args(args.file, args.out_dir)
+    return Args(args.file, args.out_dir, args.chunk_size)
 
 
 # ---------------------------------------------------------------------------
@@ -125,41 +133,50 @@ def clean_results(results: dict) -> pd.DataFrame:
 
 
 # ---------------------------------------------------------------------------
-def run_query(ids: pd.Series) -> pd.DataFrame:
+def run_query(ids: pd.Series, chunk_size: Optional[int]) -> pd.DataFrame:
     """
     Run query on EuropePMC API
 
     Parameters:
     `ids`: Dataframe ID column
+    `chunk_size`: Maximum number of IDs to check per request
 
     Return: `DataFrame` of returned article information
     """
 
-    query = ' OR '.join(set(ids))
-    prefix = 'https://www.ebi.ac.uk/europepmc/webservices/rest/search?query='
-    suffix = '&resultType=core&fromSearchPost=false&format=json'
-    url = prefix + query + suffix
+    out_df = pd.DataFrame()
 
-    # Not using try-except because if there is an exception it is not
-    # because there is not an archived version, it means the API
-    # has changed.
-    results = requests.get(url)
-    if results.status_code != requests.codes.ok:  # pylint: disable=no-member
-        results.raise_for_status()
+    for id_chunk in chunk_rows(ids, chunk_size):
+        query = ' OR '.join(set(id_chunk))
+        prefix = ('https://www.ebi.ac.uk/europepmc/'
+                  'webservices/rest/search?query=')
+        suffix = '&resultType=core&fromSearchPost=false&format=json'
+        url = prefix + query + suffix
 
-    results_json = cast(dict, results.json())
+        # Not using try-except because if there is an exception,
+        # it means the API has changed.
+        results = requests.get(url)
+        status = results.status_code
+        if status != requests.codes.ok:  # pylint: disable=no-member
+            results.raise_for_status()
 
-    return clean_results(results_json)
+        results_json = cast(dict, results.json())
+
+        cleaned_results = clean_results(results_json)
+
+        pd.concat([out_df, cleaned_results])
+
+    return out_df
 
 
 # ---------------------------------------------------------------------------
 def extract_countries(affiliations: pd.Series) -> pd.Series:
     """
     Extract country names from affiliations column
-    
+
     Parameters:
     `affiliations`: Column of affiliations
-    
+
     Return: column of extracted country names
     """
 
@@ -167,10 +184,9 @@ def extract_countries(affiliations: pd.Series) -> pd.Series:
     for affiliation in affiliations:
         found_countries = []
         for country in pycountry.countries:
-            if any([
+            if any(
                     re.search(fr'\b{x}\b', affiliation)
-                    for x in [country.name, country.alpha_3, country.alpha_2]
-            ]):
+                    for x in [country.name, country.alpha_3, country.alpha_2]):
                 found_countries.append(country.name)
         countries.append(', '.join(found_countries))
 
@@ -205,16 +221,20 @@ def main() -> None:
         os.makedirs(out_dir)
 
     df = pd.read_csv(args.file)
-    df['ID'] = df['ID'].astype(str)
+    df['ID'] = df['ID'].astype(int).astype(str)
 
-    results = run_query(df['ID'])
+    results = run_query(df['ID'], args.chunk_size)
     results['ID'] = results['ID'].astype(str)
 
     all_info = pd.merge(df, results, how='inner', on='ID')
 
     all_info['countries'] = extract_countries(all_info['affiliation'])
 
-    all_info.to_csv(os.path.join(out_dir, 'meta.csv'), index=False)
+    out_file = os.path.join(out_dir, os.path.basename(args.file.name))
+
+    all_info.to_csv(out_file, index=False)
+
+    print(f'Done. Wrote output to {out_file}.')
 
 
 # ---------------------------------------------------------------------------
