@@ -55,51 +55,32 @@ def fixture_raw_data() -> pd.DataFrame:
 
     columns = [
         'ID', 'text', 'common_name', 'common_prob', 'full_name', 'full_prob',
-        'extracted_url', 'extracted_url_status', 'extracted_url_country',
-        'extracted_url_coordinates'
+        'extracted_url'
     ]
 
     df = pd.DataFrame(
         [
-            [  # Two common names, one full
-                '123', 'The text', 'mmCIF, PDB', '0.987, 0.775',
-                'Protein Data Bank', '0.717', 'http://www.pdb.org/', '200',
-                'US', '(34.22,-118.24)'
+            [  # Only common name
+                '123', 'text', 'Sen', '0.99', '', '', 'url1'
             ],
-            [  # No common name, low probability full name
-                '456', 'More text.', '', '', 'SBASE', '0.648',
-                'http://www.icgeb.trieste.it/sbase', '301', '', ''
+            [  # Only full name
+                '456', 'text', '', '', 'Chihiro Ogino', '0.98', 'url2'
             ],
-            [  # No URL
-                '789', 'Stuff.', 'LDB2000', '0.997', '', '', '', '', '', ''
+            [  # One of each
+                '789', 'text', 'Sen', '0.99', 'Chihiro Ogino', '0.98', 'url3'
             ],
-            [  # Two URLS
-                '147', 'Wow.', 'TwoURLS', '0.998', '', '',
-                'http://website.com, http://db.org', '200, 302', 'JP, GB',
-                '(35.67,139.65), (52.20,0.13)'
+            [  # Two common
+                '147', 'text', 'Sen, Kamaji', '0.97, 0.99', '', '', 'url4'
             ],
-            [  # Many URLs
-                '258', 'Sawasdee', 'LotsaURLS', '0.996', '', '',
-                'http://db.com, http://site.org, http://res.net, http://db.io',
-                '404, Exception, 200, 301', ', , JP, GB',
-                ', , (35.67,139.65), (52.20,0.13)'
+            [  # Two full
+                '258', 'text', '', '', 'Yubaba, Haku', '0.95, 0.98', 'url5'
             ],
-            [  # Same name as 123, but not highest prob
-                '369', 'The cat drank wine', 'PDB', '0.963',
-                'Protein Data Bank', '0.964', 'http://www.pdb.org/', '200',
-                'US', '(34.22,-118.24)'
+            [  # Two of each
+                '369', 'text', 'Sen, Kamaji', '0.97, 0.99', 'Yubaba, Haku',
+                '0.95, 0.98', 'url6'
             ],
-            [  # Shared highest prob name with 369
-                '741', 'Almost 7eleven', 'PDB', '0.983', 'Protein Data Bank',
-                '0.964', 'http://www.pdb.org/', '200', 'US', '(34.22,-118.24)'
-            ],
-            [  # Same common and full names, mismatched prob ranking with 741
-                '852', 'Chihiro', 'PDB', '0.963', 'Protein Data Bank', '0.984',
-                'http://www.pdb.org/', '200', 'US', '(34.22,-118.24)'
-            ],
-            [  # No names predicted
-                '963', 'Sen', '', '', '', '', 'http://www.pdb.org/', '200',
-                'US', '(34.22,-118.24)'
+            [  # No name
+                '321', 'No Face', '', '', '', '', 'url7'
             ]
         ],
         columns=columns)
@@ -292,25 +273,18 @@ def wrangle_names(df: pd.DataFrame,
 def test_wrangle_names(raw_data: pd.DataFrame) -> None:
     """ Test wrangle_names() """
 
-    out_df = wrangle_names(raw_data)
+    out_df = wrangle_names(filter_names(raw_data))
 
-    best_common = pd.Series([
-        'mmCIF', '', 'LDB2000', 'TwoURLS', 'LotsaURLS', 'PDB', 'PDB', 'PDB', ''
-    ],
+    best_common = pd.Series(['Sen', '', 'Sen', 'Kamaji', '', 'Kamaji'],
                             name='best_common')
-    best_full = pd.Series([
-        'Protein Data Bank', 'SBASE', '', '', '', 'Protein Data Bank',
-        'Protein Data Bank', 'Protein Data Bank', ''
-    ],
-                          name='best_full')
-    best_overall = pd.Series([
-        'mmCIF', 'SBASE', 'LDB2000', 'TwoURLS', 'LotsaURLS',
-        'Protein Data Bank', 'PDB', 'Protein Data Bank', ''
-    ],
-                             name='best_name')
-    best_prob = pd.Series(
-        [0.987, 0.648, 0.997, 0.998, 0.996, 0.964, 0.983, 0.984, 0],
-        name='best_name_prob')
+    best_full = pd.Series(
+        ['', 'Chihiro Ogino', 'Chihiro Ogino', '', 'Haku', 'Haku'],
+        name='best_full')
+    best_overall = pd.Series(
+        ['Sen', 'Chihiro Ogino', 'Sen', 'Kamaji', 'Haku', 'Kamaji'],
+        name='best_name')
+    best_prob = pd.Series([0.99, 0.98, 0.99, 0.99, 0.98, 0.99],
+                          name='best_name_prob')
 
     assert_series_equal(out_df['best_common'], best_common)
     assert_series_equal(out_df['best_full'], best_full)
@@ -329,22 +303,20 @@ def filter_names(df: pd.DataFrame) -> pd.DataFrame:
     Return: Dataframe with rows without names are removed
     """
 
-    return df[df['best_name'] != '']
+    return df[~((df['common_name'] == '') & (df['full_name'] == ''))]
 
 
 # ---------------------------------------------------------------------------
 def test_filter_names(raw_data: pd.DataFrame) -> None:
     """ Test filter_names() """
 
-    in_df = wrangle_names(raw_data)
-
-    # Article ID 963 is the only article without any predicted names
+    # Article ID 321 is the only article without any predicted names
     remaining_article_ids = pd.Series(
-        ['123', '456', '789', '147', '258', '369', '741', '852'], name='ID')
+        ['123', '456', '789', '147', '258', '369'], name='ID')
 
-    return_df = filter_names(in_df)
+    return_df = filter_names(raw_data)
 
-    assert (in_df.columns == return_df.columns).all()
+    assert (raw_data.columns == return_df.columns).all()
     assert_series_equal(return_df['ID'], remaining_article_ids)
 
 
@@ -361,7 +333,7 @@ def filter_df(df: pd.DataFrame) -> Tuple[pd.DataFrame, int]:
 
     orig_rows = len(df)
 
-    out_df = filter_names(wrangle_names(df))
+    out_df = wrangle_names(filter_names(df))
     num_bad_names = orig_rows - len(out_df)
 
     return out_df, num_bad_names
