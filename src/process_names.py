@@ -89,6 +89,34 @@ def fixture_raw_data() -> pd.DataFrame:
 
 
 # ---------------------------------------------------------------------------
+def filter_names(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Remove articles for which no names were predicted
+
+    Parameters:
+    `df`: Input dataframe
+
+    Return: Dataframe with rows without names are removed
+    """
+
+    return df[~((df['common_name'] == '') & (df['full_name'] == ''))]
+
+
+# ---------------------------------------------------------------------------
+def test_filter_names(raw_data: pd.DataFrame) -> None:
+    """ Test filter_names() """
+
+    # Article ID 321 is the only article without any predicted names
+    remaining_article_ids = pd.Series(
+        ['123', '456', '789', '147', '258', '369'], name='ID')
+
+    return_df = filter_names(raw_data)
+
+    assert (raw_data.columns == return_df.columns).all()
+    assert_series_equal(return_df['ID'], remaining_article_ids)
+
+
+# ---------------------------------------------------------------------------
 def make_dict(keys: List, values: Union[List, Iterator[float]]) -> Dict:
     """
     Make a dictionary from lists of keys and values
@@ -293,35 +321,7 @@ def test_wrangle_names(raw_data: pd.DataFrame) -> None:
 
 
 # ---------------------------------------------------------------------------
-def filter_names(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Remove articles for which no names were predicted
-
-    Parameters:
-    `df`: Input dataframe
-
-    Return: Dataframe with rows without names are removed
-    """
-
-    return df[~((df['common_name'] == '') & (df['full_name'] == ''))]
-
-
-# ---------------------------------------------------------------------------
-def test_filter_names(raw_data: pd.DataFrame) -> None:
-    """ Test filter_names() """
-
-    # Article ID 321 is the only article without any predicted names
-    remaining_article_ids = pd.Series(
-        ['123', '456', '789', '147', '258', '369'], name='ID')
-
-    return_df = filter_names(raw_data)
-
-    assert (raw_data.columns == return_df.columns).all()
-    assert_series_equal(return_df['ID'], remaining_article_ids)
-
-
-# ---------------------------------------------------------------------------
-def filter_df(df: pd.DataFrame) -> Tuple[pd.DataFrame, int]:
+def process_df(df: pd.DataFrame) -> Tuple[pd.DataFrame, int]:
     """
     Determine best short and full names, and remove rows with no names
 
@@ -340,10 +340,10 @@ def filter_df(df: pd.DataFrame) -> Tuple[pd.DataFrame, int]:
 
 
 # ---------------------------------------------------------------------------
-def test_filter_df(raw_data: pd.DataFrame) -> None:
+def test_process_df(raw_data: pd.DataFrame) -> None:
     """ Test filter_df() """
 
-    _, num_no_name = filter_df(raw_data)
+    _, num_no_name = process_df(raw_data)
 
     assert num_no_name == 1
 
@@ -386,7 +386,7 @@ def main() -> None:
 
     in_df = pd.read_csv(args.file).fillna('').drop_duplicates(['ID'])
 
-    out_df, num_no_name = filter_df(in_df)
+    out_df, num_no_name = process_df(in_df)
 
     plu = 's' if num_no_name != 1 else ''
     print(f'Done processing names.\n{num_no_name} '
