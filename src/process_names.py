@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Purpose: Finalize inventory by deduplicating and filtering
+Purpose: Process predicted names
 Authors: Kenneth Schackart
 """
 
@@ -9,7 +9,6 @@ import os
 from itertools import chain
 from typing import Dict, Iterator, List, NamedTuple, TextIO, Tuple, Union
 
-import numpy as np
 import pandas as pd
 import pytest
 from pandas.testing import assert_series_equal
@@ -24,80 +23,29 @@ class Args(NamedTuple):
     """ Command-line arguments """
     file: TextIO
     out_dir: str
-    min_urls: int
-    max_urls: int
-    min_prob: float
-
-
-# ---------------------------------------------------------------------------
-class FilterResults(NamedTuple):
-    """
-    Result of filtering
-
-    `df`: Filtered `DataFrame`
-    `under_urls`: Number of rows with too few URLs
-    `over_urls`: Number of rows with too many URLs
-    `no_names`: Number of rows with no predicted names
-    `review`: Number of rows flagged for review
-    """
-    df: pd.DataFrame
-    under_urls: int
-    over_urls: int
-    no_names: int
-    review: int
 
 
 # ---------------------------------------------------------------------------
 def get_args() -> Args:
     """ Parse command-line arguments """
 
-    parser = argparse.ArgumentParser(description=('Filter the inventory'),
+    parser = argparse.ArgumentParser(description=('Process predicted names'),
                                      formatter_class=CustomHelpFormatter)
 
-    inputs = parser.add_argument_group('Inputs and Outputs')
-    filters = parser.add_argument_group('Parameters for Filtering')
-
-    inputs.add_argument('file',
+    parser.add_argument('file',
                         metavar='FILE',
                         type=argparse.FileType('rt', encoding='ISO-8859-1'),
                         help='CSV file of predictions and metadata')
-    inputs.add_argument('-o',
+    parser.add_argument('-o',
                         '--out-dir',
                         metavar='DIR',
                         type=str,
                         default='out/',
                         help='Output directory')
-    filters.add_argument('-nu',
-                         '--min-urls',
-                         metavar='INT',
-                         type=int,
-                         default=1,
-                         help=('Minimum number of URLs per resource.'
-                               ' Resources with less discarded.'))
-    filters.add_argument('-xu',
-                         '--max-urls',
-                         metavar='INT',
-                         type=int,
-                         default=2,
-                         help=('Maximum number of URLs per resource.'
-                               ' Resources with more are discarded.'
-                               ' (0 = No maximum)'))
-    filters.add_argument(
-        '-np',
-        '--min_prob',
-        metavar='PROB',
-        type=float,
-        default=0.95,
-        help=('Minimum probability of predicted resource name.'
-              ' Anything below will be flagged for review.'))
 
     args = parser.parse_args()
 
-    if args.min_urls < 0:
-        parser.error(f'--min-urls cannot be less than 0; got {args.min_urls}')
-
-    return Args(args.file, args.out_dir, args.min_urls, args.max_urls,
-                args.min_prob)
+    return Args(args.file, args.out_dir)
 
 
 # ---------------------------------------------------------------------------
@@ -157,71 +105,6 @@ def fixture_raw_data() -> pd.DataFrame:
         columns=columns)
 
     return df
-
-
-# ---------------------------------------------------------------------------
-def filter_urls(df: pd.DataFrame, min_urls: int,
-                max_urls: int) -> Tuple[pd.DataFrame, int, int]:
-    """
-    Filter dataframe to only include rows with
-    `min_urls` <= URLs <= `max_urls`.
-
-    Parameters:
-    `df`: Raw dataframe
-    `min_urls`: Minimum number of URLS per row/article (0=no min)
-    `max_urls`: Maximum number of URLs per row/article (0=no max)
-
-    Return: Filtered dataframe, number of no URLs, number of too
-    many URLs
-    """
-
-    df = df.copy()
-
-    df['url_count'] = df['extracted_url'].map(lambda x: len(x.split(', ')))
-
-    no_urls = df['extracted_url'].values == ''
-    df['url_count'][no_urls] = 0
-
-    enough_urls = min_urls <= df['url_count'].values
-    under_urls = sum([val is np.bool_(False) for val in list(enough_urls)])
-    out_df = df[enough_urls]
-
-    over_urls = 0
-    if max_urls:
-        not_too_many_urls = out_df['url_count'].values <= max_urls
-        over_urls = sum([val is np.bool_(False) for val in not_too_many_urls])
-        out_df = out_df[not_too_many_urls]
-
-    out_df.drop(['url_count'], axis='columns', inplace=True)
-
-    return out_df, under_urls, over_urls
-
-
-# ---------------------------------------------------------------------------
-def test_filter_urls(raw_data: pd.DataFrame) -> None:
-    """ Test filter_urls() """
-    original_row_count = len(raw_data)
-    original_cols = raw_data.columns
-
-    # Doesn't remove any rows; no min and no max
-    out_df, _, _ = filter_urls(raw_data, 0, 0)
-    assert len(out_df) == original_row_count
-    assert (out_df.columns == original_cols).all()
-
-    # Removes row with 4 URLs; no min
-    out_df, _, _ = filter_urls(raw_data, 0, 3)
-    assert len(out_df) == original_row_count - 1
-    assert (out_df.columns == original_cols).all()
-
-    # Removes row with no URLs; no max
-    out_df, _, _ = filter_urls(raw_data, 1, 0)
-    assert len(out_df) == original_row_count - 1
-    assert (out_df.columns == original_cols).all()
-
-    # Removes row with 0 and 4 URLs
-    out_df, _, _ = filter_urls(raw_data, 1, 3)
-    assert len(out_df) == original_row_count - 2
-    assert (out_df.columns == original_cols).all()
 
 
 # ---------------------------------------------------------------------------
@@ -409,9 +292,7 @@ def wrangle_names(df: pd.DataFrame,
 def test_wrangle_names(raw_data: pd.DataFrame) -> None:
     """ Test wrangle_names() """
 
-    in_df, _, _ = filter_urls(raw_data, 0, 0)
-
-    out_df = wrangle_names(in_df)
+    out_df = wrangle_names(raw_data)
 
     best_common = pd.Series([
         'mmCIF', '', 'LDB2000', 'TwoURLS', 'LotsaURLS', 'PDB', 'PDB', 'PDB', ''
@@ -438,43 +319,6 @@ def test_wrangle_names(raw_data: pd.DataFrame) -> None:
 
 
 # ---------------------------------------------------------------------------
-def flag_for_review(df: pd.DataFrame, thresh: float) -> pd.DataFrame:
-    """
-    Flag rows with best name probability < `thresh` for manual review
-
-    Parameters:
-    `df`: Dataframe with wrangled names
-    `thresh`: Threshold for flagging
-
-    Return: Flagged dataframe
-    """
-
-    df['confidence'] = ''
-    df['confidence'][df['best_name_prob'] < thresh] = 'manual_review'
-
-    return df
-
-
-# ---------------------------------------------------------------------------
-def test_flag_for_review(raw_data: pd.DataFrame) -> None:
-    """ Test flag_for_review() """
-
-    filt_df, _, _ = filter_urls(raw_data, 0, 0)
-    in_df = wrangle_names(filt_df)
-
-    thresh = 0.99
-    confidence = pd.Series([
-        'manual_review', 'manual_review', '', '', '', 'manual_review',
-        'manual_review', 'manual_review', 'manual_review'
-    ],
-                           name='confidence')
-
-    out_df = flag_for_review(in_df, thresh)
-
-    assert_series_equal(out_df['confidence'], confidence)
-
-
-# ---------------------------------------------------------------------------
 def filter_names(df: pd.DataFrame) -> pd.DataFrame:
     """
     Remove articles for which no names were predicted
@@ -492,8 +336,7 @@ def filter_names(df: pd.DataFrame) -> pd.DataFrame:
 def test_filter_names(raw_data: pd.DataFrame) -> None:
     """ Test filter_names() """
 
-    filt_df, _, _ = filter_urls(raw_data, 0, 0)
-    in_df = flag_for_review(wrangle_names(filt_df), 0.99)
+    in_df = wrangle_names(raw_data)
 
     # Article ID 963 is the only article without any predicted names
     remaining_article_ids = pd.Series(
@@ -506,46 +349,31 @@ def test_filter_names(raw_data: pd.DataFrame) -> None:
 
 
 # ---------------------------------------------------------------------------
-def filter_df(df: pd.DataFrame, min_urls: int, max_urls: int,
-              min_prob: float) -> FilterResults:
+def filter_df(df: pd.DataFrame) -> Tuple[pd.DataFrame, int]:
     """
-    Filter dataframe based on URLs and names
+    Determine best short and full names, and remove rows with no names
 
     Parameters:
     `df`: Input dataframe
-    `min_urls`: Minimum number of URLs
-    `max_urls`: Maximum number of URLs
-    `min_prob`: Minimum probability of best name, flag those below
 
-    Return: `FilterResults` object with dataframe and filter stats
+    Return: Tuple of Dataframe, number of no-names
     """
 
     orig_rows = len(df)
 
-    url_filt_df, under_urls, over_urls = filter_urls(df, min_urls, max_urls)
+    out_df = filter_names(wrangle_names(df))
+    num_bad_names = orig_rows - len(out_df)
 
-    name_filt_df = filter_names(flag_for_review(wrangle_names(df), min_prob))
-    num_bad_names = orig_rows - len(name_filt_df)
-
-    num_review = sum(name_filt_df['confidence'] == 'manual_review')
-
-    # out_df = pd.merge(url_filt_df, name_filt_df, how='inner', on='ID')
-    out_df = pd.merge(url_filt_df, name_filt_df, how='inner')
-
-    return FilterResults(out_df, under_urls, over_urls, num_bad_names,
-                         num_review)
+    return out_df, num_bad_names
 
 
 # ---------------------------------------------------------------------------
 def test_filter_df(raw_data: pd.DataFrame) -> None:
     """ Test filter_df() """
 
-    filt_results = filter_df(raw_data, 1, 2, 0.9)
+    _, num_no_name = filter_df(raw_data)
 
-    assert filt_results.under_urls == 1
-    assert filt_results.over_urls == 1
-    assert filt_results.no_names == 1
-    assert filt_results.review == 1
+    assert num_no_name == 1
 
 
 # ---------------------------------------------------------------------------
@@ -585,22 +413,14 @@ def main() -> None:
     outfile = make_filename(out_dir, args.file.name)
 
     in_df = pd.read_csv(args.file).fillna('').drop_duplicates(['ID'])
-    orig_rows = len(in_df)
 
-    filt_results = filter_df(in_df, args.min_urls, args.max_urls,
-                             args.min_prob)
+    out_df, num_no_name = filter_df(in_df)
 
-    end_rows = len(filt_results.df)
+    plu = 's' if num_no_name != 1 else ''
+    print(f'Done processing names.\n{num_no_name} '
+          f'article{plu} with no names removed.')
 
-    print(f'Done filtering results:\n'
-          f'\tOriginal Number of articles: {orig_rows}\n'
-          f'\t- Too few URLs: {filt_results.under_urls}\n'
-          f'\t- Too many URLs: {filt_results.over_urls}\n'
-          f'\t- Articles with no name: {filt_results.no_names}\n'
-          f'\tNumber remaining articles: {end_rows}\n'
-          f'\tNumber marked for review: {filt_results.review}')
-
-    filt_results.df.to_csv(outfile, index=False)
+    out_df.to_csv(outfile, index=False)
 
     print(f'Wrote output to {outfile}.')
 
