@@ -100,7 +100,7 @@ def filter_data(df: pd.DataFrame) -> pd.DataFrame:
 
     df = df[['id', 'title', 'abstract', 'curation_score']]
 
-    return df[df['curation_score'].isin([0, 1])]
+    return df[df['curation_score'].isin(['0', '1'])]
 
 
 # ---------------------------------------------------------------------------
@@ -108,14 +108,14 @@ def test_filter_data() -> None:
     """ Test filter_data() """
 
     in_df = pd.DataFrame(
-        [[123, 'First title', 'First abstract', 0, 'nope'],
-         [456, 'Second title', 'Second abstract', 1, 'yup'],
-         [789, 'Third title', 'Third abstract', 0.5, 'unsure']],
+        [[123, 'First title', 'First abstract', '0', 'nope'],
+         [456, 'Second title', 'Second abstract', '1', 'yup'],
+         [789, 'Third title', 'Third abstract', '0.5', 'unsure']],
         columns=['id', 'title', 'abstract', 'curation_score', 'notes'])
 
     out_df = pd.DataFrame(
-        [[123, 'First title', 'First abstract', 0],
-         [456, 'Second title', 'Second abstract', 1]],
+        [[123, 'First title', 'First abstract', '0'],
+         [456, 'Second title', 'Second abstract', '1']],
         columns=['id', 'title', 'abstract', 'curation_score'])
 
     assert_frame_equal(filter_data(in_df), out_df, check_dtype=False)
