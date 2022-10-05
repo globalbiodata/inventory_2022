@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Purpose: Finalize inventory by deduplicating and filtering
+Purpose: Flag rows for manual review
 Authors: Kenneth Schackart
 """
 
@@ -15,6 +15,7 @@ import pytest
 from pandas.testing import assert_series_equal
 
 from inventory_utils.custom_classes import CustomHelpFormatter
+from inventory_utils.wrangling import join_commas
 
 pd.options.mode.chained_assignment = None
 
@@ -38,20 +39,21 @@ class FilterResults(NamedTuple):
     `under_urls`: Number of rows with too few URLs
     `over_urls`: Number of rows with too many URLs
     `no_names`: Number of rows with no predicted names
-    `review`: Number of rows flagged for review
     """
     df: pd.DataFrame
     under_urls: int
     over_urls: int
     no_names: int
-    review: int
 
 
 # ---------------------------------------------------------------------------
 def get_args() -> Args:
     """ Parse command-line arguments """
 
-    parser = argparse.ArgumentParser(description=('Filter the inventory'),
+    parser = argparse.ArgumentParser(description=('Flag rows for review '
+                                                  'based on number of URLs, '
+                                                  'name probability, and '
+                                                  'possible duplication.'),
                                      formatter_class=CustomHelpFormatter)
 
     inputs = parser.add_argument_group('Inputs and Outputs')
@@ -74,16 +76,16 @@ def get_args() -> Args:
                          default=1,
                          help=('Minimum number of URLs per resource.'
                                ' Resources with less discarded.'))
-    filters.add_argument('-xu',
+    filters.add_argument('-u',
                          '--max-urls',
                          metavar='INT',
                          type=int,
                          default=2,
                          help=('Maximum number of URLs per resource.'
-                               ' Resources with more are discarded.'
+                               ' Resources with more are flagged.'
                                ' (0 = No maximum)'))
     filters.add_argument(
-        '-np',
+        '-p',
         '--min_prob',
         metavar='PROB',
         type=float,
@@ -107,8 +109,8 @@ def fixture_raw_data() -> pd.DataFrame:
 
     columns = [
         'ID', 'text', 'common_name', 'common_prob', 'full_name', 'full_prob',
-        'extracted_url', 'extracted_url_status', 'extracted_url_country',
-        'extracted_url_coordinates'
+        'extracted_url', 'best_common', 'best_common_prob', 'best_full',
+        'best_full_prob', 'best_name', 'best_name_prob'
     ]
 
     df = pd.DataFrame(
@@ -225,256 +227,6 @@ def test_filter_urls(raw_data: pd.DataFrame) -> None:
 
 
 # ---------------------------------------------------------------------------
-def make_dict(keys: List, values: Union[List, Iterator[float]]) -> Dict:
-    """
-    Make a dictionary from lists of keys and values
-
-    Parameters:
-    `keys`: list of keys
-    `values`: list of values
-
-    Return: Dictionary
-    """
-
-    # Replace single character keys (names) with empty string
-    keys = [key if len(key) != 1 else '' for key in keys]
-
-    # Assign zero probability (value) to empty strings
-    return {key: value if key != '' else 0 for key, value in zip(keys, values)}
-
-
-# ---------------------------------------------------------------------------
-def test_make_dict() -> None:
-    """ Test make_dict() """
-
-    names = ['mmCIF', 'PDB', 'A']
-    probs = [0.987, 0.775, 0.95]
-
-    assert make_dict(names, probs) == {'mmCIF': 0.987, 'PDB': 0.775, '': 0}
-
-
-# ---------------------------------------------------------------------------
-def concat_dicts(*args: Dict) -> Dict:
-    """
-    Concatenate multiple dictionaries into one
-
-    Parameters:
-    `*args`: Any number of dictionaries
-
-    Return: Concatenated dictionary
-    """
-
-    return dict(chain.from_iterable(d.items() for d in args))
-
-
-# ---------------------------------------------------------------------------
-def test_combine_dicts() -> None:
-    """ Test combine_dicts() """
-
-    comm = {'mmCIF': 0.987, 'PDB': 0.775}
-    full = {'Protein Data Bank': 0.717}
-    combined = {'mmCIF': 0.987, 'PDB': 0.775, 'Protein Data Bank': 0.717}
-
-    assert concat_dicts(comm, full) == combined
-
-
-# ---------------------------------------------------------------------------
-def select_names(common_names: str, common_probs: str, full_names: str,
-                 full_probs: str) -> pd.Series:
-    """
-    Select common name with highest probability, full name with highest
-    probability, and name with overall highest probability
-
-    Parameters:
-    `common_names`: Predicted common name(s)
-    `common_probs`: Probabilities of predicted common name(s)
-    `full_names`: Predicted full name(s)
-    `full_probs`: Probabilities of predicted full name(s)
-
-    Return: Pandas Series with probable common name, probable full name,
-    best overall name, and probabilities of each
-    """
-    def convert_number(s: str) -> float:
-        return float(s) if s else 0
-
-    common_dict = make_dict(common_names.split(', '),
-                            map(convert_number, common_probs.split(', ')))
-    full_dict = make_dict(full_names.split(', '),
-                          map(convert_number, full_probs.split(', ')))
-    combined_dict = concat_dicts(full_dict, common_dict)
-
-    best_common = sorted(
-        common_dict,
-        key=common_dict.get,  # type: ignore
-        reverse=True)[0]
-    best_common_prob = combined_dict[best_common]
-    best_full = sorted(
-        full_dict,
-        key=full_dict.get,  # type: ignore
-        reverse=True)[0]
-    best_full_prob = combined_dict[best_full]
-    best_name = sorted(
-        combined_dict,
-        key=combined_dict.get,  # type: ignore
-        reverse=True)[0]
-    best_prob = combined_dict[best_name]
-
-    return pd.Series([
-        best_common, best_common_prob, best_full, best_full_prob, best_name,
-        best_prob
-    ],
-                     index=[
-                         'best_common', 'best_common_prob', 'best_full',
-                         'best_full_prob', 'best_name', 'best_name_prob'
-                     ])
-
-
-# ---------------------------------------------------------------------------
-def test_select_names() -> None:
-    """ Test select_names() """
-
-    idx = [
-        'best_common', 'best_common_prob', 'best_full', 'best_full_prob',
-        'best_name', 'best_name_prob'
-    ]
-    # Only one found
-    in_list = ['LBD2000', '0.997', '', '']
-    output = pd.Series(['LBD2000', 0.997, '', 0, 'LBD2000', 0.997], index=idx)
-    assert_series_equal(select_names(*in_list), output)
-
-    # Common name is better
-    in_list = ['PDB', '0.983', 'Protein Data Bank', '0.964']
-    output = pd.Series(
-        ['PDB', 0.983, 'Protein Data Bank', 0.964, 'PDB', 0.983], index=idx)
-    assert_series_equal(select_names(*in_list), output)
-
-    # Full name is better
-    in_list = ['PDB', '0.963', 'Protein Data Bank', '0.984']
-    output = pd.Series(
-        ['PDB', 0.963, 'Protein Data Bank', 0.984, 'Protein Data Bank', 0.984],
-        index=idx)
-    assert_series_equal(select_names(*in_list), output)
-
-    # Multiple to unpack
-    in_list = ['mmCIF, PDB', '0.987, 0.775', 'Protein Data Bank', '0.717']
-    output = pd.Series(
-        ['mmCIF', 0.987, 'Protein Data Bank', 0.717, 'mmCIF', 0.987],
-        index=idx)
-    assert_series_equal(select_names(*in_list), output)
-
-    # Equal probability, favor full name
-    in_list = ['PDB', '0.963', 'Protein Data Bank', '0.963']
-    output = pd.Series(
-        ['PDB', 0.963, 'Protein Data Bank', 0.963, 'Protein Data Bank', 0.963],
-        index=idx)
-    assert_series_equal(select_names(*in_list), output)
-
-    # Single letter name
-    in_list = ['mmCIF, A', '0.987, 0.99', 'F, G', '0.717, 0.912']
-    output = pd.Series(['mmCIF', 0.987, '', 0, 'mmCIF', 0.987], index=idx)
-    assert_series_equal(select_names(*in_list), output)
-
-
-# ---------------------------------------------------------------------------
-def wrangle_names(df: pd.DataFrame,
-                  common_col: str = 'common_name',
-                  common_prob_col: str = 'common_prob',
-                  full_name_col: str = 'full_name',
-                  full_prob_col: str = 'full_prob') -> pd.DataFrame:
-    """
-    Place best common name, best full name, best overall name, and best name
-    probability in new columns
-
-    Parameters:
-    `df`: Dataframe
-
-    Return: Dataframe with 4 new columns
-    """
-
-    new_cols = [
-        'best_common', 'best_common_prob', 'best_full', 'best_full_prob',
-        'best_name', 'best_name_prob'
-    ]
-
-    df[new_cols] = df.apply(lambda x: list(
-        select_names(x[common_col], x[common_prob_col], x[full_name_col], x[
-            full_prob_col])),
-                            axis=1,
-                            result_type='expand')
-
-    return df.reset_index(drop=True)
-
-
-# ---------------------------------------------------------------------------
-def test_wrangle_names(raw_data: pd.DataFrame) -> None:
-    """ Test wrangle_names() """
-
-    in_df, _, _ = filter_urls(raw_data, 0, 0)
-
-    out_df = wrangle_names(in_df)
-
-    best_common = pd.Series([
-        'mmCIF', '', 'LDB2000', 'TwoURLS', 'LotsaURLS', 'PDB', 'PDB', 'PDB', ''
-    ],
-                            name='best_common')
-    best_full = pd.Series([
-        'Protein Data Bank', 'SBASE', '', '', '', 'Protein Data Bank',
-        'Protein Data Bank', 'Protein Data Bank', ''
-    ],
-                          name='best_full')
-    best_overall = pd.Series([
-        'mmCIF', 'SBASE', 'LDB2000', 'TwoURLS', 'LotsaURLS',
-        'Protein Data Bank', 'PDB', 'Protein Data Bank', ''
-    ],
-                             name='best_name')
-    best_prob = pd.Series(
-        [0.987, 0.648, 0.997, 0.998, 0.996, 0.964, 0.983, 0.984, 0],
-        name='best_name_prob')
-
-    assert_series_equal(out_df['best_common'], best_common)
-    assert_series_equal(out_df['best_full'], best_full)
-    assert_series_equal(out_df['best_name'], best_overall)
-    assert_series_equal(out_df['best_name_prob'], best_prob)
-
-
-# ---------------------------------------------------------------------------
-def flag_for_review(df: pd.DataFrame, thresh: float) -> pd.DataFrame:
-    """
-    Flag rows with best name probability < `thresh` for manual review
-
-    Parameters:
-    `df`: Dataframe with wrangled names
-    `thresh`: Threshold for flagging
-
-    Return: Flagged dataframe
-    """
-
-    df['confidence'] = ''
-    df['confidence'][df['best_name_prob'] < thresh] = 'manual_review'
-
-    return df
-
-
-# ---------------------------------------------------------------------------
-def test_flag_for_review(raw_data: pd.DataFrame) -> None:
-    """ Test flag_for_review() """
-
-    filt_df, _, _ = filter_urls(raw_data, 0, 0)
-    in_df = wrangle_names(filt_df)
-
-    thresh = 0.99
-    confidence = pd.Series([
-        'manual_review', 'manual_review', '', '', '', 'manual_review',
-        'manual_review', 'manual_review', 'manual_review'
-    ],
-                           name='confidence')
-
-    out_df = flag_for_review(in_df, thresh)
-
-    assert_series_equal(out_df['confidence'], confidence)
-
-
-# ---------------------------------------------------------------------------
 def filter_names(df: pd.DataFrame) -> pd.DataFrame:
     """
     Remove articles for which no names were predicted
@@ -513,7 +265,7 @@ def filter_df(df: pd.DataFrame, min_urls: int, max_urls: int,
 
     Parameters:
     `df`: Input dataframe
-    `min_urls`: Minimum number of URLs
+    # `min_urls`: Minimum number of URLs
     `max_urls`: Maximum number of URLs
     `min_prob`: Minimum probability of best name, flag those below
 
@@ -524,16 +276,13 @@ def filter_df(df: pd.DataFrame, min_urls: int, max_urls: int,
 
     url_filt_df, under_urls, over_urls = filter_urls(df, min_urls, max_urls)
 
-    name_filt_df = filter_names(flag_for_review(wrangle_names(df), min_prob))
+    name_filt_df = filter_names(df)
     num_bad_names = orig_rows - len(name_filt_df)
-
-    num_review = sum(name_filt_df['confidence'] == 'manual_review')
 
     # out_df = pd.merge(url_filt_df, name_filt_df, how='inner', on='ID')
     out_df = pd.merge(url_filt_df, name_filt_df, how='inner')
 
-    return FilterResults(out_df, under_urls, over_urls, num_bad_names,
-                         num_review)
+    return FilterResults(out_df, under_urls, over_urls, num_bad_names)
 
 
 # ---------------------------------------------------------------------------
@@ -546,6 +295,78 @@ def test_filter_df(raw_data: pd.DataFrame) -> None:
     assert filt_results.over_urls == 1
     assert filt_results.no_names == 1
     assert filt_results.review == 1
+
+
+# ---------------------------------------------------------------------------
+def flag_duplicates(ids: pd.Series, values: pd.Series) -> pd.Series:
+    """
+    Create column which indicates potential duplicates based on the given
+    column. New column values are ID's of that row's potential duplicate
+
+    Parameters:
+    `ids`: Column of IDs
+    `values`: Column of values which may have duplicates
+
+    Return: Columns with potential duplicate IDs
+    """
+
+    out = []
+    for id, value in zip(ids, values):
+        matches = []
+        for split_value in value.split(','):
+            match_mask = [
+                split_value in other_value.split(',') for other_value in values
+            ]
+            id_matches = ids[match_mask]
+            id_matches = [match for match in id_matches if match != id]
+            matches += id_matches
+
+        out.append(join_commas(matches))
+
+    print(out)
+
+    return pd.Series(out)
+
+
+# ---------------------------------------------------------------------------
+def test_flag_duplicates() -> None:
+    """ Test flag_duplicates() """
+
+    ids = pd.Series(['123', '456', '789', '147', '258', '369'])
+
+    names = pd.Series(['name1', 'name2', 'name3', 'name1', 'name4', 'name1'])
+    expected_flagged_names = pd.Series(
+        ['147, 369', '', '', '123, 369', '', '123, 147'])
+    flagged_names = flag_duplicates(ids, names)
+    assert_series_equal(flagged_names, expected_flagged_names)
+
+    urls = pd.Series(
+        ['url1', 'url2', 'url1', 'url13, url4', 'url2', 'url1, url5'])
+    expected_flagged_urls = pd.Series(
+        ['789, 369', '258', '123, 369', '', '456', '123, 789'])
+    flagged_urls = flag_duplicates(ids, urls)
+    assert_series_equal(flagged_urls, expected_flagged_urls)
+
+
+# ---------------------------------------------------------------------------
+def flag_df(df: pd.DataFrame, min_prob: float):
+    """
+    Flag dataframe for manual review. Two columns are added:
+    potential_duplicates, and check_out
+
+    Parameters:
+    `df`: Input dataframe
+    `min_prob`: Minimum probability of best name, flag those below
+
+    Return:
+    """
+
+    df['duplicate_urls'] = flag_duplicates(df['ID'], df['extracted_url'])
+    df['duplicate_names'] = flag_duplicates(df['ID'], df['best_name'])
+
+    df['low_prob'] = flag_probs(df['best_name_prob'], min_prob)
+
+    return df
 
 
 # ---------------------------------------------------------------------------
@@ -587,8 +408,11 @@ def main() -> None:
     in_df = pd.read_csv(args.file).fillna('').drop_duplicates(['ID'])
     orig_rows = len(in_df)
 
-    filt_results = filter_df(in_df, args.min_urls, args.max_urls,
-                             args.min_prob)
+    filt_results = filter_df(
+        args.min_urls,
+        args.max_urls,
+    )
+    out_df = flag_df(filt_results.df, args.min_prob)
 
     end_rows = len(filt_results.df)
 

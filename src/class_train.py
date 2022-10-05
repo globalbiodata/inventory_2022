@@ -247,7 +247,7 @@ def train(settings: Settings,
           f'Best Val Recall: {best_val.recall:.3f}\n'
           f'Best Val F1: {best_val.f1:.3f}\n')
 
-    return best_model, train_progress, best_val, best_train
+    return best_model, train_progress, best_train, best_val
 
 
 # ---------------------------------------------------------------------------

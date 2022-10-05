@@ -149,7 +149,7 @@ def convert_predictions(seq_preds: SeqPrediction) -> List[NamedEntity]:
 
     for entity in entities:
         if len(entity.string.strip()) == 1 or re.findall(
-                'http', entity.string):
+                'http', entity.string) or len(entity.string.strip()) > 100:
             continue
 
         out_entities.append(

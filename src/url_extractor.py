@@ -11,6 +11,7 @@ import string
 from typing import List, NamedTuple, Set, TextIO
 
 import pandas as pd
+import pytest
 from pandas.testing import assert_frame_equal
 
 from inventory_utils.custom_classes import CustomHelpFormatter
@@ -22,6 +23,7 @@ class Args(NamedTuple):
     """ Command-line arguments """
     file: TextIO
     out_dir: str
+    max_urls: int
 
 
 # ---------------------------------------------------------------------------
@@ -42,10 +44,37 @@ def get_args() -> Args:
                         type=str,
                         default='out/',
                         help='Output directory')
+    parser.add_argument('-x',
+                        '--max-urls',
+                        metavar='INT',
+                        type=int,
+                        default=2,
+                        help=('Maximum number of URLs, remove rows with '
+                              'more than this number.'))
 
     args = parser.parse_args()
 
-    return Args(args.file, args.out_dir)
+    return Args(args.file, args.out_dir, args.max_urls)
+
+
+# ---------------------------------------------------------------------------
+@pytest.fixture(name='raw_data')
+def fixture_raw_data() -> pd.DataFrame:
+    """ Fake input dataframe """
+
+    df = pd.DataFrame(
+        [['123', 'ATAV (http://atavdb.org)', 'ATAV', '0.995', '', ''],
+         [
+             '456',
+             'https://pharos.nih.gov/ and http://juniper.health.unm.edu/tcrd/',
+             'Pharos', '0.961', '', ''
+         ], ['789', 'no url', 'Anon', '0.97', '', '']],
+        columns=[
+            'ID', 'text', 'common_name', 'common_prob', 'full_name',
+            'full_prob'
+        ])
+
+    return df
 
 
 # ---------------------------------------------------------------------------
@@ -132,20 +161,8 @@ def add_url_column(df: pd.DataFrame) -> pd.DataFrame:
 
 
 # ---------------------------------------------------------------------------
-def test_add_url_column() -> None:
+def test_add_url_column(raw_data: pd.DataFrame) -> None:
     """ Test add_url_column """
-
-    in_df = pd.DataFrame(
-        [['123', 'ATAV (http://atavdb.org)', 'ATAV', '0.995', '', ''],
-         [
-             '456',
-             'https://pharos.nih.gov/ and http://juniper.health.unm.edu/tcrd/',
-             'Pharos', '0.961', '', ''
-         ]],
-        columns=[
-            'ID', 'text', 'common_name', 'common_prob', 'full_name',
-            'full_prob'
-        ])
 
     out_df = pd.DataFrame(
         [[
@@ -157,13 +174,51 @@ def test_add_url_column() -> None:
              'https://pharos.nih.gov/ and http://juniper.health.unm.edu/tcrd/',
              'Pharos', '0.961', '', '',
              'https://pharos.nih.gov/, http://juniper.health.unm.edu/tcrd/'
-         ]],
+         ], ['789', 'no url', 'Anon', '0.97', '', '', '']],
         columns=[
             'ID', 'text', 'common_name', 'common_prob', 'full_name',
             'full_prob', 'extracted_url'
         ])
 
-    assert_frame_equal(add_url_column(in_df), out_df)
+    assert_frame_equal(add_url_column(raw_data), out_df)
+
+
+# ---------------------------------------------------------------------------
+def filter_url_column(df: pd.DataFrame, max_urls: int) -> pd.DataFrame:
+    """
+    Remove rows for which no URL could be found
+
+    Parameters:
+    `df`: Input dataframe with predicted URLs
+
+    Return: Dataframe
+    """
+
+    df = df.copy()
+    df = df[df['extracted_url'] != '']
+
+    df['url_count'] = df['extracted_url'].map(lambda x: len(x.split(', ')))
+    df = df[df['url_count'] <= max_urls]
+
+    df.drop(['url_count'], axis='columns', inplace=True)
+
+    return df
+
+
+# ---------------------------------------------------------------------------
+def test_filter_url_column(raw_data: pd.DataFrame) -> None:
+    """ Test add_url_column """
+
+    out_df = pd.DataFrame([[
+        '123', 'ATAV (http://atavdb.org)', 'ATAV', '0.995', '', '',
+        'http://atavdb.org'
+    ]],
+                          columns=[
+                              'ID', 'text', 'common_name', 'common_prob',
+                              'full_name', 'full_prob', 'extracted_url'
+                          ])
+
+    assert_frame_equal(filter_url_column(add_url_column(raw_data), 1), out_df)
 
 
 # ---------------------------------------------------------------------------
@@ -206,7 +261,7 @@ def main() -> None:
         df = preprocess_data(df)
         df = df.rename(columns={'title_abstract': 'text'})
 
-    df = add_url_column(df)
+    df = filter_url_column(add_url_column(df), args.max_urls)
 
     out_name = get_outname(out_dir, args.file.name)
 
