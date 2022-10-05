@@ -47,9 +47,11 @@ def split_df(df: pd.DataFrame, rand_seed: bool, splits: List[float]) -> Splits:
 
     train, val_test = train_test_split(df,
                                        test_size=val_test_split,
+                                       train_size= 1 - val_test_split,
                                        random_state=seed)
     val, test = train_test_split(val_test,
                                  test_size=test_split / val_test_split,
+                                 train_size= 1 -  (test_split / val_test_split),
                                  random_state=seed)
 
     return Splits(train, val, test)
