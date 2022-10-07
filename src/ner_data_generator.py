@@ -546,7 +546,7 @@ def main() -> None:
     if not os.path.isdir(out_dir):
         os.makedirs(out_dir)
 
-    df = pd.read_csv(args.infile)
+    df = pd.read_csv(args.infile, dtype=str)
 
     check_input(df)
 
