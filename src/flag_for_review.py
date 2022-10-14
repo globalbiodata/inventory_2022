@@ -6,6 +6,7 @@ Authors: Kenneth Schackart
 
 import argparse
 import os
+from tkinter import N
 from typing import NamedTuple, TextIO
 
 import numpy as np
@@ -25,6 +26,22 @@ class Args(NamedTuple):
     file: TextIO
     out_dir: str
     min_prob: float
+
+
+# ---------------------------------------------------------------------------
+class FlaggingStats(NamedTuple):
+    """
+    Counts of flagged rows
+    
+    `total_flags`: Total number of flagged rows
+    `duplicate_urls`: Number of rows flagged for duplicate URLs
+    `duplicate_names`: Number of rows flagged for duplicate names
+    `low_probs`: Number of rows flagged for low probability name
+    """
+    total_flags: int
+    duplicate_urls: int
+    duplicate_names: int
+    low_probs: int
 
 
 # ---------------------------------------------------------------------------
@@ -220,7 +237,8 @@ def flag_df(df: pd.DataFrame, min_prob: float):
 
 
 # ---------------------------------------------------------------------------
-def count_flags(df: pd.DataFrame) -> int:
+def count_flags(url_flags: pd.Series, name_flags: pd.Series,
+                prob_flags: pd.Series) -> FlaggingStats:
     """
     Count the number of rows that have been flagged for manual review
     
@@ -230,11 +248,31 @@ def count_flags(df: pd.DataFrame) -> int:
     Return: Number of flagged rows
     """
 
-    flagged_rows = np.where(
-        df['duplicate_urls'] != '' and df['duplicate_names'] != ''
-        and df['low_prob'] != '', 1, 0)
+    num_url_flags = sum(url_flags != '')
+    num_name_flags = sum(name_flags != '')
+    num_prob_flags = sum(prob_flags != '')
 
-    return sum(flagged_rows)
+    any_flags = [(url_flag == name_flag == prob_flag == '')
+                 for url_flag, name_flag, prob_flag in zip(
+                     url_flags, name_flags, prob_flags)]
+    num_any_flag = any_flags.count(False)
+
+    return FlaggingStats(num_any_flag, num_url_flags, num_name_flags,
+                         num_prob_flags)
+
+
+# ---------------------------------------------------------------------------
+def test_count_flags() -> None:
+    """ Test count_flags() """
+
+    url_flags = pd.Series(['', '258', '', '', '456', ''])
+    name_flags = pd.Series(['', '', '147, 258', '789, 258', '789, 147', ''])
+    prob_flags = pd.Series(
+        ['low_prob_best_name', 'low_prob_best_name', '', '', '', ''])
+
+    expected_counts = FlaggingStats(5, 2, 3, 2)
+
+    assert count_flags(url_flags, name_flags, prob_flags) == expected_counts
 
 
 # ---------------------------------------------------------------------------
@@ -277,10 +315,13 @@ def main() -> None:
 
     out_df = flag_df(in_df, args.min_prob)
 
-    num_flagged = count_flags(out_df)
-    plu = '' if num_flagged == 0 else 's'
+    num_flagged = count_flags(out_df['duplicate_urls'],
+                              out_df['duplicate_names'], out_df['low_prob'])
 
-    print(f'{num_flagged} row{plu} flagged for manual review')
+    print(f'Total number of flagged rows: {num_flagged.total_flags}')
+    print(f'Rows with duplicate names: {num_flagged.duplicate_names}')
+    print(f'Rows with duplicate URLs: {num_flagged.duplicate_urls}')
+    print(f'Rows with low probability name: {num_flagged.low_probs}')
 
     out_df.to_csv(outfile, index=False)
 
