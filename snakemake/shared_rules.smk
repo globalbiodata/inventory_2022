@@ -54,67 +54,61 @@ rule extract_urls:
         config["extract_url_dir"] + "/predictions.csv",
     params:
         out_dir=config["extract_url_dir"],
+        max_urls=config["max_urls"],
     shell:
         """
         python3 src/url_extractor.py \
             -o {params.out_dir} \
+            -x {params.max_urls} \
             {input}
         """
 
 
-# Check URL status, get locations, and check for Wayback Snapshot
-rule check_urls:
+# Process predcited resource names
+rule process_names:
     input:
         config["extract_url_dir"] + "/predictions.csv",
     output:
-        config["check_url_dir"] + "/predictions.csv",
+        config["processed_names_dir"] + "/predictions.csv",
     params:
-        out_dir=config["check_url_dir"],
+        out_dir=config["processed_names_dir"],
     shell:
         """
-        python3 src/check_urls.py \
+        python3 src/process_names.py \
             -o {params.out_dir} \
             {input}
         """
 
 
-# Filter the inventory
-rule filter_results:
+# Perform deduplication on exact match names and URLs
+rule initial_deduplication:
     input:
-        config["check_url_dir"] + "/predictions.csv",
+        config["processed_names_dir"] + "/predictions.csv",
     output:
-        config["filtered_results_dir"] + "/predictions.csv",
+        config["initial_dedupe_dir"] + "/predictions.csv",
     params:
-        out_dir=config["filtered_results_dir"],
-        min_urls=config["min_urls"],
-        max_urls=config["max_urls"],
-        min_prob=config["manual_review_prob"],
-    log:
-        config["filtered_results_dir"] + "/log.txt",
+        out_dir=config["initial_dedupe_dir"],
     shell:
         """
-        (python3 src/filter_results \
-            -nu {params.min_urls} \
-            -xu {params.max_urls} \
-            -np {params.min_prob} \
+        python3 src/initial_deduplicate.py \
             -o {params.out_dir} \
-            {input}) 2>&1 | tee {log}
+            {input}
         """
 
 
-# Deduplicate the inventory
-rule deduplicat_results:
+# Flag rows for manual review
+rule flag_for_review:
     input:
-        config["filtered_results_dir"] + "/predictions.csv",
+        config["initial_dedupe_dir"] + "/predictions.csv",
     output:
-        config["deduplicated_dir"] + "/predictions.csv",
+        config["manual_review_dir"] + "/predictions.csv",
     params:
-        out_dir=config["deduplicated_dir"],
-    log:
-        config["deduplicated_dir"] + "/log.txt",
+        out_dir=config["manual_review_dir"],
+        min_prob=config["min_best_name_prob"],
     shell:
         """
-        (python3 src/deduplicate.py \
+        python3 src/flag_for_review.py \
             -o {params.out_dir} \
-            {input}) 2>&1 | tee {log}
+            -p {params.min_prob} \
+            {input}
         """
