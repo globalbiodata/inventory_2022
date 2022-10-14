@@ -27,11 +27,14 @@ extract_url_dir: 'out/original_query/url_extraction'
 ## URL Checking
 check_url_dir: 'out/original_query/url_checking'
 
-## Filtering
-filtered_results_dir: 'out/original_query/filtered_results'
+## Name processing
+processed_names_dir: 'out/original_query/processed_names'
 
-## Deduplicating
-deduplicated_dir: 'out/original_query/deduplicated_results'
+## Initial deduplication
+initial_dedupe_dir: 'out/original_query/initial_deduplication'
+
+## Manual review
+manual_review_dir: 'out/original_query/manual_review'
 
 # Input files
 classif_data: 'data/manual_classifications.csv'
@@ -57,6 +60,5 @@ classif_epochs: 10
 ner_epochs: 10
 
 # Filtering parameters
-min_urls: 1
 max_urls: 2
-manual_review_prob: 0.95
+min_best_name_prob: 0.978
