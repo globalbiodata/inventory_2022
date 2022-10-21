@@ -173,7 +173,7 @@ def main() -> None:
     class_labels = ClassLabel(num_classes=2, names=args.descriptive_labels)
 
     # Predict labels
-    df = pd.read_csv(open(args.infile.name, encoding='ISO-8859-1'))
+    df = pd.read_csv(open(args.infile.name, encoding='ISO-8859-1'), dtype=str)
     df.fillna('', inplace=True)
     df = df[~df.duplicated('id')]
     df = df[df['id'] != '']

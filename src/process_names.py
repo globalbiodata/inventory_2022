@@ -384,7 +384,8 @@ def main() -> None:
 
     outfile = make_filename(out_dir, args.file.name)
 
-    in_df = pd.read_csv(args.file).fillna('').drop_duplicates(['ID'])
+    in_df = pd.read_csv(args.file,
+                        dtype=str).fillna('').drop_duplicates(['ID'])
 
     out_df, num_no_name = process_df(in_df)
 
