@@ -147,9 +147,8 @@ def deduplicate(df: pd.DataFrame) -> pd.DataFrame:
     Return: Deduplicated dataframe
     """
 
-    df = df.drop(
-        ['text', 'common_name', 'common_prob', 'full_name', 'full_prob'],
-        axis='columns')
+    df = df.drop(['common_name', 'common_prob', 'full_name', 'full_prob'],
+                 axis='columns')
     all_columns = df.columns
     df[all_columns] = df[all_columns].fillna('').astype(str)
     df['extracted_url'] = df['extracted_url'].map(clean_url)
@@ -164,6 +163,8 @@ def deduplicate(df: pd.DataFrame) -> pd.DataFrame:
     duplicate_df = (duplicate_df.groupby(['best_name', 'extracted_url']).agg({
         'ID':
         join_commas,
+        'text':
+        'first',
         'best_common':
         join_commas,
         'best_common_prob':
@@ -176,11 +177,12 @@ def deduplicate(df: pd.DataFrame) -> pd.DataFrame:
         len
     }).reset_index())
 
-    duplicate_df = wrangle_names(duplicate_df, 'best_common',
-                                 'best_common_prob', 'best_full',
-                                 'best_full_prob')
-
     unique_df['article_count'] = 1
+
+    if len(duplicate_df) > 0:
+        duplicate_df = wrangle_names(duplicate_df, 'best_common',
+                                     'best_common_prob', 'best_full',
+                                     'best_full_prob')
 
     out_df = pd.concat([unique_df, duplicate_df])
 

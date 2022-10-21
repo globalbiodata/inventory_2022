@@ -78,7 +78,7 @@ graph TD
     classifier --> pos[Positive]
     pos --> ner{{NER Model}}
     pos --> regex(regex)
-    pos --> scrape(scraping)
+    pos --> scrape(APIs)
     ner -- names --> attr[Resource Information]
     regex -- URL --> attr
     scrape -- authors, country --> attr
