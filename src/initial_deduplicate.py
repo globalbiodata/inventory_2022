@@ -101,14 +101,29 @@ def fixture_raw_data() -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 def clean_url(url: str) -> str:
     """
-    For the sake of matching URLs, remove trailing slash and replace
-    https:// with http://
+    For the sake of matching URLs, remove trailing slash, replace
+    https:// with http://, and lowercase all before first single slash
 
     Parameters:
     `url`: URL string
 
     Return: Cleaned URL
     """
+
+    # Split at first single slash to lowercase the first half
+    url_parts = re.search(
+        r'''(?P<before_slash>.*?) # Group everything before first slash
+        (?<!/)                    # No preceding slash
+        /                         # Match single slash
+        (?!/)                     # No following slash
+        (?P<after_slash>.*)       # Group everything after first slash
+        ''', url, re.X)
+
+    if url_parts:
+        url = url_parts['before_slash'].lower(
+        ) + '/' + url_parts['after_slash']
+    else:
+        url = url.lower()
 
     return re.sub('https', 'http', url.rstrip('/'))
 
@@ -128,6 +143,13 @@ def test_clean_url() -> None:
 
     # Does both
     assert clean_url('https://mirdb.org/') == 'http://mirdb.org'
+
+    # Lowercases domain
+    assert clean_url('http://mycoCLAP.fungalgenomics.ca'
+                     ) == 'http://mycoclap.fungalgenomics.ca'
+
+    # Does not lowercase anything after first single slash
+    assert clean_url('http://MYDB.com/BASE') == 'http://mydb.com/BASE'
 
 
 # ---------------------------------------------------------------------------
