@@ -122,13 +122,20 @@ def clean_results(results: List[dict]) -> pd.DataFrame:
     pmids = []
     titles = []
     abstracts = []
+    dates = []
     for page in results:
         for paper in page.get('resultList').get('result'):  # type: ignore
             pmids.append(paper.get('pmid'))
             titles.append(paper.get('title'))
             abstracts.append(paper.get('abstractText'))
+            dates.append(paper.get('firstPublicationDate'))
 
-    return pd.DataFrame({'id': pmids, 'title': titles, 'abstract': abstracts})
+    return pd.DataFrame({
+        'id': pmids,
+        'title': titles,
+        'abstract': abstracts,
+        'publication_date': dates
+    })
 
 
 # ---------------------------------------------------------------------------
