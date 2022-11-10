@@ -6,7 +6,6 @@ Authors: Kenneth Schackart
 
 import argparse
 import os
-from tkinter import N
 from typing import NamedTuple, TextIO
 
 import numpy as np
@@ -32,7 +31,7 @@ class Args(NamedTuple):
 class FlaggingStats(NamedTuple):
     """
     Counts of flagged rows
-    
+
     `total_flags`: Total number of flagged rows
     `duplicate_urls`: Number of rows flagged for duplicate URLs
     `duplicate_names`: Number of rows flagged for duplicate names
@@ -241,10 +240,10 @@ def count_flags(url_flags: pd.Series, name_flags: pd.Series,
                 prob_flags: pd.Series) -> FlaggingStats:
     """
     Count the number of rows that have been flagged for manual review
-    
+
     Parameters:
     `df`: Flagged dataframe
-    
+
     Return: Number of flagged rows
     """
 
@@ -273,6 +272,26 @@ def test_count_flags() -> None:
     expected_counts = FlaggingStats(5, 2, 3, 2)
 
     assert count_flags(url_flags, name_flags, prob_flags) == expected_counts
+
+
+# ---------------------------------------------------------------------------
+def add_review_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Add columns that are to be filled during manual review
+
+    Parameters:
+    `df`: Flagged dataframe
+
+    Return: Dataframe with new (empty)columns
+    """
+
+    df[[
+        'review_low_prob', 'review_dup_urls', 'review_dup_names',
+        'review_notes_low_prob', 'review_notes_dup_url',
+        'review_notes_dup_names'
+    ]] = ''
+
+    return df
 
 
 # ---------------------------------------------------------------------------
@@ -314,15 +333,18 @@ def main() -> None:
     in_df = pd.read_csv(args.file,
                         dtype=str).fillna('').drop_duplicates(['ID'])
 
-    out_df = flag_df(in_df, args.min_prob)
+    flagged_df = flag_df(in_df, args.min_prob)
 
-    num_flagged = count_flags(out_df['duplicate_urls'],
-                              out_df['duplicate_names'], out_df['low_prob'])
+    num_flagged = count_flags(flagged_df['duplicate_urls'],
+                              flagged_df['duplicate_names'],
+                              flagged_df['low_prob'])
 
     print(f'Total number of flagged rows: {num_flagged.total_flags}')
     print(f'Rows with duplicate names: {num_flagged.duplicate_names}')
     print(f'Rows with duplicate URLs: {num_flagged.duplicate_urls}')
     print(f'Rows with low probability name: {num_flagged.low_probs}')
+
+    out_df = add_review_columns(flagged_df)
 
     out_df.to_csv(outfile, index=False)
 
