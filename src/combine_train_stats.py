@@ -63,7 +63,7 @@ def main() -> None:
 
     out_file = os.path.join(args.out_dir, 'combined_train_stats.csv')
 
-    out_df.to_csv(out_file)
+    out_df.to_csv(out_file, index=False)
 
     print(f'Done. Wrote output to {out_file}.')
 
