@@ -7,14 +7,20 @@ This directory contains the source code used in this project.
 ├── inventory_utils/         # Modules used in the project
 ├── check_urls.py            # Gather information from URLs
 ├── class_data_generator.py  # Prepare and split classification data
+├── class_final_eval.ppy     # Evaluate best model on test set
 ├── class_predict.py         # Use trained model to predict classification
 ├── class_train.py           # Train classifier
+├── flag_for_review.py       # Flag inventory for manual review
+├── initial_deduplication.py # Perform initial automated deduplication
 ├── model_picker.py          # Select best trained model
 ├── ner_data_generator.py    # Prepare and split NER data
+├── ner_final_eval.py        # Evaluate best model on test set
 ├── ner_predict.py           # Use trained model to perform NER
 ├── ner_train.py             # Train NER model
-├── url_extractor.py         # Extract URLs from text
-└── query_epmc.py            # Query EuropePMC
+├── process_manual_review.py # Process manually reviewed inventory
+├── process_names.py         # Process predicted names to determine best
+├── query_epmc.py            # Query EuropePMC
+└── url_extractor.py         # Extract URLs from text
 ```
 
 ## Accessing Help
@@ -113,6 +119,8 @@ One output file is created in `--out-dir`:
 
 The trained model checkpoint is used to perform prediction. NER prediction should only be performed on articles predicted to be (or manually classified as) biodata resources.
 
+Any records for which no names were predicted are dropped by the `ner_predict.py` script.
+
 # Downstream tasks
 
 Once classification and NER have been performed, other information can be gathered about the predicted resources. These next steps take as input the output from `ner_predict.py`.
@@ -120,6 +128,30 @@ Once classification and NER have been performed, other information can be gather
 ## URL extraction
 
 `url_extractor.py` is used to extract all unique URLs from the "text" (title + abstract). This is done using a regular expression.
+
+Any records with either no detected URLs or more URLs than the limit `-x|--max-urls` (default: 2) are dropped from the inventory at this stage.
+
+## Name Selection
+
+The NER model may predict multiple common and full names. `process_names.py` selects the common name and full name with the highest probability, as well as the name with the overall highest probability.
+
+## Initial Deduplication
+
+Since many resources publish articles periodically to provide updates, many records may describe the same resource. To deduplicate the inventory, an initial automated deduplication is performed.
+
+`initial_deduplication.py` merges records that have the same `best_name` (name with highest probability) and same extracted URL (ignoring differences due to trailing slashes or difference between "http:" vs "https:").
+
+Articles whose best_name probability is below the threshold (default: 0.978) are not merged, even if they appear to be duplicates. For this reason, it is best to use the same probability threshold for this step and the next step (flagging for manual review).
+
+## Flagging for Manual Review
+
+During this step, the inventory is marked for manual review.
+
+Records with a `best_name` probability below the threshold `-p|--min-prob` (default: 0.978) are marked for review in the `low_best_prob` column. 
+
+Articles that have the same `best_name` are maked in the `duplicate_names` column. The values in the column are the IDs of the records that have the same name as the given record.
+
+Articles that have the same URL are marked in the `duplicate_urls` column. The values are given similar to the `duplicate_names` column.
 
 ## Checking URLs
 
@@ -143,20 +175,9 @@ Additionally, a `-v|--verbose` flag is available for debugging.
 
 So with a back off factor of 0.1, it will sleep for [0.0s, 0.2s, 0.4s, ...]. More information can be found in the [urllib3 documentation](https://urllib3.readthedocs.io/en/latest/reference/urllib3.util.html#module-urllib3.util.retry)
 
-## Cleaning and Filtering
+## Getting Metadata from EuropePMC
 
-Once all data and metadata are collected, the inventory is pared down with filtering.
-Some parameters for filtering are removing rows with too few URLs (< `-nu|--min-urls`), or too many URLS (> `-xu|--max-urls`). Min URLs is not likely to be used, since articles must have at least 1 URL to pass the URL checking step. Maximum URLs is useful for removing articles that are citing several resources, so predicted resource name, *etc.* are unlikely to be meaningful.
-
-Additionally, this step sorts out the predicted names. If no common or full name could be predicted, the article is removed. The common name with the highest probability is placed in the "best_common" column, similarly with full names. Of the best common and best full names, the one with the highest probability is placed in the new "best_name" column (favoring full name in case of a tie). This is the final predicted resource name. If the best name has a probability below `-np|--min-prob` that row is flagged for manual review in the new "confidence" column.
-
-The filtered data are output to `-o|--out-dir`, and a summary of the filtering process is output to `stdout`, such as how many articles were removed on each filtering criteria. Note that an article can be removed for several reasons, such as both no URL and no name, in which case it will be counted twice in the summary.
-
-## Deduplication
-
-Deduplication can be performed on several fields. By default, deduplication occurs on the best predicted name; observations with the same best name (with probability above `-np|--min-prob`) are aggregated into a single row. Optionally, deduplication can also occur on any of: common name, full name, or URL (not mutually exclusive).
-
-During deduplication, the texts are dropped, and IDs are concatenated into a list.
+{DETAILS}
 
 # Manual Workflow Examples
 

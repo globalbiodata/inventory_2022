@@ -182,22 +182,26 @@ def deduplicate(df: pd.DataFrame) -> pd.DataFrame:
     duplicate_df['article_count'] = 0
     all_columns = df.columns
 
-    duplicate_df = (duplicate_df.groupby(['best_name', 'extracted_url']).agg({
-        'ID':
-        join_commas,
-        'text':
-        'first',
-        'best_common':
-        join_commas,
-        'best_common_prob':
-        join_commas,
-        'best_full':
-        join_commas,
-        'best_full_prob':
-        join_commas,
-        'article_count':
-        len
-    }).reset_index())
+    duplicate_df = (duplicate_df.sort_values(
+        'publication_date',
+        ascending=False).groupby(['best_name', 'extracted_url']).agg({
+            'ID':
+            join_commas,
+            'text':
+            'first',
+            'best_common':
+            join_commas,
+            'best_common_prob':
+            join_commas,
+            'best_full':
+            join_commas,
+            'best_full_prob':
+            join_commas,
+            'article_count':
+            len,
+            'publication_date':
+            'first'
+        }).reset_index())
 
     unique_df['article_count'] = 1
 

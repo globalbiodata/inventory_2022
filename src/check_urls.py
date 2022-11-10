@@ -15,6 +15,7 @@ from functools import partial
 from multiprocessing.pool import Pool
 from typing import List, NamedTuple, Optional, OrderedDict, TextIO, Union, cast
 
+import numpy as np
 import pandas as pd
 import pytest
 import requests
@@ -269,7 +270,9 @@ def remove_missing_urls(df: pd.DataFrame) -> pd.DataFrame:
     Return: Dataframe with no missing URLs
     """
 
-    return df.dropna(subset=['extracted_url'])
+    return df.replace({
+        'extracted_url': ''
+    }, np.nan).dropna(subset=['extracted_url'])
 
 
 # ---------------------------------------------------------------------------
@@ -284,8 +287,7 @@ def test_remove_missing_urls() -> None:
 
     out_df = pd.DataFrame(
         [[123, 'Some text', 'https://www.google.com, http://google.com'],
-         [789, 'Foo', 'https://www.amazon.com/afbadfbnvbadfbaefbnaegn'],
-         [147, 'Blah', '']],
+         [789, 'Foo', 'https://www.amazon.com/afbadfbnvbadfbaefbnaegn']],
         columns=['ID', 'text', 'extracted_url'])
 
     assert_frame_equal(remove_missing_urls(in_df), out_df)
@@ -780,16 +782,20 @@ def regroup_df(df: pd.DataFrame) -> pd.DataFrame:
     df['extracted_url'] = df['extracted_url'].astype(str)
     df['wayback_url'] = df['wayback_url'].astype(str)
 
-    out_df = (df.groupby(['ID', 'text']).agg({
-        'common_name': 'first',
-        'common_prob': 'first',
-        'full_name': 'first',
-        'full_prob': 'first',
+    out_df = (df.groupby(['ID']).agg({
+        'best_name': 'first',
+        'best_name_prob': 'first',
+        'best_common': 'first',
+        'best_common_prob': 'first',
+        'best_full': 'first',
+        'best_full_prob': 'first',
+        'article_count': 'first',
+        'publication_date': 'first',
         'extracted_url': join_commas,
         'extracted_url_status': join_commas,
         'extracted_url_country': join_commas,
         'extracted_url_coordinates': join_commas,
-        'wayback_url': join_commas
+        'wayback_url': join_commas,
     }).reset_index())
 
     return out_df
@@ -857,10 +863,10 @@ def main() -> None:
     session = get_session(args.num_tries, args.backoff)
 
     logging.debug('Reading input file: %s.', args.file.name)
-    df = remove_missing_urls(pd.read_csv(args.file))
+    df = remove_missing_urls(pd.read_csv(args.file, dtype=str))
 
     if args.partial:
-        part_df = pd.read_csv(args.partial)
+        part_df = pd.read_csv(args.partial, dtype=str)
         df = remove_partial(df, part_df)
         part_df.to_csv(outfile, index=False)
 

@@ -47,11 +47,11 @@ def split_df(df: pd.DataFrame, rand_seed: bool, splits: List[float]) -> Splits:
 
     train, val_test = train_test_split(df,
                                        test_size=val_test_split,
-                                       train_size= 1 - val_test_split,
+                                       train_size=1 - val_test_split,
                                        random_state=seed)
     val, test = train_test_split(val_test,
                                  test_size=test_split / val_test_split,
-                                 train_size= 1 -  (test_split / val_test_split),
+                                 train_size=1 - (test_split / val_test_split),
                                  random_state=seed)
 
     return Splits(train, val, test)
@@ -332,7 +332,7 @@ def test_convert_to_tags() -> None:
 
 
 # ---------------------------------------------------------------------------
-def join_commas(ls: List[str]) -> str:
+def join_commas(ls: List[str], remove_empty: bool = False) -> str:
     """
     Create a string by placing a comma and space between each element in a
     list of strings.
@@ -343,6 +343,10 @@ def join_commas(ls: List[str]) -> str:
     Return: Joined string
     """
 
+    if remove_empty:
+        ls = [item for item in ls if item != '']
+
+    ls = [str(item) for item in ls]
     return ', '.join(ls)
 
 
@@ -350,6 +354,7 @@ def join_commas(ls: List[str]) -> str:
 def test_join_commas() -> None:
     """ Test join_commas() """
 
+    assert join_commas(['', ''], True) == ''
     assert join_commas(['foo']) == 'foo'
     assert join_commas(['foo', 'bar', 'baz']) == 'foo, bar, baz'
 

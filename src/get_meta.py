@@ -10,13 +10,14 @@ import re
 from collections import defaultdict
 from typing import NamedTuple, Optional, TextIO, Tuple, cast
 
+import numpy as np
 import pandas as pd
 import pycountry
 import requests
-from pandas.testing import assert_series_equal
+from pandas.testing import assert_frame_equal, assert_series_equal
 
 from inventory_utils.custom_classes import CustomHelpFormatter
-from inventory_utils.wrangling import chunk_rows
+from inventory_utils.wrangling import chunk_rows, join_commas
 
 
 # ---------------------------------------------------------------------------
@@ -55,6 +56,46 @@ def get_args() -> Args:
     args = parser.parse_args()
 
     return Args(args.file, args.out_dir, args.chunk_size)
+
+
+# ---------------------------------------------------------------------------
+def separate_ids(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Separate IDs into one row per ID. Assign a resource number to each row
+    first so that they can be remerged after querying EuropePMC.
+    
+    Parameters:
+    `df`: Deduplicated dataframe
+    
+    Return: Dataframe with one row per ID
+    """
+
+    df['resource_num'] = np.arange(len(df))
+
+    df['ID'] = df['ID'].str.split(', ')
+
+    df = df.explode('ID')
+
+    df.reset_index(drop=True, inplace=True)
+
+    return df
+
+
+# ---------------------------------------------------------------------------
+def test_separate_ids() -> None:
+    """ Test separate_ids() """
+
+    in_df = pd.DataFrame(
+        [['123', 'text1', 'url1'], ['456, 789', 'text2', 'url2'],
+         ['147', 'text3', 'url3']],
+        columns=['ID', 'text', 'extracted_url'])
+
+    out_df = pd.DataFrame(
+        [['123', 'text1', 'url1', 0], ['456', 'text2', 'url2', 1],
+         ['789', 'text2', 'url2', 1], ['147', 'text3', 'url3', 2]],
+        columns=['ID', 'text', 'extracted_url', 'resource_num'])
+
+    assert_frame_equal(separate_ids(in_df), out_df)
 
 
 # ---------------------------------------------------------------------------
@@ -211,6 +252,42 @@ def test_extract_countries() -> None:
 
 
 # ---------------------------------------------------------------------------
+def remerge_resources(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Re-merge rows that have the same resource number
+    (arbitrarily assigned while separating IDs).
+
+    Parameters:
+    `df`: input dataframe with one row per ID
+
+    Return: dataframe with one row per resource
+    """
+
+    df.groupby('resource_num').agg({
+        'ID': join_commas,
+        'best_name': 'first',
+        'best_name_prob': 'first',
+        'best_common': 'first',
+        'best_common_prob': 'first',
+        'best_full': 'first',
+        'best_full_prob': 'first',
+        'article_count': 'first',
+        'extracted_url': 'first',
+        'extracted_url_status': 'first',
+        'extracted_url_country': 'first',
+        'extracted_url_coordinates': 'first',
+        'wayback_url': 'first',
+        'publication_date': 'first',
+        'affiliation': join_commas,
+        'countries': join_commas
+    }).reset_index
+
+    df.drop('resource_num', axis='columns', inplace=True)
+
+    return df
+
+
+# ---------------------------------------------------------------------------
 def main() -> None:
     """ Main function """
 
@@ -220,8 +297,9 @@ def main() -> None:
     if not os.path.isdir(out_dir):
         os.makedirs(out_dir)
 
-    df = pd.read_csv(args.file)
-    df['ID'] = df['ID'].astype(int).astype(str)
+    df = pd.read_csv(args.file, dtype=str)
+
+    df = separate_ids(df)
 
     results = run_query(df['ID'], args.chunk_size)
     results['ID'] = results['ID'].astype(str)
@@ -230,9 +308,11 @@ def main() -> None:
 
     all_info['countries'] = extract_countries(all_info['affiliation'])
 
+    out_df = remerge_resources(all_info)
+
     out_file = os.path.join(out_dir, os.path.basename(args.file.name))
 
-    all_info.to_csv(out_file, index=False)
+    out_df.to_csv(out_file, index=False)
 
     print(f'Done. Wrote output to {out_file}.')
 

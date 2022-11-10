@@ -24,17 +24,23 @@ ner_out_dir: 'out/original_query/ner'
 ## URL Extraction
 extract_url_dir: 'out/original_query/url_extraction'
 
-## URL Checking
-check_url_dir: 'out/original_query/url_checking'
-
 ## Name processing
 processed_names_dir: 'out/original_query/processed_names'
 
 ## Initial deduplication
 initial_dedupe_dir: 'out/original_query/initial_deduplication'
 
-## Manual review
-manual_review_dir: 'out/original_query/manual_review'
+## For manual review
+for_manual_review_dir: 'out/original_query/for_manual_review'
+
+## Manually reviewed
+manually_reviewed_dir: 'out/original_query/manually_reviewed'
+
+## Processed manual review
+processed_manual_review: 'out/original_query/processed_manual_review'
+
+## URL Checking
+check_url_dir: 'out/original_query/url_checking'
 
 # Input files
 classif_data: 'data/manual_classifications.csv'
@@ -62,3 +68,8 @@ ner_epochs: 10
 # Filtering parameters
 max_urls: 2
 min_best_name_prob: 0.978
+
+# URL checking
+chunk_size: 200
+num_tries: 3
+backoff: 0.5

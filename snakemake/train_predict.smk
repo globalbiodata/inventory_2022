@@ -12,7 +12,7 @@ model_df = model_df.fillna("")
 
 rule all:
     input:
-        config["manual_review_dir"] + "/predictions.csv",
+        config["for_manual_review_dir"] + "/predictions.csv",
         config["classif_train_outdir"] + "/best/test_set_evaluation/metrics.csv",
         config["ner_train_outdir"] + "/best/test_set_evaluation/metrics.csv",
 
@@ -97,6 +97,26 @@ rule train_classif:
             -r \
             {params.scheduler_flag}
         )2> {log}
+        """
+
+
+# Combine training stats of all models
+rule combine_classifier_stats:
+    input:
+        expand(
+            "{d}/{model}/train_stats.csv",
+            d=config["classif_train_outdir"],
+            model=model_df.index,
+        ),
+    output:
+        config["classif_train_outdir"] + "/combined_stats/combined_train_stats.csv",
+    params:
+        out_dir=config["classif_train_outdir"] + "/combined_stats",
+    shell:
+        """
+        python3 src/combine_train_stats.py \
+            -o {params.out_dir} \
+            {input}
         """
 
 
@@ -200,6 +220,26 @@ rule train_ner:
             -r \
             {params.scheduler_flag}
         )2> {log}
+        """
+
+
+# Combine training stats of all models
+rule combine_ner_stats:
+    input:
+        expand(
+            "{d}/{model}/train_stats.csv",
+            d=config["ner_train_outdir"],
+            model=model_df.index,
+        ),
+    output:
+        config["ner_train_outdir"] + "/combined_stats/combined_train_stats.csv",
+    params:
+        out_dir=config["ner_train_outdir"] + "/combined_stats",
+    shell:
+        """
+        python3 src/combine_train_stats.py \
+            -o {params.out_dir} \
+            {input}
         """
 
 
