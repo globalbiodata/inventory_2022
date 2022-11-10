@@ -14,7 +14,9 @@ rule all:
     input:
         config["for_manual_review_dir"] + "/predictions.csv",
         config["classif_train_outdir"] + "/best/test_set_evaluation/metrics.csv",
+        config["classif_train_outdir"] + "/combined_stats/combined_train_stats.csv",
         config["ner_train_outdir"] + "/best/test_set_evaluation/metrics.csv",
+        config["ner_train_outdir"] + "/combined_stats/combined_train_stats.csv",
 
 
 # Run EruopePMC query
