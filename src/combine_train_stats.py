@@ -59,7 +59,7 @@ def main() -> None:
     for fh in args.files:
         in_df = pd.read_csv(fh)
 
-        pd.concat([out_df, in_df])
+        out_df = pd.concat([out_df, in_df])
 
     out_file = os.path.join(args.out_dir, 'combined_train_stats.csv')
 
