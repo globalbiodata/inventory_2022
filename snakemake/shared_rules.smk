@@ -103,7 +103,7 @@ rule flag_for_review:
     output:
         config["for_manual_review_dir"] + "/predictions.csv",
     params:
-        out_dir=config["manual_review_dir"],
+        out_dir=config["for_manual_review_dir"],
         min_prob=config["min_best_name_prob"],
         new_dir=config["manually_reviewed_dir"],
     shell:
@@ -155,10 +155,3 @@ rule check_urls:
             -o {params.out_dir} \
             {input}
         """
-
-# Get metadata from EuropePMC
-rule get_meta:
-    input:
-        config["check_url_dir"] + "/predictions.csv",
-    output:
-        
