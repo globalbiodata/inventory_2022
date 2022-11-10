@@ -1,4 +1,5 @@
 env/
+r_env/
 out*/
 __pycache__/
 .snakemake/
