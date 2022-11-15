@@ -278,8 +278,8 @@ def remerge_resources(df: pd.DataFrame) -> pd.DataFrame:
         'extracted_url_coordinates': 'first',
         'wayback_url': 'first',
         'publication_date': 'first',
-        'affiliation': join_commas,
-        'countries': join_commas
+        'affiliation': join_commas  #,
+        #'countries': join_commas
     }).reset_index
 
     df.drop('resource_num', axis='columns', inplace=True)
@@ -306,7 +306,7 @@ def main() -> None:
 
     all_info = pd.merge(df, results, how='inner', on='ID')
 
-    all_info['countries'] = extract_countries(all_info['affiliation'])
+    # all_info['countries'] = extract_countries(all_info['affiliation'])
 
     out_df = remerge_resources(all_info)
 
