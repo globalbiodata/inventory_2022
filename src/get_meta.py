@@ -278,7 +278,10 @@ def remerge_resources(df: pd.DataFrame) -> pd.DataFrame:
         'extracted_url_coordinates': 'first',
         'wayback_url': 'first',
         'publication_date': 'first',
-        'affiliation': join_commas  #,
+        'affiliation': join_commas,
+        'authors': join_commas,
+        'grant_ids': join_commas,
+        'grant_agencies': join_commas
         #'countries': join_commas
     }).reset_index
 
