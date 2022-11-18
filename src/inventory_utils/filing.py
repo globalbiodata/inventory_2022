@@ -135,17 +135,19 @@ def save_train_stats(df: pd.DataFrame, filename: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-def save_metrics(metrics: Metrics, filename: str) -> None:
+def save_metrics(model_name: str, metrics: Metrics, filename: str) -> None:
     """
     Save test metrics to csv file
 
     Parameters:
+    `model_name`: Name of model
     `metrics`: A `Metrics` NamedTuple
+    `filename`: Output file name
     """
 
     with open(filename, 'wt') as fh:
-        print('precision,recall,f1,loss', file=fh)
-        print(f'{metrics.precision},{metrics.recall},',
+        print('model,precision,recall,f1,loss', file=fh)
+        print(f'{model_name},{metrics.precision},{metrics.recall},',
               f'{metrics.f1},{metrics.loss}',
               sep='',
               file=fh)
