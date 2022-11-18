@@ -98,7 +98,7 @@ def main() -> None:
 
     test_metrics = get_ner_metrics(model, dataloader, device)
 
-    save_metrics(test_metrics, out_file)
+    save_metrics(model_name, test_metrics, out_file)
 
     print(f'Done. Wrote output to {out_dir}.')
 
