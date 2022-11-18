@@ -42,6 +42,9 @@ processed_manual_review: 'out/original_query/processed_manual_review'
 ## URL Checking
 check_url_dir: 'out/original_query/url_checking'
 
+## Additional metadata from EuropePMC
+epmc_meta_dir: 'out/original_query/epmc_meta'
+
 # Input files
 classif_data: 'data/manual_classifications.csv'
 ner_data: 'data/manual_ner_extraction.csv'
@@ -73,3 +76,6 @@ min_best_name_prob: 0.978
 chunk_size: 200
 num_tries: 3
 backoff: 0.5
+
+# Getting metadata from EuropePMC
+epmc_chunk_size: 20
