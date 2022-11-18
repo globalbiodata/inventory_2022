@@ -155,3 +155,21 @@ rule check_urls:
             -o {params.out_dir} \
             {input}
         """
+
+
+# Get additional metadata from EuropePMC
+rule get_epmc_meta:
+    input:
+        config["check_url_dir"] + "/predictions.csv",
+    output:
+        config["epmc_meta_dir"] + "/predictions.csv",
+    params:
+        out_dir=config["epmc_meta_dir"],
+        chunk_size=config["epmc_chunk_size"],
+    shell:
+        """
+        python3 src/get_meta.py \
+            -s {params.chunk_size} \
+            -o {params.out_dir} \
+            {input}
+        """

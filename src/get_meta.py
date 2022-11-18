@@ -50,8 +50,8 @@ def get_args() -> Args:
                         '--chunk-size',
                         metavar='INT',
                         type=int,
-                        help=('Number of rows '
-                              'to process at a time.'))
+                        help=('Number of IDs to send to'
+                              'EuropePMC at a time.'))
 
     args = parser.parse_args()
 
@@ -141,6 +141,7 @@ def clean_results(results: dict) -> pd.DataFrame:
         parsed_info['titles'].append(paper.get('title'))
         parsed_info['abstracts'].append(paper.get('abstractText'))
         parsed_info['affiliations'].append(paper.get('affiliation'))
+        parsed_info['num_citations'].append(int(paper.get('citedByCount')))
 
         authors = []
         for author in paper.get('authorList', {}).get('author', {}):
@@ -169,7 +170,8 @@ def clean_results(results: dict) -> pd.DataFrame:
         'affiliation': parsed_info['affiliations'],
         'authors': parsed_info['authors'],
         'grant_ids': parsed_info['grant_ids'],
-        'grant_agencies': parsed_info['agencies']
+        'grant_agencies': parsed_info['agencies'],
+        'num_citations': parsed_info['num_citations']
     })
 
 
@@ -205,7 +207,7 @@ def run_query(ids: pd.Series, chunk_size: Optional[int]) -> pd.DataFrame:
 
         cleaned_results = clean_results(results_json)
 
-        pd.concat([out_df, cleaned_results])
+        out_df = pd.concat([out_df, cleaned_results])
 
     return out_df
 
@@ -263,7 +265,7 @@ def remerge_resources(df: pd.DataFrame) -> pd.DataFrame:
     Return: dataframe with one row per resource
     """
 
-    df.groupby('resource_num').agg({
+    df = df.groupby('resource_num').agg({
         'ID': join_commas,
         'best_name': 'first',
         'best_name_prob': 'first',
@@ -279,8 +281,11 @@ def remerge_resources(df: pd.DataFrame) -> pd.DataFrame:
         'wayback_url': 'first',
         'publication_date': 'first',
         'affiliation': join_commas,
-        'countries': join_commas
-    }).reset_index
+        'authors': join_commas,
+        'grant_ids': join_commas,
+        'grant_agencies': join_commas,
+        'num_citations': sum
+    }).reset_index()
 
     df.drop('resource_num', axis='columns', inplace=True)
 
@@ -302,11 +307,8 @@ def main() -> None:
     df = separate_ids(df)
 
     results = run_query(df['ID'], args.chunk_size)
-    results['ID'] = results['ID'].astype(str)
 
-    all_info = pd.merge(df, results, how='inner', on='ID')
-
-    all_info['countries'] = extract_countries(all_info['affiliation'])
+    all_info = pd.merge(df, results, how='left', on='ID')
 
     out_df = remerge_resources(all_info)
 
