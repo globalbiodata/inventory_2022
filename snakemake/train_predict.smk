@@ -13,10 +13,10 @@ model_df = model_df.fillna("")
 rule all:
     input:
         config["for_manual_review_dir"] + "/predictions.csv",
-        config["classif_train_outdir"] + "/best/test_set_evaluation/metrics.csv",
-        config["classif_train_outdir"] + "/combined_stats/combined_train_stats.csv",
-        config["ner_train_outdir"] + "/best/test_set_evaluation/metrics.csv",
-        config["ner_train_outdir"] + "/combined_stats/combined_train_stats.csv",
+        config["classif_train_outdir"] + "/combined_train_stats/combined_stats.csv",
+        config["classif_train_outdir"] + "/combined_test_stats/combined_stats.csv",
+        config["ner_train_outdir"] + "/combined_train_stats/combined_stats.csv",
+        config["ner_train_outdir"] + "/combined_test_stats/combined_stats.csv",
 
 
 # Run EruopePMC query
@@ -111,18 +111,18 @@ rule combine_classifier_stats:
             model=model_df.index,
         ),
     output:
-        config["classif_train_outdir"] + "/combined_stats/combined_train_stats.csv",
+        config["classif_train_outdir"] + "/combined_train_stats/combined_stats.csv",
     params:
-        out_dir=config["classif_train_outdir"] + "/combined_stats",
+        out_dir=config["classif_train_outdir"] + "/combined_train_stats",
     shell:
         """
-        python3 src/combine_train_stats.py \
+        python3 src/combine_stats.py \
             -o {params.out_dir} \
             {input}
         """
 
 
-# Select best trained classifier based on validation F1 score
+# Select best trained classifier based on validation set
 rule find_best_classifier:
     input:
         expand(
@@ -144,21 +144,41 @@ rule find_best_classifier:
         """
 
 
-# Evaluate model on test set
-rule evaluate_best_classifier:
+# Evaluate classification models on test set
+rule evaluate_classifiers_on_test_set:
     input:
         infile=config["classif_splits_dir"] + "/test_paper_classif.csv",
-        model=config["classif_train_outdir"] + "/best/best_checkpt.txt",
+        model=config["classif_train_outdir"] + "/{model}/checkpt.pt",
     output:
-        config["classif_train_outdir"] + "/best/test_set_evaluation/metrics.csv",
+        config["classif_train_outdir"] + "/{model}/test_set_evaluation/metrics.csv",
     params:
-        outdir=config["classif_train_outdir"] + "/best/test_set_evaluation",
+        outdir=config["classif_train_outdir"] + "/{model}/test_set_evaluation",
     shell:
         """
         python3 src/class_final_eval.py \
             -o {params.outdir} \
             -t {input.infile} \
-            -c "$(< {input.model})"
+            -c {input.model}
+        """
+
+
+# Combine training stats of all article classification models on test set
+rule combine_classifier_test_stats:
+    input:
+        expand(
+            "{d}/{model}/test_set_evaluation/metrics.csv",
+            d=config["classif_train_outdir"],
+            model=model_df.index,
+        ),
+    output:
+        config["classif_train_outdir"] + "/combined_test_stats/combined_stats.csv",
+    params:
+        out_dir=config["classif_train_outdir"] + "/combined_test_stats",
+    shell:
+        """
+        python3 src/combine_stats.py \
+            -o {params.out_dir} \
+            {input}
         """
 
 
@@ -225,7 +245,7 @@ rule train_ner:
         """
 
 
-# Combine training stats of all models
+# Combine training stats of all NER models
 rule combine_ner_stats:
     input:
         expand(
@@ -234,18 +254,18 @@ rule combine_ner_stats:
             model=model_df.index,
         ),
     output:
-        config["ner_train_outdir"] + "/combined_stats/combined_train_stats.csv",
+        config["ner_train_outdir"] + "/combined_train_stats/combined_stats.csv",
     params:
-        out_dir=config["ner_train_outdir"] + "/combined_stats",
+        out_dir=config["ner_train_outdir"] + "/combined_train_stats",
     shell:
         """
-        python3 src/combine_train_stats.py \
+        python3 src/combine_stats.py \
             -o {params.out_dir} \
             {input}
         """
 
 
-# Select best NER model based on validation F1 score
+# Select best NER model based on validation set
 rule find_best_ner:
     input:
         expand(
@@ -267,19 +287,39 @@ rule find_best_ner:
         """
 
 
-# Evaluate model on test set
-rule evaluate_best_ner:
+# Evaluate NER models on test set
+rule evaluate_ner_on_test_set:
     input:
         infile=config["ner_splits_dir"] + "/test_ner.pkl",
-        model=config["ner_train_outdir"] + "/best/best_checkpt.txt",
+        model=config["ner_train_outdir"] + "/{model}/checkpt.pt",
     output:
-        config["ner_train_outdir"] + "/best/test_set_evaluation/metrics.csv",
+        config["ner_train_outdir"] + "/{model}/test_set_evaluation/metrics.csv",
     params:
-        outdir=config["ner_train_outdir"] + "/best/test_set_evaluation",
+        outdir=config["ner_train_outdir"] + "/{model}/test_set_evaluation",
     shell:
         """
         python3 src/ner_final_eval.py \
             -o {params.outdir} \
             -t {input.infile} \
-            -c "$(< {input.model})"
+            -c {input.model}
+        """
+
+
+# Combine stats of all NER models on test set
+rule combine_ner_test_stats:
+    input:
+        expand(
+            "{d}/{model}/test_set_evaluation/metrics.csv",
+            d=config["ner_train_outdir"],
+            model=model_df.index,
+        ),
+    output:
+        config["ner_train_outdir"] + "/combined_test_stats/combined_stats.csv",
+    params:
+        out_dir=config["ner_train_outdir"] + "/combined_test_stats",
+    shell:
+        """
+        python3 src/combine_stats.py \
+            -o {params.out_dir} \
+            {input}
         """
