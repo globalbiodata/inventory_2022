@@ -205,7 +205,7 @@ def run_query(ids: pd.Series, chunk_size: Optional[int]) -> pd.DataFrame:
 
         cleaned_results = clean_results(results_json)
 
-        pd.concat([out_df, cleaned_results])
+        out_df = pd.concat([out_df, cleaned_results])
 
     return out_df
 
@@ -263,7 +263,7 @@ def remerge_resources(df: pd.DataFrame) -> pd.DataFrame:
     Return: dataframe with one row per resource
     """
 
-    df.groupby('resource_num').agg({
+    df = df.groupby('resource_num').agg({
         'ID': join_commas,
         'best_name': 'first',
         'best_name_prob': 'first',
@@ -283,7 +283,7 @@ def remerge_resources(df: pd.DataFrame) -> pd.DataFrame:
         'grant_ids': join_commas,
         'grant_agencies': join_commas
         #'countries': join_commas
-    }).reset_index
+    }).reset_index()
 
     df.drop('resource_num', axis='columns', inplace=True)
 
@@ -305,9 +305,9 @@ def main() -> None:
     df = separate_ids(df)
 
     results = run_query(df['ID'], args.chunk_size)
-    results['ID'] = results['ID'].astype(str)
+    # results['ID'] = results['ID'].astype(str)
 
-    all_info = pd.merge(df, results, how='inner', on='ID')
+    all_info = pd.merge(df, results, how='left', on='ID')
 
     # all_info['countries'] = extract_countries(all_info['affiliation'])
 
