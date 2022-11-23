@@ -10,6 +10,7 @@ This directory contains the source code used in this project.
 ├── class_final_eval.ppy     # Evaluate best model on test set
 ├── class_predict.py         # Use trained model to predict classification
 ├── class_train.py           # Train classifier
+├── combine_stats.py         # Combine training/evulation stats files
 ├── flag_for_review.py       # Flag inventory for manual review
 ├── initial_deduplication.py # Perform initial automated deduplication
 ├── model_picker.py          # Select best trained model
@@ -17,6 +18,7 @@ This directory contains the source code used in this project.
 ├── ner_final_eval.py        # Evaluate best model on test set
 ├── ner_predict.py           # Use trained model to perform NER
 ├── ner_train.py             # Train NER model
+├── process_countries.py     # Process informationa about country codes
 ├── process_manual_review.py # Process manually reviewed inventory
 ├── process_names.py         # Process predicted names to determine best
 ├── query_epmc.py            # Query EuropePMC
