@@ -173,3 +173,19 @@ rule get_epmc_meta:
             -o {params.out_dir} \
             {input}
         """
+
+
+# Process country information
+rule process_countries:
+    input:
+        config["epmc_meta_dir"] + "/predictions.csv",
+    output:
+        config["processed_countries"] + "/predictions.csv",
+    params:
+        out_dir=config["processed_countries"],
+    shell:
+        """
+        python3 src/process_countries.py \
+            -o {params.out_dir} \
+            {input}
+        """
