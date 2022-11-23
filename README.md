@@ -4,6 +4,10 @@ This is a public repository of the code used for the Biodata Resource Inventory 
 
 To meet these goals, natural language processing (NLP) methods are applied to journal articles obtained from EuropePMC. First, articles are classified based on their titles and abstracts, to predict if they describe biodata resources. Then, of those articles that are predicted to describe biodata resources, named entity recognition (NER) is employed to predict the resource's name. Further metadata is gathered from the various fields obtained by querying EuropePMC. To aid in reproducibility and reuse, Snakemake pipelines were developed for automation of training, prediction, and updating the inventory.
 
+# Contributions
+
+This code repository represents work done as part of a collaborative effort between the Chan Zuckerberg Initiative (CZI) and Global Biodata Coalition (GBC) to create an inventory of biodata resources found in scientific articles. CZI Research Scientist Ana-Maria Istate designed the machine learning framework for the project and wrote the code to implement and evaluate the NLP models used to classify articles and extract individual resources. Ana’s code was used by GBC consultant Ken Schackart as the starting point for a pipeline to create an ML-predicted preliminary inventory, which is then further refined with code that includes steps for deduplication, processing for selective manual review, and augmentation with additional attributes to create the final inventory of biodata resources.
+
 # Workflow overview
 
 ## Data curation
@@ -235,6 +239,9 @@ Configurations for reproducing original results are in [config/train_predict.yml
 Configurations regarding model training parameters are stored in [config/models_info.tsv](config/models_info.tsv), such as number of epochs, and convenient model names as well as official HuggingFace model names.
 
 The EuropePMC query string is stored in [config/query.txt](config/query.txt).
+
+# How to Cite
+
 
 
 # Authorship
