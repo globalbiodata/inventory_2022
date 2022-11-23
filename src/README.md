@@ -153,6 +153,14 @@ Articles that have the same `best_name` are maked in the `duplicate_names` colum
 
 Articles that have the same URL are marked in the `duplicate_urls` column. The values are given similar to the `duplicate_names` column.
 
+## Processing Manually Reviewed Inventory
+
+Once the flagged inventory has been manually reviewed, the determinations made during review are executed (*e.g.* removing certain rows, merging duplicates) by `process_manual_review.py`.
+
+There are quite a few validations to ensure that the manual review process was conducted in a way that it can be properly processed. If there any errors are discovered during this evaluation, an error message with the ID values of bad rows will be given, as well as a description of the problem(s).
+
+The `text` column is dropped during this step.
+
 ## Checking URLs
 
 `check_urls.py` checks each extracted URL by submitting a request. The status of the request (either a status code or the returned error message if an exception occurs) is recorded in a new column labeled extracted_url_status. Rows without URLs are removed, since the inventory requires a URL to identify the resource.
@@ -177,7 +185,34 @@ So with a back off factor of 0.1, it will sleep for [0.0s, 0.2s, 0.4s, ...]. Mor
 
 ## Getting Metadata from EuropePMC
 
-{DETAILS}
+`get_meta.py` queries EuropePMC to gather further metadata on the IDs that are now in the final inventory.
+
+In particular, the following columns are created:
+`affiliation`: Author affiliations
+`authors`: Author names
+`grant_ids`: Grant IDs
+`grant_agencies`: Unmodified grant agency list
+`num_citations`: Number of citations for the paper(s) describing that resource
+
+Since many resources are described in multiple articles, this information has to be aggregated. To do so, the IDs are separated and queried indenpendently. The information for each resource is then re-joined. All information except for number of citations is just concatenated, using a comma and space to separate the information from each article. The number of citations is summed across the number of citations for each article associated with a given resource.
+
+The `-s|--chunk-size` parameter determines how many IDs to send to EuropePMC per request. 20  (default) is generally a good number.
+
+## Process Country Information
+
+`process_countries.py` porocesses and harmonizes the various information about countries in the inventory.
+
+During URL checking, the country of the IP address is queried using various APIs, which can give differently formatted country information (US vs USA). There are mentions of countries in the author affiliations.
+
+The Python library `pycountry` is used to extract the country information, and harmonize any differences.
+
+The output country code can be of 4 types as defined by [ISO 3166](https://en.wikipedia.org/wiki/ISO_3166). The `-f|--format` option can be used to select the output country code type from `alpha-2`, `alpha-3`, `full`, and `numeric`.
+
+The `extracted_url_country` column gets overwritten, by replacing country codes with the desired format.
+
+A new column is added, `affiliation_countries`. This is created by searching for any mentions of countries in the `affiliation` column, which could by in `alpha-2`, `alpha-3`, or `full` format. All country mentions that are found are formatted in the desired countryt code format, and joined with a comma and a space.
+
+*Note*: Both of these country information columns may not be 100% accurate. The `extracted_url_country` may not be the actual host country. The `affiliation_countries` will miss any countries that are not in one of the 3 standard formats. Additionally, there may be false positives, such as the state of Georgia being labeled as the country Georgia. If the values in the two columns match, that may be a decent indicator that they are accurate.
 
 # Manual Workflow Examples
 
@@ -395,22 +430,82 @@ predictions.csv
 Extract URLs
 ```sh
 $ python3 src/url_extractor.py \
-    --out-dir out/original_query/urls \
+    --out-dir out/original_query/url_predictions \
     out/original_query/ner/predictions.csv
 ```
 
-Check URLs
+Process names
 ```sh
-$ python3 src/check_urls.py \
-    --out-dir out/original_query/check_urls \
-    out/original_query/urls/predictions.csv
+$ python3 src/process_names.py \
+    --out-dir out/original_query/processed_names \
+    out/original_query/url_predictions/predictions.csv
 ```
 
-Get other metadata from EuropePMC query
+Initial Deduplication
+```sh
+$ python3 src/initial_deduplicate.py \
+    --out-dir out/original_query/initial_deduplication \
+    out/original_query/processed_names/predictions.csv
+```
+
+Flag for selective manual review
+```sh
+$ python3 src/flag_for_review.py \
+    --out-dir out/original_query/manual_review \
+    --min-prob 0.978 \
+    out/original_query/initial_deduplication/predictions.csv
+```
+
+Make directory for manually reviewed inventory
+```sh
+$ mkdir -p out/original_query/manually_reviewed
+```
+
+At this point, the inventory must be manually reviewed following the instructions.
+
+Once it has been reviewed, place the file (`predictions.csv`) in the folder created above.
+
+Process manually reviewed inventory
+```sh
+$ python3 src/process_manual_review.py \
+    --out-dir out/original_query/processed_manual_review \
+    out/original_query/manually_reviewed/predictions.csv
+```
+
+Check URL HTTP statuses
+```sh
+$ python3 src/check_urls.py \
+    --out-dir out/original_query/url_checks \
+    --chunk-size 200 \
+    --num-tries 3 \
+    --backoff 0.5 \
+    out/original_query/processed_manual_review/predictions.csv
+```
+
+If the above gets interrupted, the partially completed output can be supplied as input to resume where it left off
+```sh
+$ python3 src/check_urls.py \
+    --out-dir out/original_query/url_checks \
+    --chunk-size 200 \
+    --num-tries 3 \
+    --backoff 0.5 \
+    --partial out/original_query/url_checks/predictions.csv \
+    out/original_query/processed_manual_review/predictions.csv
+```
+
+Get additional metadata from EuropePMC
 ```sh
 $ python3 src/get_meta.py \
-    --out-dir out/original_query/meta \
-    out/original_query/check_urls/predictions.csv
+    --out-dir out/original_query/epmc_meta \
+    --chunk-size 20 \
+    out/original_query/url_checks/predictions.csv
+```
+
+Process country information
+```sh
+$ python3 src/process_countries.py \
+    --out-dir out/original_query/processed_countries \
+    out/original_query/epmc_meta/predictions.csv
 ```
 
 ## Updating the Inventory
