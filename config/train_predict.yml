@@ -56,7 +56,7 @@ ner_data: 'data/manual_ner_extraction.csv'
 models: 'config/models_info.tsv'
 
 # Dates used for initial query
-initial_query_start: 2001
+initial_query_start: 2011
 initial_query_end: 2021
 query_string: 'config/query.txt'
 
