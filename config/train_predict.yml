@@ -45,6 +45,9 @@ check_url_dir: 'out/original_query/url_checking'
 ## Additional metadata from EuropePMC
 epmc_meta_dir: 'out/original_query/epmc_meta'
 
+## Processed country codes
+processed_countries: 'out/original_query/processed_countries'
+
 # Input files
 classif_data: 'data/manual_classifications.csv'
 ner_data: 'data/manual_ner_extraction.csv'

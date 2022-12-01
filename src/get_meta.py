@@ -6,15 +6,13 @@ Authors: Kenneth Schackart
 
 import argparse
 import os
-import re
 from collections import defaultdict
 from typing import NamedTuple, Optional, TextIO, Tuple, cast
 
 import numpy as np
 import pandas as pd
-import pycountry
 import requests
-from pandas.testing import assert_frame_equal, assert_series_equal
+from pandas.testing import assert_frame_equal
 
 from inventory_utils.custom_classes import CustomHelpFormatter
 from inventory_utils.wrangling import chunk_rows, join_commas
@@ -50,6 +48,7 @@ def get_args() -> Args:
                         '--chunk-size',
                         metavar='INT',
                         type=int,
+                        default=20,
                         help=('Number of IDs to send to'
                               'EuropePMC at a time.'))
 
@@ -63,10 +62,10 @@ def separate_ids(df: pd.DataFrame) -> pd.DataFrame:
     """
     Separate IDs into one row per ID. Assign a resource number to each row
     first so that they can be remerged after querying EuropePMC.
-    
+
     Parameters:
     `df`: Deduplicated dataframe
-    
+
     Return: Dataframe with one row per ID
     """
 
@@ -210,47 +209,6 @@ def run_query(ids: pd.Series, chunk_size: Optional[int]) -> pd.DataFrame:
         out_df = pd.concat([out_df, cleaned_results])
 
     return out_df
-
-
-# ---------------------------------------------------------------------------
-def extract_countries(affiliations: pd.Series) -> pd.Series:
-    """
-    Extract country names from affiliations column
-
-    Parameters:
-    `affiliations`: Column of affiliations
-
-    Return: column of extracted country names
-    """
-
-    countries = []
-    for affiliation in affiliations:
-        found_countries = []
-        for country in pycountry.countries:
-            if any(
-                    re.search(fr'\b{x}\b', affiliation)
-                    for x in [country.name, country.alpha_3, country.alpha_2]):
-                found_countries.append(country.name)
-        countries.append(', '.join(found_countries))
-
-    return pd.Series(countries)
-
-
-# ---------------------------------------------------------------------------
-def test_extract_countries() -> None:
-    """ Test extract_countries() """
-
-    in_col = pd.Series([
-        'USA.', 'United States', 'US', 'The United States of America',
-        '605014, India.', 'France', 'UK'
-    ])
-
-    out_col = pd.Series([
-        'United States', 'United States', 'United States', 'United States',
-        'India', 'France', 'UK'
-    ])
-
-    assert_series_equal(extract_countries(in_col), out_col)
 
 
 # ---------------------------------------------------------------------------
