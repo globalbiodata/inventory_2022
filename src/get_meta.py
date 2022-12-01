@@ -7,6 +7,7 @@ Authors: Kenneth Schackart
 import argparse
 import os
 from collections import defaultdict
+from functools import partial
 from typing import NamedTuple, Optional, TextIO, Tuple, cast
 
 import numpy as np
@@ -223,6 +224,8 @@ def remerge_resources(df: pd.DataFrame) -> pd.DataFrame:
     Return: dataframe with one row per resource
     """
 
+    join_commas_no_empty = partial(join_commas, remove_empty=True)
+
     df = df.groupby('resource_num').agg({
         'ID': join_commas,
         'best_name': 'first',
@@ -238,10 +241,10 @@ def remerge_resources(df: pd.DataFrame) -> pd.DataFrame:
         'extracted_url_coordinates': 'first',
         'wayback_url': 'first',
         'publication_date': 'first',
-        'affiliation': join_commas,
-        'authors': join_commas,
-        'grant_ids': join_commas,
-        'grant_agencies': join_commas,
+        'affiliation': join_commas_no_empty,
+        'authors': join_commas_no_empty,
+        'grant_ids': join_commas_no_empty,
+        'grant_agencies': join_commas_no_empty,
         'num_citations': sum
     }).reset_index()
 
