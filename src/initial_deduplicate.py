@@ -59,39 +59,41 @@ def fixture_raw_data() -> pd.DataFrame:
     columns = [
         'ID', 'text', 'common_name', 'common_prob', 'full_name', 'full_prob',
         'extracted_url', 'best_common', 'best_common_prob', 'best_full',
-        'best_full_prob', 'best_name', 'best_name_prob'
+        'best_full_prob', 'best_name', 'best_name_prob', 'publication_date'
     ]
 
     df = pd.DataFrame(
         [[
             '123', 'The text', 'mmCIF, PDB', '0.987, 0.775',
             'Protein Data Bank', '0.717', 'http://www.pdb.org/', 'mmCIF',
-            '0.987', 'Protein Data Bank', '0.717', 'mmCIF', '0.987'
+            '0.987', 'Protein Data Bank', '0.717', 'mmCIF', '0.987',
+            '2011-01-01'
         ],
          [
              '456', 'More text.', '', '', 'SBASE', '0.648',
              'http://www.icgeb.trieste.it/sbase', '', '', 'SBASE', '0.648',
-             'SBASE', '0.648'
+             'SBASE', '0.648', '2011-01-02'
          ],
          [
              '147', 'Wow.', 'TwoURLS', '0.998', '', '',
              'http://website.com, http://db.org', 'TwoURLS', '0.998', '', '',
-             'TwoURLS', '0.998'
+             'TwoURLS', '0.998', '2011-01-03'
          ],
          [
              '369', 'The cat drank wine', 'PDB', '0.963', 'Protein Data Bank',
              '0.964', 'http://www.pdb.org/', 'PDB', '0.963',
-             'Protein Data Bank', '0.964', 'Protein Data Bank', '0.964'
+             'Protein Data Bank', '0.964', 'Protein Data Bank', '0.964',
+             '2011-01-04'
          ],
          [
              '741', 'Almost 7eleven', 'PDB', '0.983', 'Protein Data Bank',
              '0.964', 'http://www.pdb.org/', 'PDB', '0.983',
-             'Protein Data Bank', '0.964', 'PDB', '0.983'
+             'Protein Data Bank', '0.964', 'PDB', '0.983', '2011-01-05'
          ],
          [
              '852', 'Chihiro', 'PDB', '0.963', 'Protein Data Bank', '0.984',
              'http://www.pdb.org/', 'PDB', '0.963', 'Protein Data Bank',
-             '0.984', 'Protein Data Bank', '0.984'
+             '0.984', 'Protein Data Bank', '0.984', '2011-01-06'
          ]],
         columns=columns)
 
@@ -219,7 +221,7 @@ def deduplicate(df: pd.DataFrame) -> pd.DataFrame:
 def test_deduplicate(raw_data: pd.DataFrame) -> None:
     """ Test deduplicate() """
 
-    out_ids = pd.Series(['123', '456', '147', '741', '369, 852'], name='ID')
+    out_ids = pd.Series(['123', '456', '147', '741', '852, 369'], name='ID')
     out_citations = pd.Series([1, 1, 1, 1, 2], name='article_count')
 
     return_df = deduplicate(raw_data)
