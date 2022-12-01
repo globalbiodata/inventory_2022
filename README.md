@@ -1,12 +1,18 @@
-# inventory_2022 (Work in Progress)
+# GBC Inventory 2022
 
-This is a public repository of the code used for the Biodata Resource Inventory performed in 2022. This project is an effort by the [Global Biodata Coalition](https://globalbiodata.org/) to conduct a comprehensive inventory of the global infrastructure of biological data resources. A large portion of this effort is dedicated to being able to periodically update the inventory using the methods developed here.
+This code repository represents work done as part of a collaborative effort between the Chan Zuckerberg Initiative (CZI) and Global Biodata Coalition (GBC) to create an inventory of biodata resources found in scientific articles. CZI Research Scientist Ana-Maria Istrate designed the machine learning framework for the project and wrote the code to implement and evaluate the NLP models used to classify articles and extract individual resources. Ana’s code was used by GBC consultant Ken Schackart as the starting point for a pipeline to create an ML-predicted preliminary inventory, which is then further refined with code that includes steps for deduplication, processing for selective manual review, and augmentation with additional attributes to create the final inventory of biodata resources.
 
-To meet these goals, natural language processing (NLP) methods are applied to journal articles obtained from EuropePMC. First, articles are classified based on their titles and abstracts, to predict if they describe biodata resources. Then, of those articles that are predicted to describe biodata resources, named entity recognition (NER) is employed to predict the resource's name. Further metadata is gathered from the various fields obtained by querying EuropePMC. To aid in reproducibility and reuse, Snakemake pipelines were developed for automation of training, prediction, and updating the inventory.
+## Overview of Methods
 
-# Contributions
+EuropePMC is queried to obtain titles and abstracts of scientific articles. A BERT model is used to classify those articles as describing or not describing a biodata resource. A BERT model is also used to perform named entity recoginition to extract the resource name for those articles that are predicted to describe a biodata resource. Resource URLs are extracted using a regular expression.
 
-This code repository represents work done as part of a collaborative effort between the Chan Zuckerberg Initiative (CZI) and Global Biodata Coalition (GBC) to create an inventory of biodata resources found in scientific articles. CZI Research Scientist Ana-Maria Istate designed the machine learning framework for the project and wrote the code to implement and evaluate the NLP models used to classify articles and extract individual resources. Ana’s code was used by GBC consultant Ken Schackart as the starting point for a pipeline to create an ML-predicted preliminary inventory, which is then further refined with code that includes steps for deduplication, processing for selective manual review, and augmentation with additional attributes to create the final inventory of biodata resources.
+This initial collection of articles is automatically deduplicated, and marked for selective manual review. A person manually reviews articles that are potential resource duplicates or false positives.
+
+The manually reviewed inventory is processed to further deduplicate the inventory and remove false positives. The HTTP statuses of the extracted URLs is checked, the IP addresses of the URLs are geolocated, and archived versions of the URLs are checked in the Internet Archive's WayBack Machine. Further article metadata is obtained from EruopePMC.
+
+The final inventory gives a list of biodata resources, the PMIDs of the articles describing those resources, and the metadata described above.
+
+Snakemake is used as a workflow manager to automate these processes.
 
 # Workflow overview
 
@@ -70,9 +76,13 @@ graph TD
     ner --> eval
 ```
 
-## Inventory
+## Automated Inventory Generation
 
-Once the classifier and NER models have been trained and selected, they are applied to the full corpus. Those papers that are classified as biodata resource by the trained classifier are passed to the trained NER model for extracting attributes of the resource such as resource name and description. Other scripts will be used to glean other information, such as resource URLs, authors, country of origin, etc.
+Once the classifier and NER models have been trained and selected, they are applied to the full corpus. Those papers that are classified as biodata resource by the trained classifier are passed to the trained NER model for extracting attributes of the resource such as resource common name and full name. Resource URLs are extracted using a regular expression
+
+The predicted resources are automatically deduplicated (when the name and URL are the same), and the IDs of all articles describing resources are maintained.
+
+The automatically generated inventory that has been deduplicated is flagged for selective manual review. Articles that share either the resource name or URL are marked as potential duplicates. Articles with low predicted name probability are maked for review.
 
 ```mermaid
 graph TD
@@ -82,11 +92,66 @@ graph TD
     classifier --> pos[Positive]
     pos --> ner{{NER Model}}
     pos --> regex(regex)
-    pos --> scrape(APIs)
-    ner -- names --> attr[Resource Information]
+    ner -- name --> attr[Resource Descriptions]
     regex -- URL --> attr
-    scrape -- authors, country --> attr
+    attr --> dedup(Initial Deduplication)
+    dedup --> flag(Flagging for Selective Review)
+    flag --> auto_inv[Automatically Generated Inventory]
 ```
+
+## Selective Manual Review
+
+The process up to this point is run without human intervention. As a quality control measure, the inventory must be manually reviewed for articles that are potentially duplicate descriptions of a common resource, or potential false positives based on a low name probability score.
+
+During manual review, the inventory is annotated to determine which potential duplicates should be merged, and which low-probability articles should be removed.
+
+## Final Processing
+
+Once the automatically generated inventory has been manually reviewed, the directions given during manual review are exectued (further deduplication, removal of false resources). Further metadata is obtained from this finalized list of resources. HTTP status of associated URLs is assessed. Various APIs are queried to geolocated the IP address associated with the URLs. EuropePMC is queried to gather metadata on the articles describing the resources, such as the authors, author affiliations, funding agencies, grant IDs, and number of citations. The affiliations are parsed to extract the countries that are mentioned in the affiliations.
+
+```mermaid
+graph TD
+    manual[Manually Reviewed Inventory]
+    manual --> rev_process(Review Processing)
+    rev_process --> final_list[Final List of Resources]
+    final_list -- names --> final[Final Inventory]
+    final_list -- PMIDs --> epmc(EuropePMC)
+    final_list -- URL --> check(HTTP Check)
+    final_list -- URL --> wayback(WayBack Machine)
+    check -- URL status --> final
+    final_list -- URL --> ip_check(IP APIs)
+    ip_check -- IP location --> final
+    wayback -- Archived URL --> final
+    epmc -- article metadata --> final
+    epmc -- affiliations --> affil_parse(Parsing)
+    affil_parse -- affiliation countries --> final
+```
+
+## Final Inventory Output
+
+The finalized inventory has the following columns:
+
+Column | Type | Description
+:----: | :--: | -----------
+ID | list(integer) | PMIDs associated with resource. IF multiple, they are separated by a comma and a space
+best_name | string | Predicted name with highest probability
+best_name_prob | float | Probability associated with the best name (out of 1.0)
+best_common | string | Predicted common name with highest probability
+best_common_prob | float | Probability associated with the best common name (out of 1.0)
+best_full | string | Predicted full name with highest probability
+best_full_prob | float | Probability associated with the best full name (out of 1.0)
+extracted_url | string | URL(s) extracted from text
+extracted_url_status | integer OR string | URL HTTP status code, or error string if an exception occured while requesting URL
+extracted_url_country | string | Country code of IP address based on extracted URL, when available
+extracted_url_coordinates | string | Country code of IP address based on extracted URL, when available. Formatted as (latitude, longitude)
+wayback_url | string | Internet Archive's WayBack Machine's archived version of URL, when available
+publication_date | string | Date of initial publication of newest article describing resource. Formatted as YYYY-MM-DD
+affiliation | list(string) | Affiliation information from EuropePMC. Affiliation information from individual articles are joined with a space and a comma
+authors | list(string) | Authors from EuropePMC. Author lists from individual articles are joined with a space and a comma.
+grant_ids| list(string) | Grant IDs from EuropePMC. Author lists from individual articles are joined with a space and a comma.
+grant_agencies | list(string) | Grant agencies from EuropePMC. Author lists from individual articles are joined with a space and a comma.
+num_citations | integer | Number of citations for papers describing the resource
+affiliation_countries | list(string) | Country codes of countries mentioned in affiliations
 
 # Repository Structure
 
@@ -95,7 +160,7 @@ graph TD
 ├── config/          # Workflow configuration files
 ├── data/            # Manual curation files and data splits
 ├── snakemake/       # Snakemake pipelines and rules
-├── src/             # Python scripts
+├── src/             # Python scripts and modules
 ├── tests/           # pytest scripts
 ├── .gitignore
 ├── LICENSE
