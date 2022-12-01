@@ -10,9 +10,12 @@ from typing import BinaryIO, List, NamedTuple, TextIO
 
 from torch.utils.data.dataloader import DataLoader
 
-from class_data_handler import DataFields, RunParams, get_dataloader
-from utils import (CustomHelpFormatter, get_classif_metrics, get_classif_model,
-                   get_torch_device, save_metrics)
+from inventory_utils.class_data_handler import (DataFields, RunParams,
+                                                get_dataloader)
+from inventory_utils.custom_classes import CustomHelpFormatter
+from inventory_utils.filing import get_classif_model, save_metrics
+from inventory_utils.metrics import get_classif_metrics
+from inventory_utils.runtime import get_torch_device
 
 
 # ---------------------------------------------------------------------------
@@ -149,7 +152,7 @@ def main() -> None:
 
     test_metrics = get_classif_metrics(model, dataloader, device)
 
-    save_metrics(test_metrics, out_file)
+    save_metrics(model_name, test_metrics, out_file)
 
     print(f'Done. Wrote output to {out_dir}.')
 

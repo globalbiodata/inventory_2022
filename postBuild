@@ -1,0 +1,16 @@
+#!/bin/bash
+
+# Make the necessary directories if they do not exist
+mkdir -p out/{classif_train_out,ner_train_out}/
+
+# Get the datasets from Zenodo if they are not present
+CLASS_TRAIN_STATS='out/classif_train_out/classif_combined_stats.csv'
+NER_TRAIN_STATS='out/ner_train_out/ner_combined_stats.csv'
+
+if [ ! -f $CLASS_TRAIN_STATS ]; then
+    curl -o $CLASS_TRAIN_STATS https://zenodo.org/record/6812387/files/classif_combined_stats.csv
+fi
+
+if [ ! -f $NER_TRAIN_STATS ]; then
+    curl -o $NER_TRAIN_STATS https://zenodo.org/record/6812387/files/ner_combined_stats.csv
+fi

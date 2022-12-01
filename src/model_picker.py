@@ -1,23 +1,24 @@
 #!/usr/bin/env python3
 """
-Purpose: Choose model based on highest validation F1 score
+Purpose: Choose model based on highest metric of choice
 Authors: Kenneth Schackart
 """
 
 import argparse
 import os
-import shutil
-from typing import List, NamedTuple
+from typing import BinaryIO, Dict, List, NamedTuple, Union, cast
 
 import pandas as pd
+import torch
 
-from utils import CustomHelpFormatter, make_filenames
+from inventory_utils.custom_classes import CustomHelpFormatter, Metrics
 
 
 # ---------------------------------------------------------------------------
 class Args(NamedTuple):
     """ Command-line arguments """
-    files: List[str]
+    checkpoints: List[BinaryIO]
+    metric: str
     out_dir: str
 
 
@@ -26,14 +27,21 @@ def get_args() -> Args:
     """ Parse command-line arguments """
 
     parser = argparse.ArgumentParser(
-        description='Choose model based on highest validation F1 score',
+        description='Choose model with highest validation metric of choice',
         formatter_class=CustomHelpFormatter)
 
-    parser.add_argument('files',
+    parser.add_argument('checkpoints',
                         nargs='+',
                         metavar='FILE',
+                        type=argparse.FileType('rb'),
+                        help='Model checkpoints to be compared')
+    parser.add_argument('-m',
+                        '--metric',
+                        metavar='METRIC',
+                        choices=['f1', 'precision', 'recall'],
+                        default='f1',
                         type=str,
-                        help='Training stat files of models to be compared')
+                        help='Metric to use for choosing best model')
     parser.add_argument('-o',
                         '--out-dir',
                         metavar='DIR',
@@ -43,67 +51,69 @@ def get_args() -> Args:
 
     args = parser.parse_args()
 
-    for file in args.files:
-        if not os.path.isfile(file):
-            parser.error(f'Input file "{file}" does not exist.')
-
-    return Args(args.files, args.out_dir)
+    return Args(args.checkpoints, args.metric, args.out_dir)
 
 
 # ---------------------------------------------------------------------------
-def get_model_name(filename: str) -> str:
+def get_metrics(checkpoint_fh: BinaryIO) -> Dict[str, Union[float, str]]:
     """
-    Get model name from input file name
-
-    e.g. 'out/scibert/checkpoint.pt' -> 'scibert'
+    Retrieve the validation metrics from model checkpoint
 
     Parameters:
-    `filename`: Input filename containing model name
+    `checkpoint_fh`: Trained model checkpoint
 
-    Return: Model (short)name
+    Return: Dictionary of validation set metrics
     """
 
-    model_name = filename.split('/')[-2]
+    checkpoint = torch.load(checkpoint_fh)
+    metrics = cast(Metrics, checkpoint['val_metrics'])
 
-    return model_name
+    return {
+        'f1': metrics.f1,
+        'precision': metrics.precision,
+        'recall': metrics.recall,
+        'loss': metrics.loss
+    }
 
 
 # ---------------------------------------------------------------------------
-def test_get_model_name() -> None:
-    """ Test get_model_name """
-
-    model_name = 'scibert'
-    _, filename = make_filenames('out/' + model_name)
-    assert get_model_name(filename) == model_name
-
-    model_name = 'biomed_roberta'
-    _, filename = make_filenames('out/' + model_name)
-    assert get_model_name(filename) == model_name
-
-
-# ---------------------------------------------------------------------------
-def get_checkpoint_dir(filename: str) -> str:
+def get_best_model(df: pd.DataFrame, metric: str) -> str:
     """
-    Get checkpoint directory from input file name
+    Determine best model from the training stats
 
     Parameters:
-    `filename`: Input filename
+    `df`: Chosen models dataframe
+    `metric`: Metric to use as criteria
 
-    Return:
-    Checkpoint directory name
+    Return: Best model checkpoint
     """
 
-    return os.path.split(filename)[0]
+    best_model = df.sort_values(by=[metric, 'loss'], ascending=[False,
+                                                                True]).iloc[0]
+
+    return best_model['checkpt']
 
 
 # ---------------------------------------------------------------------------
-def test_get_checkpoint_dir() -> None:
-    """ Test get_checkpoint_dir """
+def test_get_best_model() -> None:
+    """ Test get_best_model() """
 
-    chkpt_dir = 'out/classif_checkpoints/scibert'
-    _, filename = make_filenames(chkpt_dir)
+    cols = ['f1', 'precision', 'recall', 'loss', 'checkpt']
 
-    assert get_checkpoint_dir(filename) == chkpt_dir
+    in_df = pd.DataFrame([[
+        0.92,
+        0.926,
+        0.82,
+        0.008,
+        'scibert.pt',
+    ], [0.87, 0.926, 0.82, 0.007, 'biobert.pt']],
+                         columns=cols)
+
+    # scibert has higher f1
+    assert get_best_model(in_df, 'f1') == 'scibert.pt'
+
+    # They have same precision, but biobert has lower loss on that epoch
+    assert get_best_model(in_df, 'precision') == 'biobert.pt'
 
 
 # ---------------------------------------------------------------------------
@@ -115,39 +125,21 @@ def main() -> None:
     if not os.path.isdir(args.out_dir):
         os.makedirs(args.out_dir)
 
-    out_df = pd.DataFrame()
-    best_f1 = 0.
-    best_model = ''
-    for filename in args.files:
-        model_name = get_model_name(filename)
+    all_metrics = pd.DataFrame()
+    for checkpoint in args.checkpoints:
+        metrics = get_metrics(checkpoint)
+        metrics['checkpt'] = checkpoint.name
+        all_metrics = pd.concat(
+            [all_metrics, pd.DataFrame(metrics, index=[0])])
 
-        df = pd.read_csv(filename)
+    best_model = get_best_model(all_metrics, args.metric)
 
-        if max(df['val_f1']) > best_f1:
-            checkpoint_dir = get_checkpoint_dir(filename)
-            best_model, _ = make_filenames(checkpoint_dir)
-            best_model_name = model_name
-            best_f1 = max(df['val_f1'])
+    out_file = os.path.join(args.out_dir, 'best_checkpt.txt')
+    with open(out_file, 'wt') as out_fh:
+        print(best_model, file=out_fh)
 
-        df['model'] = model_name
-        out_df = pd.concat([out_df, df])
-
-    out_df.reset_index(inplace=True, drop=True)
-
-    out_dir = os.path.join(args.out_dir, best_model_name)
-
-    model_outfile = os.path.join(out_dir, 'best_checkpt.pt')
-    stats_outfile = os.path.join(out_dir, 'combined_stats.csv')
-
-    if not os.path.isdir(out_dir):
-        os.makedirs(out_dir)
-
-    out_df.to_csv(stats_outfile, index=False)
-    shutil.copyfileobj(open(best_model, 'rb'), open(model_outfile, 'wb'))
-
-    print(f'Checkpoint of best model is {best_model}')
-    print('Done. Wrote combined stats file and best model checkpoint',
-          f'to {out_dir}')
+    print(f'Best model checkpoint is {best_model}.')
+    print(f'Done. Wrote output to {out_file}.')
 
 
 # ---------------------------------------------------------------------------

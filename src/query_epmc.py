@@ -8,12 +8,12 @@ import argparse
 import os
 import re
 from datetime import datetime
-from typing import NamedTuple, Tuple, cast
+from typing import List, NamedTuple, Tuple, cast
 
 import pandas as pd
 import requests
 
-from utils import CustomHelpFormatter
+from inventory_utils.custom_classes import CustomHelpFormatter
 
 
 # ---------------------------------------------------------------------------
@@ -61,8 +61,8 @@ def get_args() -> Args:
 
     if os.path.isfile(args.query):
         args.query = open(args.query).read()
-    if os.path.isfile(args.date):
-        args.date = open(args.date).read()
+    if os.path.isfile(args.from_date):
+        args.from_date = open(args.from_date).read()
 
     date_pattern = re.compile(
         r'''^           # Beginning of date string
@@ -73,8 +73,8 @@ def get_args() -> Args:
             $           # Followed by nothing else
             ''', re.X)
     for date in [args.from_date, args.to_date]:
-        if not re.match(date_pattern, args.date):
-            parser.error(f'Last date "{date}" must be one of:\n'
+        if not re.match(date_pattern, date):
+            parser.error(f'Date "{date}" must be one of:\n'
                          '\t\t\tYYYY\n'
                          '\t\t\tYYYY-MM\n'
                          '\t\t\tYYYY-MM-DD')
@@ -109,7 +109,7 @@ def test_make_filenames() -> None:
 
 
 # ---------------------------------------------------------------------------
-def clean_results(results: dict) -> pd.DataFrame:
+def clean_results(results: List[dict]) -> pd.DataFrame:
     """
     Retrieve the PMIDs, titles, and abstracts from results of query
 
@@ -122,12 +122,20 @@ def clean_results(results: dict) -> pd.DataFrame:
     pmids = []
     titles = []
     abstracts = []
-    for paper in results.get('resultList').get('result'):  # type: ignore
-        pmids.append(paper.get('pmid'))
-        titles.append(paper.get('title'))
-        abstracts.append(paper.get('abstractText'))
+    dates = []
+    for page in results:
+        for paper in page.get('resultList').get('result'):  # type: ignore
+            pmids.append(paper.get('pmid'))
+            titles.append(paper.get('title'))
+            abstracts.append(paper.get('abstractText'))
+            dates.append(paper.get('firstPublicationDate'))
 
-    return pd.DataFrame({'id': pmids, 'title': titles, 'abstract': abstracts})
+    return pd.DataFrame({
+        'id': pmids,
+        'title': titles,
+        'abstract': abstracts,
+        'publication_date': dates
+    })
 
 
 # ---------------------------------------------------------------------------
@@ -155,7 +163,20 @@ def run_query(query: str, from_date: str, to_date: str) -> pd.DataFrame:
 
     results_json = cast(dict, results.json())
 
-    return clean_results(results_json)
+    result_pages: List[dict] = []
+    result_pages.append(results_json)
+
+    while results_json.get('nextPageUrl') is not None:
+        results = requests.get(results_json['nextPageUrl'])
+        status = results.status_code
+        if status != requests.codes.ok:  # pylint: disable=no-member
+            results.raise_for_status()
+
+        results_json = cast(dict, results.json())
+
+        result_pages.append(results_json)
+
+    return clean_results(result_pages)
 
 
 # ---------------------------------------------------------------------------

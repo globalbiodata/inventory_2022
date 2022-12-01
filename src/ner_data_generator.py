@@ -16,8 +16,9 @@ from numpy.core.numeric import NaN
 from pandas._testing.asserters import assert_series_equal
 from pandas.testing import assert_frame_equal
 
-from utils import (CustomHelpFormatter, concat_title_abstract, split_df,
-                   strip_xml)
+from inventory_utils.custom_classes import CustomHelpFormatter
+from inventory_utils.wrangling import (concat_title_abstract, split_df,
+                                       strip_xml)
 
 
 # ---------------------------------------------------------------------------
@@ -295,7 +296,7 @@ def test_restructure_df() -> None:
 def assign_tags(words: pd.Series, full_names: List[str],
                 common_names: List[str]) -> pd.Series:
     """
-    Assign BIO tags to tokens in sequence
+    Assign BIO tags to words in sequence
 
     Parameters:
     `words`: Series of tokens stripped of punctuation
@@ -304,7 +305,7 @@ def assign_tags(words: pd.Series, full_names: List[str],
 
     Return:
     Series of tags (`O`, `B-COM`, `I-COM`, `B-FUL`, or `I-FUL`) corresponding
-    to tokens in sequence
+    to words in sequence
     """
 
     seq_len = len(words)
@@ -373,7 +374,7 @@ def tag_article_tokens(df: pd.DataFrame) -> pd.DataFrame:
         and full_name columns
 
     Return:
-    Dataframe with one row per token and with word and sentence indices and
+    Dataframe with one row per word and with word and sentence indices and
     BIO tags
     """
 
@@ -421,7 +422,7 @@ def BIO_scheme_transform(df: pd.DataFrame) -> pd.DataFrame:
     `df`: Dataframe with one row per article including extracted resource
     common name and full name
 
-    Return: Dataframe with one row per token per article including indices
+    Return: Dataframe with one row per word per article including indices
     and BIO tags
     """
 
@@ -545,7 +546,7 @@ def main() -> None:
     if not os.path.isdir(out_dir):
         os.makedirs(out_dir)
 
-    df = pd.read_csv(args.infile)
+    df = pd.read_csv(args.infile, dtype=str)
 
     check_input(df)
 

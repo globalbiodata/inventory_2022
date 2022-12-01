@@ -1,5 +1,10 @@
 env/
+r_env/
 out*/
 __pycache__/
 .snakemake/
 .vscode/
+.Rproj.user
+.Rhistory
+.Rprofile
+*.html

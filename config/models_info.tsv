@@ -4,8 +4,8 @@ biobert	dmis-lab/biobert-v1.1	16	3e-5	0
 bioelectra	kamalkraj/bioelectra-base-discriminator-pubmed	16	5e-5	0	-lr
 bioelectra_pmc	kamalkraj/bioelectra-base-discriminator-pubmed-pmc	32	5e-5	0	-lr
 biomed_roberta	allenai/biomed_roberta_base	16	2e-5	0	
-biomed_roberta_chemprot	allenai/dsp_roberta_base_dapt_biomed_tapt_rct_500	16	2e-5	0	
-biomed_roberta_rct500	allenai/dsp_roberta_base_dapt_biomed_tapt_chemprot_4169	16	2e-5	0	
+biomed_roberta_chemprot	allenai/dsp_roberta_base_dapt_biomed_tapt_chemprot_4169	16	2e-5	0	
+biomed_roberta_rct500	allenai/dsp_roberta_base_dapt_biomed_tapt_rct_500	16	2e-5	0	
 bluebert	bionlp/bluebert_pubmed_uncased_L-12_H-768_A-12	16	3e-5	0	-lr
 bluebert_mimic3	bionlp/bluebert_pubmed_mimic_uncased_L-12_H-768_A-12	32	3e-5	0	
 electramed	giacomomiolo/electramed_base_scivocab_1M	16	5e-5	0	-lr
