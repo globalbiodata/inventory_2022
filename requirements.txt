@@ -10,4 +10,5 @@ seqeval == 1.2.2
 snakemake
 torch == 1.9.0
 transformers == 4.16.2
-tqdm == 4.63.0 
+tqdm == 4.63.0
+pycountry == 22.3.5
