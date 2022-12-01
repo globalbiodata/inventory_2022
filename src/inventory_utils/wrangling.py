@@ -339,6 +339,7 @@ def join_commas(ls: List[str], remove_empty: bool = False) -> str:
 
     Parameters
     `ls`: List of strings
+    `remove_empty`: Optionally, filter out empty strings before joining
 
     Return: Joined string
     """
