@@ -807,38 +807,43 @@ def test_regroup_df() -> None:
 
     in_df = pd.DataFrame(
         [[
-            123, 'Some text', 'google', 0.99, '', '', 'https://www.google.com',
-            200, 'US', '(12,10)', 'wayback_google'
+            123, 'Some text', 'google', 0.99, 'google', 0.99, '', '',
+            'https://www.google.com', 200, 'US', '(12,10)', 'wayback_google',
+            '2012-01-01', '2'
         ],
          [
-             123, 'Some text', 'google', 0.99, '', '', 'http://google.com',
-             301, 'US', '(100,17)', 'no_wayback'
+             123, 'Some text', 'google', 0.99, 'google', 0.99, '', '',
+             'http://google.com', 301, 'US', '(100,17)', 'no_wayback',
+             '2012-01-01', '2'
          ],
          [
-             789, 'Foo', 'amazon', 0.87, 'The Amazon', 0.65,
+             789, 'Foo', 'amazon', 0.87, 'amazon', 0.87, 'The Amazon', 0.65,
              'https://www.amazon.com/afbadfbnvbadfbaefbnaegn', 404, '', '',
-             'no_wayback'
+             'no_wayback', '2012-01-02', '1'
          ]],
         columns=[
-            'ID', 'text', 'common_name', 'common_prob', 'full_name',
-            'full_prob', 'extracted_url', 'extracted_url_status',
-            'extracted_url_country', 'extracted_url_coordinates', 'wayback_url'
+            'ID', 'text', 'best_name', 'best_name_prob', 'best_common',
+            'best_common_prob', 'best_full', 'best_full_prob', 'extracted_url',
+            'extracted_url_status', 'extracted_url_country',
+            'extracted_url_coordinates', 'wayback_url', 'publication_date',
+            'article_count'
         ])
 
     out_df = pd.DataFrame(
         [[
-            123, 'Some text', 'google', 0.99, '', '',
+            123, 'google', 0.99, 'google', 0.99, '', '', '2', '2012-01-01',
             'https://www.google.com, http://google.com', '200, 301', 'US, US',
             '(12,10), (100,17)', 'wayback_google, no_wayback'
         ],
          [
-             789, 'Foo', 'amazon', 0.87, 'The Amazon', 0.65,
-             'https://www.amazon.com/afbadfbnvbadfbaefbnaegn', '404', '', '',
-             'no_wayback'
+             789, 'amazon', 0.87, 'amazon', 0.87, 'The Amazon', 0.65, '1',
+             '2012-01-02', 'https://www.amazon.com/afbadfbnvbadfbaefbnaegn',
+             '404', '', '', 'no_wayback'
          ]],
         columns=[
-            'ID', 'text', 'common_name', 'common_prob', 'full_name',
-            'full_prob', 'extracted_url', 'extracted_url_status',
+            'ID', 'best_name', 'best_name_prob', 'best_common',
+            'best_common_prob', 'best_full', 'best_full_prob', 'article_count',
+            'publication_date', 'extracted_url', 'extracted_url_status',
             'extracted_url_country', 'extracted_url_coordinates', 'wayback_url'
         ])
 
