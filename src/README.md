@@ -7,7 +7,7 @@ This directory contains the source code used in this project.
 ├── inventory_utils/         # Modules used in the project
 ├── check_urls.py            # Gather information from URLs
 ├── class_data_generator.py  # Prepare and split classification data
-├── class_final_eval.ppy     # Evaluate best model on test set
+├── class_final_eval.ppy     # Evaluate trained model on test set
 ├── class_predict.py         # Use trained model to predict classification
 ├── class_train.py           # Train classifier
 ├── combine_stats.py         # Combine training/evulation stats files
@@ -15,7 +15,7 @@ This directory contains the source code used in this project.
 ├── initial_deduplication.py # Perform initial automated deduplication
 ├── model_picker.py          # Select best trained model
 ├── ner_data_generator.py    # Prepare and split NER data
-├── ner_final_eval.py        # Evaluate best model on test set
+├── ner_final_eval.py        # Evaluate trained model on test set
 ├── ner_predict.py           # Use trained model to perform NER
 ├── ner_train.py             # Train NER model
 ├── process_countries.py     # Process informationa about country codes
@@ -64,7 +64,7 @@ If the query has no placeholders, the `--from-date` and `--to-date` arguments ar
 Once the query is completed two files are created in `--out-dir`:
 
 * `last_query_date.txt`: File with the `--to-date`, defaulting to today's date
-* `new_query_results.csv`: Containing IDs, titles, and abstracts from query
+* `new_query_results.csv`: Containing IDs, titles, abstracts, and first publication dates from query
 
 # Data Generation
 
@@ -91,7 +91,7 @@ If it is desired to run training on only a certain number of samples, the `-nt|-
 
 Finally, to make training reproducible, the `-r|--seed` option is available.
 
-During each epoch of model training, *F*1 score is computed for predictions on the validation set. Once validation *F*1 begins to drop, training is ended, since this indicates that over-fitting has begun. If the validation *F*1 score does not drop, training will continue until `-ne|--num-epochs` is met.
+Training is run for the number of epochs specified by `-ne|--num-epochs`. The epoch with the most performant model is decided based on the `-c|--metric`, which can be *F*1, precision, or recall.
 
 Once training is complete, two outputs are created in `--out-dir`:
 * `checkpoint.pt`: The trained model checkpoint, which can be used for prediction
@@ -113,15 +113,50 @@ One output is created in `--out-dir`:
 Final evaluation of the chosen models is performed using `class_final_eval.py` and `ner_final_eval.py` on the witheld test sets. Precision, recall, *F*1 and loss are computed.
 
 One output file is created in `--out-dir`:
-* `{outdir}/metrics.csv`
+* `{out-dir}/metrics.csv`
 
 # Prediction
 
 `class_predict.py` and `ner_predict.py`
 
-The trained model checkpoint is used to perform prediction. NER prediction should only be performed on articles predicted to be (or manually classified as) biodata resources.
+The trained model checkpoint is used to perform prediction.
+
+## Classification
+
+`class_predict.py` outputs the same columns that are input (id, title, abstract) plus a `predicted_label` column. This column will contain the values specified using `-desc|--descriptive-labels` (default: 'not-bio-resource' and 'bio-resource').
+
+## NER
+
+NER prediction should only be performed on articles predicted to be (or manually classified as) biodata resources.
+
+The NER model predicts labels and assigns a probability score for the tokens in the title and abstract. Five labels are used:
+
+* `B-COM`: Beginning of common name
+* `I-COM`: Non-first token of common name
+* `B-FUL`: Beginning of full name
+* `I-FUL`: Non-first token of full name
+* `O`: Otherwise
+
+The predicted labels for each article are processed together. All named entities (anything that does not have an `O` label) are extracted. The probability of a named entity is taken as the average probability of the tokens composing that entity.
+
+Named entitities are filtered on several conditions. All of the following are removed:
+
+* Entities that are a single character
+* Entities greater than 100 characters long
+* Entities that are actually a URL (contain "http")
+
+Both categories of names are deduplicated, such that for a given article, if the same name appears multiple times, it is only output once. For those deduplicated names, the highest probability score of the name's occurence is reported.
+
+In the case that the name appears multiple times, but only differs in case (*e.g.* "Protein Data Bank" vs. "protein data bank"), it is also deduplicated. The version of the name that appears the most is reported, and in the case of a tie, the highest probability version is reported.
 
 Any records for which no names were predicted are dropped by the `ner_predict.py` script.
+
+`ner_predict.py` outputs the same input columns, but removes the predicted label column and adds four new columns:
+
+* `common_name`: Predicted "common name"
+* `common_prob`: Probability score of common name label
+* `full_name`: Predicted "full name"
+* `full_name_prob`: Probability score of full name label
 
 # Downstream tasks
 
