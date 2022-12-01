@@ -22,6 +22,13 @@ train_and_predict:
 	-s snakemake/train_predict.smk \
 	--configfile config/train_predict.yml -c1
 
+process_manually_reviewed:
+	snakemake \
+	-s snakemake/train_predict.smk \
+	--configfile config/train_predict.yml \
+	-c 1 \
+	--until process_countries
+
 update_inventory:
 	snakemake \
 	-s snakemake/update_inventory.smk \
