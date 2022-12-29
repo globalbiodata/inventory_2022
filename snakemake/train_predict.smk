@@ -323,3 +323,42 @@ rule combine_ner_test_stats:
             -o {params.out_dir} \
             {input}
         """
+
+
+# Create model metric plots and tables
+rule analyze_performance_metrics:
+    input:
+        class_train=config["classification_train_stats"],
+        class_test=config["classification_test_stats"],
+        ner_train=config["ner_train_stats"],
+        ner_test=config["ner_test_stats"],
+    output:
+        "analysis/figures/class_val_set_performances.svg",
+        "analysis/figures/class_val_set_performances.png",
+        "analysis/figures/ner_val_set_performances.svg",
+        "analysis/figures/ner_val_set_performances.png",
+        "analysis/figures/combined_classification_table.docx",
+        "analysis/figures/combined_ner_table.docx",
+    shell:
+        """
+        Rscript analysis/performance_metrics.R \
+            -cv {input.class_train} \
+            -ct {input.class_test} \
+            -nv {input.ner_train} \
+            -nt {input.ner_test}
+        """
+
+
+# Create location data figures
+rule process_location_data:
+    input:
+        config["final_inventory_file"],
+    output:
+        "analysis/figures/ip_coordinates.png",
+        "analysis/figures/ip_countries.png",
+        "analysis/figures/author_countries.png",
+    shell:
+        """
+        Rscript analysis/location_information.R \
+            {input}
+        """
