@@ -92,9 +92,15 @@ def extract_countries(strings: pd.Series, country_format: str) -> pd.Series:
     for string in strings:
         found_countries = []
         for country in pycountry.countries:
-            if any(
-                    re.search(fr'\b{x}\b', string)
-                    for x in [country.name, country.alpha_3, country.alpha_2]):
+            for country_code in [
+                    country.name,
+                    country.alpha_3  #, country.alpha_2
+            ]:
+                matches = re.findall(fr'\b{country_code}\b', string)
+
+                if not matches:
+                    continue
+
                 if country_format == 'alpha-2':
                     found_country = country.alpha_2
                 elif country_format == 'alpha-3':
@@ -104,7 +110,9 @@ def extract_countries(strings: pd.Series, country_format: str) -> pd.Series:
                 else:
                     found_country = country.name
 
-                found_countries.append(found_country)
+                for _ in matches:
+                    found_countries.append(found_country)
+
         countries.append(join_commas(found_countries))
 
     return pd.Series(countries)
@@ -119,7 +127,7 @@ def test_extract_countries() -> None:
         '605014, India.', 'France', 'GB'
     ])
 
-    # Can retrieve 2 character countrty codes
+    # Can retrieve 2 character country codes
     out_col = pd.Series(['US', 'US', 'US', 'US', 'IN', 'FR', 'GB'])
     assert_series_equal(extract_countries(in_col, 'alpha-2'), out_col)
 
@@ -142,6 +150,11 @@ def test_extract_countries() -> None:
     # Returns empty string if none found
     in_col = pd.Series(['Slovenia and Singapore', 'Portugal', ''])
     out_col = pd.Series(['SGP, SVN', 'PRT', ''])
+    assert_series_equal(extract_countries(in_col, 'alpha-3'), out_col)
+
+    # Keeps the original number of instances
+    in_col = pd.Series(['France, India, and France'])
+    out_col = pd.Series(['FRA, FRA, IND'])
     assert_series_equal(extract_countries(in_col, 'alpha-3'), out_col)
 
 
