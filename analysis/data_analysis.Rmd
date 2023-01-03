@@ -15,26 +15,44 @@ The following files are used as input:
 * `out/ner_train_out/ner_train_stats.csv`
 
 ```{r package_imports, include = FALSE}
+library(countrycode)
 library(dplyr)
+library(europepmc)
+library(forcats)
+library(ggmap)
 library(ggplot2)
+library(gt)
 library(magrittr)
 library(readr)
 library(RColorBrewer)
+library(stringr)
 library(tidyr)
 
 # Set ggplot2 theme for whole R session
 theme_set(theme_light() +
-            theme(plot.title = element_text(hjust = 0.5),
-                  plot.subtitle = element_text(hjust = 0.5)))
+            theme(
+              plot.title = element_text(hjust = 0.5),
+              plot.subtitle = element_text(hjust = 0.5)
+            ))
 ```
 
 ```{r file_imports, include = FALSE}
-raw_classif_stats <-
-  read_csv("../out/classif_train_out/classif_combined_stats.csv",
-           show_col_types = FALSE)
+raw_classif_train_stats <-
+  read_csv(
+    "../out/classif_train_out/combined_train_stats/combined_stats.csv",
+    show_col_types = FALSE
+  )
+raw_classif_test_stats <-
+  read_csv(
+    "../out/classif_train_out/combined_test_stats/combined_stats.csv",
+    show_col_types = FALSE
+  )
 
-raw_ner_stats <-
-  read_csv("../out/ner_train_out/ner_combined_stats.csv",
+raw_ner_train_stats <-
+  read_csv("../out/ner_train_out/combined_train_stats/combined_stats.csv",
+           show_col_types = FALSE)
+raw_ner_test_stats <-
+  read_csv("../out/ner_train_out/combined_test_stats/combined_stats.csv",
            show_col_types = FALSE)
 ```
 
@@ -54,25 +72,26 @@ pivot_metrics <- function(df) {
 }
 
 relabel_models <- function(df) {
-  df %>% 
-    mutate(model = case_when(
-      model == "bert" ~ "BERT",
-      model == "biobert" ~ "BioBERT",
-      model == "bioelectra" ~ "BioELECTRA",
-      model == "bioelectra_pmc" ~ "BioELECTRA PMC",
-      model == "biomed_roberta" ~ "BioMed-RoBERTa",
-      model == "biomed_roberta_chemprot" ~ "BioMed-RoBERTa-CP",
-      model == "biomed_roberta_rct500" ~ "BioMed-RoBERTa-RCT",
-      model == "bluebert" ~ "BlueBERT",
-      model == "bluebert_mimic3" ~ "BlueBERT-MIMIC-III",
-      model == "electramed" ~ "ELECTRAMed",
-      model == "bluebert" ~ "BlueBERT",
-      model == "pubmedbert" ~ "PubMedBERT",
-      model == "pubmedbert_fulltext" ~ "PubMedBERT-Full",
-      model == "sapbert" ~ "SapBERT",
-      model == "sapbert_mean_token" ~ "SapBERT-Mean",
-      model == "scibert" ~ "SciBERT"
-    ))
+  df %>%
+    mutate(
+      model = case_when(
+        model_name == "bert-base-uncased" ~ "BERT",
+        model_name == "dmis-lab/biobert-v1.1" ~ "BioBERT",
+        model_name == "kamalkraj/bioelectra-base-discriminator-pubmed" ~ "BioELECTRA",
+        model_name == "kamalkraj/bioelectra-base-discriminator-pubmed-pmc" ~ "BioELECTRA-PMC",
+        model_name == "allenai/biomed_roberta_base" ~ "BioMed-RoBERTa",
+        model_name == "allenai/dsp_roberta_base_dapt_biomed_tapt_chemprot_4169" ~ "BioMed-RoBERTa-CP",
+        model_name == "allenai/dsp_roberta_base_dapt_biomed_tapt_rct_500" ~ "BioMed-RoBERTa-RCT",
+        model_name == "bionlp/bluebert_pubmed_uncased_L-12_H-768_A-12" ~ "BlueBERT",
+        model_name == "bionlp/bluebert_pubmed_mimic_uncased_L-12_H-768_A-12" ~ "BlueBERT-MIMIC-III",
+        model_name == "giacomomiolo/electramed_base_scivocab_1M" ~ "ELECTRAMed",
+        model_name == "microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract" ~ "PubMedBERT",
+        model_name == "microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract-fulltext" ~ "PubMedBERT-Full",
+        model_name == "cambridgeltl/SapBERT-from-PubMedBERT-fulltext" ~ "SapBERT",
+        model_name == "cambridgeltl/SapBERT-from-PubMedBERT-fulltext-mean-token" ~ "SapBERT-Mean",
+        model_name == "allenai/scibert_scivocab_uncased" ~ "SciBERT"
+      )
+    )
 }
 ```
 
@@ -93,7 +112,7 @@ $F1=\frac{2*precision*recall}{precision+recall}$
 
 
 ```{r rearrange_classif_stats, echo = FALSE}
-classif_stats <- raw_classif_stats %>%
+classif_train_stats <- raw_classif_train_stats %>%
   pivot_metrics() %>% 
   relabel_models()
 ```
@@ -101,7 +120,7 @@ classif_stats <- raw_classif_stats %>%
 #### Precision
 
 ```{r plot_classif_precision, echo=FALSE}
-classif_stats %>%
+classif_train_stats %>%
   ggplot(aes(x = epoch, y = precision, color = dataset)) +
   facet_wrap(~ model) +
   geom_point() +
@@ -115,7 +134,7 @@ classif_stats %>%
 #### Sensitivity (Recall)
 
 ```{r plot_classif_sensitivity, echo=FALSE}
-classif_stats %>%
+classif_train_stats %>%
   ggplot(aes(x = epoch, y = recall, color = dataset)) +
   facet_wrap(~ model) +
   geom_point() +
@@ -129,7 +148,7 @@ classif_stats %>%
 #### *F*-1
 
 ```{r plot_classif_F1, echo=FALSE}
-classif_stats %>%
+classif_train_stats %>%
   ggplot(aes(x = epoch, y = f1, color = dataset)) +
   facet_wrap(~ model) +
   geom_point() +
@@ -145,7 +164,7 @@ classif_stats %>%
 Aside from performance metrics, we can look at *loss* over the training period. A very small loss on the training set means that the model is already modeling the training set very well. High loss on the validation set implies that the model is not modeling the validation set so well.
 
 ```{r plot_classif_loss, echo=FALSE}
-classif_stats %>%
+classif_train_stats %>%
   ggplot(aes(x = epoch, y = loss, color = dataset)) +
   facet_wrap(~ model) +
   geom_point() +
@@ -161,9 +180,9 @@ classif_stats %>%
 So far, the best model has been chosen based on the highest *F*-1 score. I will make this an optional parameter, so we can prioritize precision. Regardless, we had a tie for those 2 metrics. I will add a secondary consideration of minimal validation loss, in which case PubMedBERT-Full wins.
 
 ```{r best_ner_mode, echo = FALSE}
-classif_stats %>% 
+classif_train_stats %>% 
   filter(dataset == "Validation") %>% 
-  filter(f1 == max(f1)) %>% 
+  filter(precision == max(precision)) %>% 
   select(model, epoch, f1, precision, recall, f1, loss)
 ```
 
@@ -173,7 +192,7 @@ During model training, performance metrics were recorded for each epoch on both 
 
 
 ```{r rearrange_ner_stats, echo = FALSE}
-ner_stats <- raw_ner_stats %>%
+ner_train_stats <- raw_ner_train_stats %>%
   pivot_metrics() %>% 
   relabel_models()
 ```
@@ -181,7 +200,7 @@ ner_stats <- raw_ner_stats %>%
 #### Precision
 
 ```{r plot_ner_precision, echo=FALSE}
-ner_stats %>%
+ner_train_stats %>%
   ggplot(aes(x = epoch, y = precision, color = dataset)) +
   facet_wrap(~ model) +
   geom_point() +
@@ -195,7 +214,7 @@ ner_stats %>%
 #### Sensitivity (Recall)
 
 ```{r plot_ner_sensitivity, echo=FALSE}
-ner_stats %>%
+ner_train_stats %>%
   ggplot(aes(x = epoch, y = recall, color = dataset)) +
   facet_wrap(~ model) +
   geom_point() +
@@ -209,7 +228,7 @@ ner_stats %>%
 #### *F*-1
 
 ```{r plot_ner_F1, echo=FALSE}
-ner_stats %>%
+ner_train_stats %>%
   ggplot(aes(x = epoch, y = f1, color = dataset)) +
   facet_wrap(~ model) +
   geom_point() +
@@ -225,7 +244,7 @@ ner_stats %>%
 Aside from performance metrics, we can look at *loss* over the training period. A very small loss on the training set means that the model is already modeling the training set very well. High loss on the validation set implies that the model is not modeling the validation set so well.
 
 ```{r plot_ner_loss, echo=FALSE}
-ner_stats %>%
+ner_train_stats %>%
   ggplot(aes(x = epoch, y = loss, color = dataset)) +
   facet_wrap(~ model) +
   geom_point() +
@@ -240,8 +259,582 @@ ner_stats %>%
 
 
 ```{r best_ner_model, echo = FALSE}
-ner_stats %>% 
+ner_train_stats %>% 
   filter(dataset == "Validation") %>% 
   filter(f1 == max(f1)) %>% 
   select(model, epoch, f1, precision, recall, f1, loss)
+```
+## Validation Set Performances
+
+The y-axis labels are omitted for ease of sizing in order to create a combined figure in illustrator.
+From top to bottom the metrics are *F*-1 score, precision, recall.
+
+### Classification performance
+
+```{r}
+tidy_class_train_stats <- classif_train_stats %>%
+  filter(dataset == 'Validation') %>%
+  group_by(model) %>%
+  slice(which.max(precision)) %>%
+  ungroup() %>%
+  rename('Precision' = 'precision',
+         'Recall' = 'recall',
+         'F1-score' = 'f1') %>%
+  mutate(model = fct_reorder(model, Precision, .desc = TRUE)) %>%
+  pivot_longer(
+    names_to = 'metric',
+    values_to = 'value',
+    cols = c(Precision, Recall, 'F1-score', loss),
+  ) %>%
+  mutate(metric = factor(metric, levels = c("Recall", "Precision", "F1-score"))) %>%
+  filter(metric != 'loss')
+
+tidy_class_train_stats %>% 
+  ggplot(aes(y = metric, x = value)) +
+  facet_wrap( ~ model, ncol = 3,) +
+  geom_col(position = 'dodge', alpha = 0.8, fill = '#29477e') +
+  labs(x = '', y = '') +
+  scale_x_continuous(breaks = seq(0, 1, by = 0.2)) +
+  theme(strip.background = element_rect(fill = '#454545'),
+        axis.text.y = element_blank())
+
+ggsave('figures/class_val_set_performances.svg', width=5, height=6)
+ggsave('figures/class_val_set_performances.png', width=5, height=6)
+```
+
+
+```{r, echo=FALSE}
+class_table <- tidy_class_train_stats %>%
+  mutate(value = signif(value, 3)) %>% 
+  pivot_wider(names_from = "metric", values_from = "value") %>%
+  mutate(model = as.character(model)) %>%
+  select(-epoch,-dataset,-model_name) %>%
+  ungroup() %>%
+  arrange(desc(Precision)) %>%
+  gt(rowname_col = "model") %>%
+  tab_header(title = "Classifiction Model Performance on Validation Set") %>% 
+  cols_move_to_start(
+    columns = c("F1-score", Precision, Recall)
+  )
+
+class_table
+
+gtsave(class_table, "figures/class_validation_performance_table.docx")
+```
+
+
+```{r}
+tidy_ner_train_stats <- ner_train_stats %>%
+  filter(dataset == 'Validation') %>%
+  group_by(model) %>%
+  slice(which.max(f1)) %>%
+  ungroup() %>%
+  rename('Precision' = 'precision',
+         'Recall' = 'recall',
+         'F1-score' = 'f1') %>%
+  mutate(model = fct_reorder(model, .[['F1-score']], .desc = TRUE)) %>%
+  pivot_longer(
+    names_to = 'metric',
+    values_to = 'value',
+    cols = c(Precision, Recall, 'F1-score', loss),
+  ) %>%
+  mutate(metric = factor(metric, levels = c("Recall", "Precision", "F1-score"))) %>%
+  filter(metric != 'loss')
+
+tidy_ner_train_stats %>%
+  ggplot(aes(y = metric, x = value)) +
+  facet_wrap( ~ model, ncol = 3,) +
+  geom_col(position = 'dodge',
+           alpha = 0.8,
+           fill = '#29477e') +
+  labs(x = '', y = '') +
+  theme(strip.text = element_text(color = "#1a1a1a"),
+        #strip.background = element_rect(fill='#454545')
+        axis.text.y = element_blank())
+
+ggsave('figures/ner_val_set_performances.svg',
+       width = 5,
+       height = 6)
+ggsave('figures/ner_val_set_performances.png',
+       width = 5,
+       height = 6)
+```
+
+
+```{r, echo=FALSE}
+ner_table <- tidy_ner_train_stats %>%
+  mutate(value = signif(value, 3)) %>% 
+  pivot_wider(names_from = "metric", values_from = "value") %>%
+  mutate(model = as.character(model)) %>%
+  select(-epoch,-dataset,-model_name) %>%
+  ungroup() %>%
+  arrange(desc(.$"F1-score")) %>%
+  gt(rowname_col = "model") %>%
+  tab_header(title = "NER Model Performance on Validation Set") %>% 
+  cols_move_to_start(
+    columns = c("F1-score", Precision, Recall)
+  )
+
+ner_table
+
+gtsave(ner_table, "figures/ner_validation_performance_table.docx")
+```
+
+## Test Statistics
+
+### Classification
+
+```{r, echo=False}
+classif_test_stats <- raw_classif_test_stats %>%
+  rename(
+    'model_name' = 'model',
+    'Precision' = 'precision',
+    'Recall' = 'recall',
+    'F1-score' = 'f1'
+  ) %>%
+  relabel_models() %>%
+  select(-model_name) %>%
+  pivot_longer(
+    names_to = 'metric',
+    values_to = 'value',
+    cols = c(Precision, Recall, 'F1-score', loss),
+  )%>%
+  mutate(metric = factor(metric, levels = c("Recall", "Precision", "F1-score")))
+```
+
+```{r, echo=False}
+
+classif_test_stats %>%
+  filter(metric != 'loss') %>%
+  ggplot(aes(y = metric, x = value)) +
+  facet_wrap(~ model, ncol = 3) +
+  geom_col(position='dodge') +
+  labs(x = '', y = '')
+
+ggsave('figures/class_test_set_performances.svg', width=4, height=6)
+ggsave('figures/class_test_set_performances.png', width=4, height=6)
+
+```
+
+Chosen model's performance on the test set
+```{r}
+classif_test_stats %>% 
+  filter(model == 'BioMed-RoBERTa-RCT')
+```
+
+
+### NER
+
+```{r, echo=False}
+ner_test_stats <- raw_ner_test_stats %>%
+  rename(
+    'model_name' = 'model',
+    'Precision' = 'precision',
+    'Recall' = 'recall',
+    'F1-score' = 'f1'
+  ) %>%
+  relabel_models() %>%
+  select(-model_name) %>%
+  pivot_longer(
+    names_to = 'metric',
+    values_to = 'value',
+    cols = c(Precision, Recall, 'F1-score', loss),
+  ) %>%
+  filter(metric != 'loss') %>%
+  mutate(metric = factor(metric, levels = c("Recall", "Precision", "F1-score")))
+```
+
+```{r, echo=False}
+
+ner_test_stats  %>%
+  ggplot(aes(y = metric, x = value, fill = value)) +
+  facet_wrap(~ model, ncol = 3) +
+  geom_col(position = 'dodge', alpha=0.8) +
+  labs(x = '', y = '') +
+  scale_fill_gradient(low = '#29477e',  high='#84a4f5') +
+  theme(legend.position = 'none',
+        strip.background = element_rect(fill='#29477e'),
+        axis.text.y = element_blank())
+
+ggsave('figures/ner_test_set_performances.svg', width=4, height=6)
+ggsave('figures/ner_test_set_performances.png', width=4, height=6)
+
+```
+
+Chosen model's performance on the test set
+```{r}
+ner_test_stats %>% 
+  filter(model == 'BioMed-RoBERTa-RCT')
+```
+
+## Test and Validation Set Stat Tables
+
+```{r, echo=FALSE}
+combined_class_table <- classif_test_stats %>%
+  na.omit() %>%
+  mutate(value = signif(value, 3)) %>%
+  pivot_wider(names_from = "metric", values_from = "value") %>%
+  rename(test_precision = Precision,
+         test_recall = Recall,
+         test_f1 = "F1-score") %>%
+  left_join(
+    tidy_class_train_stats %>%
+      select(-model_name,-dataset,-epoch) %>%
+      mutate(value = signif(value, 3)) %>%
+      pivot_wider(names_from = "metric", values_from = "value") %>%
+      rename(
+        val_precision = Precision,
+        val_recall = Recall,
+        val_f1 = "F1-score"
+      ),
+    by = "model"
+  ) %>%
+  mutate(model = as.character(model)) %>%
+  ungroup() %>%
+  arrange(desc(val_precision)) %>%
+  gt(rowname_col = "model") %>%
+  tab_header(title = "Classification model performance on validation and test sets") %>%
+  cols_move_to_start(columns = c(
+    val_f1,
+    val_precision,
+    val_recall,
+    test_f1,
+    test_precision,
+    test_recall
+  )) %>%
+  tab_spanner(label = "Validation Set",
+              columns = c(val_f1, val_precision, val_recall)) %>%
+  tab_spanner(label = "Test Set",
+              columns = c(test_f1, test_precision, test_recall)) %>%
+  cols_label(
+    val_f1 = "F1-score",
+    val_precision = "Precision",
+    val_recall = "Recall",
+    test_f1 = "F1-score",
+    test_precision = "Precision",
+    test_recall = "Recall"
+  )
+
+combined_class_table
+
+
+gtsave(combined_class_table, "figures/combined_classification_table.docx")
+```
+
+```{r, echo=FALSE}
+combined_ner_table <- ner_test_stats %>%
+  na.omit() %>%
+  mutate(value = signif(value, 3)) %>%
+  pivot_wider(names_from = "metric", values_from = "value") %>%
+  rename(test_precision = Precision,
+         test_recall = Recall,
+         test_f1 = "F1-score") %>%
+  left_join(
+    tidy_ner_train_stats %>%
+      select(-model_name,-dataset,-epoch) %>%
+      mutate(value = signif(value, 3)) %>%
+      pivot_wider(names_from = "metric", values_from = "value") %>%
+      rename(
+        val_precision = Precision,
+        val_recall = Recall,
+        val_f1 = "F1-score"
+      ),
+    by = "model"
+  ) %>%
+  mutate(model = as.character(model)) %>%
+  ungroup() %>%
+  arrange(desc(val_f1)) %>%
+  gt(rowname_col = "model") %>%
+  tab_header(title = "NER model performance on validation and test sets") %>%
+  cols_move_to_start(columns = c(
+    val_f1,
+    val_precision,
+    val_recall,
+    test_f1,
+    test_precision,
+    test_recall
+  )) %>%
+  tab_spanner(label = "Validation Set",
+              columns = c(val_f1, val_precision, val_recall)) %>%
+  tab_spanner(label = "Test Set",
+              columns = c(test_f1, test_precision, test_recall)) %>%
+  cols_label(
+    val_f1 = "F1-score",
+    val_precision = "Precision",
+    val_recall = "Recall",
+    test_f1 = "F1-score",
+    test_precision = "Precision",
+    test_recall = "Recall"
+  )
+
+combined_ner_table
+
+
+gtsave(combined_ner_table, "figures/combined_ner_table.docx")
+```
+
+## Metadata analysis
+
+```{r}
+rm(list = ls())
+full_inventory <- read_csv("../out/original_query/processed_countries/predictions.csv", show_col_types = F)
+# 
+# inventory_long <- full_inventory %>%
+#   mutate(ID = strsplit(ID, ", ")) %>%
+#   unnest(ID) %>%
+#   select(
+#     -extracted_url,
+#     -extracted_url_coordinates,
+#     -extracted_url_country,
+#     -extracted_url_status,
+#     -best_name_prob,
+#     -best_common,
+#     -best_common_prob,
+#     -best_full,
+#     -best_full_prob,
+#     -publication_date,
+#     -affiliation,
+#     -authors,
+#     -grant_agencies,
+#     -grant_ids,
+#     -num_citations,
+#     -affiliation_countries
+#   )
+```
+
+```{r}
+# vector_epmc_details <- Vectorize(epmc_details)
+# inv_sample <- head(inventory_long)
+# 
+# per_article_query <- vector_epmc_details(inv_sample$ID)
+# 
+# for (res in per_article_query) {
+#   print(res[[1]]["title"])
+# }
+# 
+# for (id in inv_sample$ID) {
+#   result <- epmc_details(id)
+#   basic <- result[[1]]
+#   author_details <- result[[2]]
+#   id <- basic["id"]
+#   title <- basic["title"]
+#   affiliations <- author_details["affiliation"]
+#   row <- cbind(id, title, affiliations)
+#   print(row)
+# }
+```
+
+```{r}
+# y  <- NULL
+# for (id in inventory_long$ID) {
+#   result <- epmc_details(id)
+#   basic <- result[[1]]
+#   pmid <- basic["id"]
+#   title <- basic["title"]
+#   oa <- basic["isOpenAccess"]
+#   terms <- basic["hasTextMinedTerms"]
+#   dbcross <- basic["hasDbCrossReferences"]
+#   lablinks <- basic["hasLabsLinks"]
+#   acc_num <- basic["hasTMAccessionNumbers"]
+#   j_title <- tryCatch(result[[3]]["journal.title"], error = function(cond) {
+#     message(paste("journal title issue"))
+#     message(cond, sep="\n")
+#     return(NA)
+#     force(do.next)})
+#   license <- tryCatch(basic["license"], error = function(cond) {
+#     message(paste("licence issue"))
+#     message(cond, sep="\n")
+#     return(NA)
+#     force(do.next)})
+#   report <- cbind(pmid, title, oa, terms, dbcross, lablinks, acc_num, j_title, license)
+#   print(report)
+#   y <- rbind(y, report)
+# }
+# 
+# ## find lost PMIDs 
+# y_id <- as.data.frame(y$id)
+# names(y_id)[1] ="id"
+# id_l <- as.data.frame(inventory_long)
+# names(id_l)[1] ="id"
+# y_id$id <- as.numeric(y_id$id)
+# id_l$id <- as.numeric(id_l$id)
+# lost <- anti_join(id_l, y_id)
+# lost_id <- lost$id
+# 
+# ## all from MED
+# med  <- NULL
+# for (i in lost_id) {
+#   r <- sapply(i, epmc_details, data_src = "med") 
+#   id <- r[[1]]["id"]
+#   title <- r[[1]]["title"]
+#   oa <- r[[1]]["isOpenAccess"]
+#   terms <- r[[1]]["hasTextMinedTerms"]
+#   dbcross <- r[[1]]["hasDbCrossReferences"]
+#   lablinks <- r[[1]]["hasLabsLinks"]
+#   acc_num <- r[[1]]["hasTMAccessionNumbers"]
+#   ## in just this set, one journal title absent
+#   journal.title <- tryCatch(r[[3]]["journal.title"], error = function(cond) {
+#     message(paste("title issue"))
+#     message(cond, sep="\n")
+#     return(NA)
+#     force(do.next)})
+#   license <- tryCatch(r[[1]]["license"], error = function(cond) {
+#     message(paste("licence issue"))
+#     message(cond, sep="\n")
+#     return(NA)
+#     force(do.next)})
+#   report <- cbind(id, title, oa, terms, dbcross, lablinks, acc_num, journal.title, license)
+#   med <- rbind(med, report)
+# }
+# 
+# y <- rbind(y, med)
+```
+
+## Resource Location Analysis
+
+```{r}
+locations <- full_inventory %>%
+  select(extracted_url_country,
+         extracted_url_coordinates,
+         affiliation_countries)
+
+url_countries <- locations %>%
+  select(extracted_url_country) %>%
+  rename(country = extracted_url_country) %>%
+  na.omit() %>%
+  mutate(country = strsplit(country, ", ")) %>%
+  unnest(country) %>%
+  group_by(country) %>%
+  summarize(count = n()) %>%
+  filter(country != "Province of China") %>% 
+  mutate(
+    country = case_when(
+      country == "United States" ~ "USA",
+      country == "United Kingdom" ~ "UK",
+      country == "Korea" ~ "South Korea",
+      country == "Russian Federation" ~ "Russia",
+      country == "Czechia" ~"Czech Republic",
+      T ~ country
+    )
+  )
+
+url_coordindates <- locations %>%
+  select(extracted_url_coordinates) %>%
+  rename(coordinates = extracted_url_coordinates) %>%
+  na.omit() %>%
+  mutate(coordinates = str_replace(coordinates, ",$", "")) %>%
+  mutate(coordinates = strsplit(coordinates, ", ")) %>%
+  unnest(coordinates) %>%
+  mutate(coordinates = str_replace(coordinates, "\\(", "")) %>%
+  mutate(coordinates = str_replace(coordinates, "\\)", "")) %>%
+  filter(coordinates != "") %>%
+  separate(coordinates, into = c("lat", "long"), sep = ",")
+
+author_country_counts <- locations %>%
+  select(affiliation_countries) %>%
+  na.omit() %>% 
+  mutate(affiliation_countries = strsplit(affiliation_countries, ", ")) %>%
+  unnest(affiliation_countries) %>%
+  rename(country = affiliation_countries) %>%
+  group_by(country) %>%
+  summarize(count = n()) %>% 
+  filter(country != "Province of China") %>% 
+  mutate(
+    country = case_when(
+      country == "United States" ~ "USA",
+      country == "United Kingdom" ~ "UK",
+      country == "Korea" ~ "South Korea",
+      country == "Russian Federation" ~ "Russia",
+      country == "Czechia" ~"Czech Republic",
+      T ~ country
+    )
+  )
+```
+
+
+### URL Locations
+
+Geolocations of IP addresses were obtained from ipapi and ipinfo. This included both country names and coordinates.
+
+First, plotting those coordinates:
+
+```{r}
+url_coordindates %>%
+  mutate_all(as.double) %>%
+  ggplot(aes(long, lat)) +
+  geom_map(
+    data = map_data("world"),
+    map = map_data("world"),
+    aes(long, lat, map_id = region),
+    color = "white",
+    fill = "lightgray"
+  ) +
+  geom_point(
+    alpha = 0.2,
+    color = "#1b2a50",
+    size = 1.5,
+    shape = 16
+  ) +
+  theme_void()
+
+ggsave("figures/ip_coordinates.png")
+```
+
+Next plotting country names as `geom_polygon`s
+
+```{r}
+url_countries_joined <-
+  left_join(map_data("world"), url_countries, by = c("region" = "country"))
+
+ggplot() +
+  geom_polygon(data = url_countries_joined, aes(
+    x = long,
+    y = lat,
+    fill = count,
+    group = group
+  )) +
+  theme_void() +
+  labs(fill = "Count")
+
+ggsave("figures/ip_countries.png")
+```
+
+And plotting countries as `geom_map`
+
+```{r}
+url_countries_joined %>%
+  ggplot() +
+  geom_map(
+    data = url_countries_joined,
+    map = url_countries_joined,
+    aes(long, lat, map_id = region, fill = count),
+    color = "white"
+  ) +
+  theme_void() +
+  labs(fill = "Count")
+
+ggsave("figures/ip_countries.png")
+```
+
+### Author affiliation countries
+
+Names of countries were extracted from author affiliations. Here are those plotted and scaled by number of times that country appeared.
+
+```{r}
+author_countries_joined <-
+  left_join(map_data("world"),
+            author_country_counts,
+            by = c("region" = "country"))
+
+ggplot() +
+  geom_polygon(data = author_countries_joined, aes(
+    x = long,
+    y = lat,
+    fill = count,
+    group = group
+  )) +
+  theme_void() +
+  labs(fill = "Count")
+
+ggsave("figures/author_countries.png")
 ```
