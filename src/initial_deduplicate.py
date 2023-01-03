@@ -24,6 +24,7 @@ pd.options.mode.chained_assignment = None
 class Args(NamedTuple):
     """ Command-line arguments """
     file: TextIO
+    previous: TextIO
     out_dir: str
 
 
@@ -39,6 +40,11 @@ def get_args() -> Args:
                         metavar='FILE',
                         type=argparse.FileType('rt', encoding='ISO-8859-1'),
                         help='CSV file of predictions and metadata')
+    parser.add_argument('-p',
+                        '--previous',
+                        metavar='FILE',
+                        type=argparse.FileType('rt', encoding='ISO-8859-1'),
+                        help='Previously processed inventory')
     parser.add_argument('-o',
                         '--out-dir',
                         metavar='DIR',
@@ -48,7 +54,7 @@ def get_args() -> Args:
 
     args = parser.parse_args()
 
-    return Args(args.file, args.out_dir)
+    return Args(args.file, args.previous, args.out_dir)
 
 
 # ---------------------------------------------------------------------------
@@ -98,6 +104,104 @@ def fixture_raw_data() -> pd.DataFrame:
         columns=columns)
 
     return df
+
+
+# ---------------------------------------------------------------------------
+def clean_df(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Prepare dataframe for potential merging of old results deduplication
+
+    Parameters:
+    `df`: Input dataframe
+
+    Return: Cleaned dataframe
+    """
+
+    df = df.drop(['common_name', 'common_prob', 'full_name', 'full_prob'],
+                 axis='columns')
+    all_columns = df.columns
+    df[all_columns] = df[all_columns].fillna('').astype(str)
+    df['extracted_url'] = df['extracted_url'].map(clean_url)
+
+    return df
+
+
+# ---------------------------------------------------------------------------
+def prep_previous(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Prepare previous inventory for merging with new results
+
+    Parameters:
+    `df`: Previous inventory results
+
+    Return: Dataframe with same columns as new results
+    """
+
+    columns = [
+        'ID', 'text', 'extracted_url', 'best_common', 'best_common_prob',
+        'best_full', 'best_full_prob', 'best_name', 'best_name_prob',
+        'publication_date'
+    ]
+
+    df = df[columns]
+
+    return df
+
+
+# ---------------------------------------------------------------------------
+def test_prep_previous(raw_data: pd.DataFrame) -> None:
+    """ Test prep_previous() """
+
+    in_df = clean_df(raw_data)
+
+    new_columns = in_df.columns
+
+    # Previous results are already deduplicated
+    previous = deduplicate(raw_data)
+
+    # Add extra columns to simulate previously obtained results
+    previous['extracted_url_status'] = '400'
+    previous['extracted_url_country'] = 'USA'
+
+    previous = prep_previous(previous)
+
+    prev_columns = previous.columns
+
+    assert all(new_columns == prev_columns)
+
+
+# ---------------------------------------------------------------------------
+def integrate_previous(new_df: pd.DataFrame,
+                       prev_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Add previous results so that all can be deduplicated
+
+    Parameters:
+    `new_df`: New data
+    `prev_df`: Previously processed inventory
+
+    Return: Combined dataframe
+    """
+
+    prev_df = prep_previous(prev_df)
+    out_df = pd.concat([new_df, prev_df])
+
+    return out_df
+
+
+# ---------------------------------------------------------------------------
+def test_integrate_previous(raw_data: pd.DataFrame) -> None:
+    """ Test integrate_previous() """
+
+    previous = deduplicate(raw_data)
+
+    # Add extra columns to simulate previously obtained results
+    previous['extracted_url_status'] = '400'
+    previous['extracted_url_country'] = 'USA'
+
+    out_df = integrate_previous(raw_data, previous)
+
+    assert len(out_df) == 11
 
 
 # ---------------------------------------------------------------------------
@@ -171,18 +275,11 @@ def deduplicate(df: pd.DataFrame) -> pd.DataFrame:
     Return: Deduplicated dataframe
     """
 
-    df = df.drop(['common_name', 'common_prob', 'full_name', 'full_prob'],
-                 axis='columns')
-    all_columns = df.columns
-    df[all_columns] = df[all_columns].fillna('').astype(str)
-    df['extracted_url'] = df['extracted_url'].map(clean_url)
-
     duplicates = df.duplicated(['best_name', 'extracted_url'], keep=False)
 
     unique_df = df[~duplicates]
     duplicate_df = df[duplicates]
     duplicate_df['article_count'] = 0
-    all_columns = df.columns
 
     duplicate_df = (duplicate_df.sort_values(
         'publication_date',
@@ -264,7 +361,13 @@ def main() -> None:
     if not os.path.isdir(out_dir):
         os.makedirs(out_dir)
 
-    out_df = deduplicate(pd.read_csv(args.file, dtype=str))
+    in_df = clean_df(pd.read_csv(args.file, dtype=str))
+
+    if args.previous:
+        in_df = integrate_previous(in_df, pd.read_csv(args.previous,
+                                                      dtype=str))
+
+    out_df = deduplicate(in_df)
 
     outfile = make_filename(out_dir, args.file.name)
 

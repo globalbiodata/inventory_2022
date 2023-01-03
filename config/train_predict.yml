@@ -82,3 +82,22 @@ backoff: 0.5
 
 # Getting metadata from EuropePMC
 epmc_chunk_size: 20
+
+# Input files for data analysis
+## Data analysis can either be run on the newly generated output files
+## or on the files stored in the repository. Comment/uncomment below
+## to choose which files to use.
+
+## Newly generated files
+classification_train_stats: 'out/classif_train_out/combined_train_stats/combined_stats.csv'
+classification_test_stats: 'out/classif_train_out/combined_test_stats/combined_stats.csv'
+ner_train_stats: 'out/ner_train_out/combined_train_stats/combined_stats.csv'
+ner_test_stats: 'out/ner_train_out/combined_test_stats/combined_stats.csv'
+final_inventory_file: 'out/original_query/processed_countries/predictions.csv'
+
+## Stored files
+# classification_train_stats: 'data/classif_metrics/combined_train_stats.csv'
+# classification_test_stats: 'data/classif_metrics/combined_test_stats.csv'
+# ner_train_stats: 'data/ner_metrics/combined_train_stats.csv'
+# ner_test_stats: 'data/ner_metrics/combined_test_stats.csv'
+# final_inventory_file: 'data/final_inventory_2022.csv'

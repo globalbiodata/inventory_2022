@@ -287,7 +287,8 @@ def predict(model, tokenizer: PreTrainedTokenizer, inputs: pd.DataFrame,
     mention, lable, and probability columns
     """
 
-    pred_df = pd.DataFrame(columns=['ID', 'text', 'mention', 'label', 'prob'])
+    pred_df = pd.DataFrame(
+        columns=['ID', 'text', 'publication_date', 'mention', 'label', 'prob'])
 
     for _, row in inputs.iterrows():
         seq = row['title_abstract']
@@ -303,6 +304,7 @@ def predict(model, tokenizer: PreTrainedTokenizer, inputs: pd.DataFrame,
             pd.DataFrame({
                 'ID': [row['id']] * num_preds,
                 'text': [seq] * num_preds,
+                'publication_date': [row['publication_date']] * num_preds,
                 'mention': mentions,
                 'label': labels,
                 'prob': probs
@@ -402,27 +404,32 @@ def reformat_output(df: pd.DataFrame) -> pd.DataFrame:
     df['prob'] = df['prob'].astype(str)
 
     # Add two dummy rows so that both COM and FUL are present as labels
-    df.loc[len(df)] = ['-1', 'foo bar', 'foo', 'COM', '0']
-    df.loc[len(df)] = ['-1', 'foo bar', 'bar', 'FUL', '0']
+    df.loc[len(df)] = ['-1', 'foo bar', 'date hold', 'foo', 'COM', '0']
+    df.loc[len(df)] = ['-1', 'foo bar', 'date hold', 'bar', 'FUL', '0']
     df = df[df['mention'] != '']
 
     # For each article, aggregate multiple occurences
     # of same label into single row
-    df2 = df['mention'].groupby([df.ID, df.text,
-                                 df.label]).apply(list).reset_index()
-    df2['prob'] = df['prob'].groupby([df.ID, df.text, df.label
-                                      ]).apply(list).reset_index()['prob']
+    df2 = df['mention'].groupby(
+        [df.ID, df.text, df.publication_date,
+         df.label]).apply(list).reset_index()
+    df2['prob'] = df['prob'].groupby(
+        [df.ID, df.text, df.publication_date,
+         df.label]).apply(list).reset_index()['prob']
 
     # Create combined column of mentions and their probs
     df2['mention_prob'] = list(zip(df2['mention'], df2['prob']))
 
     # Pivot to wide format, each label gets its own column
-    df2 = df2.pivot(index=['ID', 'text'],
+    df2 = df2.pivot(index=['ID', 'text', 'publication_date'],
                     columns='label',
                     values='mention_prob')
 
     # Fill missing values
-    for col in [c for c in list(df2.columns) if c not in ['ID', 'text']]:
+    for col in [
+            c for c in list(df2.columns)
+            if c not in ['ID', 'text', 'publication_date']
+    ]:
         isna = df2[col].isna()
         df2.loc[isna, col] = pd.Series([[[''], ['']]] * isna.sum(),
                                        dtype='object').values
@@ -436,7 +443,10 @@ def reformat_output(df: pd.DataFrame) -> pd.DataFrame:
     df2.drop(['COM', 'FUL'], inplace=True, axis='columns')
 
     # Convert lists of multiple mentions to string with commas between
-    for col in [c for c in list(df2.columns) if c not in ['ID', 'text']]:
+    for col in [
+            c for c in list(df2.columns)
+            if c not in ['ID', 'text', 'publication_date']
+    ]:
         df2[col] = df2[col].fillna('')
         df2[col] = df2[col].apply(', '.join)
 
@@ -454,29 +464,46 @@ def test_reformat_output() -> None:
 
     in_df = pd.DataFrame(
         [[
-            123, 'SAVI Synthetically Accessible Virtual Inventory', 'SAVI',
-            'COM', 0.98
+            123, 'SAVI Synthetically Accessible Virtual Inventory',
+            '2011-01-01', 'SAVI', 'COM', 0.98
         ],
          [
              123, 'SAVI Synthetically Accessible Virtual Inventory',
-             'Synthetically Accessible Virtual Inventory', 'FUL', 0.64
-         ], [147, 'Chewie-NS Chewie-NS chewie-NS', 'Chewie-NS', 'COM', 0.88],
-         [456, 'PANTHER PANTHER LION', 'PANTHER', 'COM', 0.95],
-         [456, 'PANTHER PANTHER LION', 'LION', 'COM', 0.92],
-         [789, 'MicrobPad MD (MicrobPad)', 'MicrobPad', 'COM', 0.96]],
-        columns=['ID', 'text', 'mention', 'label', 'prob'])
+             '2011-01-01', 'Synthetically Accessible Virtual Inventory', 'FUL',
+             0.64
+         ],
+         [
+             147, 'Chewie-NS Chewie-NS chewie-NS', '2011-01-02', 'Chewie-NS',
+             'COM', 0.88
+         ], [
+             456, 'PANTHER PANTHER LION', '2011-01-03', 'PANTHER', 'COM', 0.95
+         ], [456, 'PANTHER PANTHER LION', '2011-01-03', 'LION', 'COM', 0.92],
+         [
+             789, 'MicrobPad MD (MicrobPad)', '2011-01-04', 'MicrobPad', 'COM',
+             0.96
+         ]],
+        columns=['ID', 'text', 'publication_date', 'mention', 'label', 'prob'])
 
-    out_df = pd.DataFrame(
-        [[
-            123, 'SAVI Synthetically Accessible Virtual Inventory', 'SAVI',
-            '0.98', 'Synthetically Accessible Virtual Inventory', '0.64'
-        ], [147, 'Chewie-NS Chewie-NS chewie-NS', 'Chewie-NS', '0.88', '', ''],
-         [456, 'PANTHER PANTHER LION', 'PANTHER, LION', '0.95, 0.92', '', ''],
-         [789, 'MicrobPad MD (MicrobPad)', 'MicrobPad', '0.96', '', '']],
-        columns=[
-            'ID', 'text', 'common_name', 'common_prob', 'full_name',
-            'full_prob'
-        ])
+    out_df = pd.DataFrame([[
+        123, 'SAVI Synthetically Accessible Virtual Inventory', '2011-01-01',
+        'SAVI', '0.98', 'Synthetically Accessible Virtual Inventory', '0.64'
+    ],
+                           [
+                               147, 'Chewie-NS Chewie-NS chewie-NS',
+                               '2011-01-02', 'Chewie-NS', '0.88', '', ''
+                           ],
+                           [
+                               456, 'PANTHER PANTHER LION', '2011-01-03',
+                               'PANTHER, LION', '0.95, 0.92', '', ''
+                           ],
+                           [
+                               789, 'MicrobPad MD (MicrobPad)', '2011-01-04',
+                               'MicrobPad', '0.96', '', ''
+                           ]],
+                          columns=[
+                              'ID', 'text', 'publication_date', 'common_name',
+                              'common_prob', 'full_name', 'full_prob'
+                          ])
 
     assert_frame_equal(reformat_output(in_df),
                        out_df,

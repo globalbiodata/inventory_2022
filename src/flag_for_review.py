@@ -64,7 +64,7 @@ def get_args() -> Args:
                         default='out/',
                         help='Output directory')
     parser.add_argument('-p',
-                        '--min_prob',
+                        '--min-prob',
                         metavar='PROB',
                         type=float,
                         default=0.95,
