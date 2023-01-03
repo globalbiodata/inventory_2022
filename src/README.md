@@ -409,7 +409,7 @@ metrics.csv
 To get the full list of papers that we will assess, we can obtain the original query. Note that if papers are added retroactively, the yield of this query may change in the future, but should be largely the same.
 
 ```sh
-$ python3 src/query_epmc.csv \
+$ python3 src/query_epmc.py \
     --out-dir out/original_query \
     --from-date 2011 \
     --to-date 2021 \
@@ -440,6 +440,20 @@ $ cat out/classif_train_out/best/best_checkpt.txt | \
     --out-dir out/original_query/classification \
     --input-file out/original_query/query_results.csv \
     --checkpoint /dev/stdin
+
+$ ls out/original_query/classification
+predictions.csv
+```
+
+If this results in an "Illegal seek" error, you can check the contents of `out/classif_train_out/best/best_checkpt.txt`, and manually supply that as the `--checkpoint` argument. For example:
+```sh
+$ cat out/classif_train_out/best/best_checkpt.txt
+out/classif_train_out/biomedroberta_rct500/checkpt.pt
+
+$ python3 src/class_predict.py \
+    --out-dir out/original_query/classification \
+    --input-file out/original_query/query_results.csv \
+    --checkpoint out/classif_train_out/biomedroberta_rct500/checkpt.pt
 
 $ ls out/original_query/classification
 predictions.csv
