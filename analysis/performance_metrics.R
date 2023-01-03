@@ -39,28 +39,40 @@ get_args <- function() {
     "--class-train",
     help  = "Classification train/val stats",
     metavar = "FILE",
-    type = "character"
+    type = "character",
+    default = "data/classif_metrics/combined_train_stats.csv"
   )
   parser$add_argument(
     "-ct",
     "--class-test",
     help  = "Classification test stats",
     metavar = "FILE",
-    type = "character"
+    type = "character",
+    default = "data/classif_metrics/combined_test_stats.csv"
   )
   parser$add_argument(
     "-nv",
     "--ner-train",
     help  = "NER train/val stats",
     metavar = "FILE",
-    type = "character"
+    type = "character",
+    default = "data/ner_metrics/combined_train_stats.csv"
   )
   parser$add_argument(
     "-nt",
     "--ner-test",
     help  = "NER test stats",
     metavar = "FILE",
-    type = "character"
+    type = "character",
+    default = "data/ner_metrics/combined_test_stats.csv"
+  )
+  parser$add_argument(
+    "-o",
+    "--out-dir",
+    help  = "Output directory",
+    metavar = "DIR",
+    type = "character",
+    default = "analysis/figures"
   )
   
   args <- parser$parse_args()
@@ -132,6 +144,8 @@ raw_ner_test_stats <-
   read_csv(args$ner_test,
            show_col_types = FALSE)
 
+out_dir <- args$out_dir
+
 ## Plots --------------------------------------------------------------------
 
 print("Generating plots.")
@@ -163,7 +177,7 @@ tidy_class_train_stats <- classif_train_stats %>%
 
 class_val_plot <- tidy_class_train_stats %>%
   ggplot(aes(y = metric, x = value)) +
-  facet_wrap(~ model, ncol = 3, ) +
+  facet_wrap( ~ model, ncol = 3,) +
   geom_col(position = "dodge",
            alpha = 0.8,
            fill = "#29477e") +
@@ -173,13 +187,13 @@ class_val_plot <- tidy_class_train_stats %>%
         axis.text.y = element_blank())
 
 ggsave(
-  "analysis/figures/class_val_set_performances.svg",
+  file.path(out_dir, "class_val_set_performances.svg"),
   class_val_plot,
   width = 5,
   height = 6
 )
 ggsave(
-  "analysis/figures/class_val_set_performances.png",
+  file.path(out_dir, "class_val_set_performances.png"),
   class_val_plot,
   width = 5,
   height = 6
@@ -212,7 +226,7 @@ tidy_ner_train_stats <- ner_train_stats %>%
 
 ner_val_plot <- tidy_ner_train_stats %>%
   ggplot(aes(y = metric, x = value)) +
-  facet_wrap(~ model, ncol = 3, ) +
+  facet_wrap( ~ model, ncol = 3,) +
   geom_col(position = "dodge",
            alpha = 0.8,
            fill = "#29477e") +
@@ -221,13 +235,13 @@ ner_val_plot <- tidy_ner_train_stats %>%
         axis.text.y = element_blank())
 
 ggsave(
-  "analysis/figures/ner_val_set_performances.svg",
+  file.path(out_dir, "ner_val_set_performances.svg"),
   ner_val_plot,
   width = 5,
   height = 6
 )
 ggsave(
-  "analysis/figures/ner_val_set_performances.png",
+  file.path(out_dir, "ner_val_set_performances.png"),
   ner_val_plot,
   width = 5,
   height = 6
@@ -266,7 +280,7 @@ combined_class_table <- classif_test_stats %>%
          test_f1 = "F1-score") %>%
   left_join(
     tidy_class_train_stats %>%
-      select(-model_name, -dataset, -epoch) %>%
+      select(-model_name,-dataset,-epoch) %>%
       mutate(value = signif(value, 3)) %>%
       pivot_wider(names_from = "metric", values_from = "value") %>%
       rename(
@@ -304,7 +318,7 @@ combined_class_table <- classif_test_stats %>%
 
 
 gtsave(combined_class_table,
-       "analysis/figures/combined_classification_table.docx")
+       file.path(out_dir, "combined_classification_table.docx"))
 
 ### NER ---------------------------------------------------------------------
 
@@ -336,7 +350,7 @@ combined_ner_table <- ner_test_stats %>%
          test_f1 = "F1-score") %>%
   left_join(
     tidy_ner_train_stats %>%
-      select(-model_name,-dataset,-epoch) %>%
+      select(-model_name, -dataset, -epoch) %>%
       mutate(value = signif(value, 3)) %>%
       pivot_wider(names_from = "metric", values_from = "value") %>%
       rename(
@@ -373,6 +387,6 @@ combined_ner_table <- ner_test_stats %>%
   )
 
 gtsave(combined_ner_table,
-       "analysis/figures/combined_ner_table.docx")
+       file.path(out_dir, "combined_ner_table.docx"))
 
 print("Done. Analysis completed successfully.")

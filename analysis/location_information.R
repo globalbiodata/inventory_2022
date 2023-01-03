@@ -29,7 +29,16 @@ get_args <- function() {
     "inventory_file",
     help  = "Final inventory file",
     metavar = "FILE",
-    type = "character"
+    type = "character",
+    default = "data/final_inventory_2022.csv"
+  )
+  parser$add_argument(
+    "-o",
+    "--out-dir",
+    help  = "Output directory",
+    metavar = "DIR",
+    type = "character",
+    default = "analysis/figures"
   )
   
   args <- parser$parse_args()
@@ -42,6 +51,8 @@ get_args <- function() {
 print("Parsing command-line arguments.")
 
 args <- get_args()
+
+out_dir <- args$out_dir
 
 full_inventory <-
   read_csv(args$inventory_file,
@@ -90,7 +101,7 @@ url_coordinate_plot <- url_coordindates %>%
   ) +
   theme_void()
 
-ggsave("analysis/figures/ip_coordinates.png",
+ggsave(file.path(out_dir, "ip_coordinates.png"),
        url_coordinate_plot)
 
 ### Countries ---------------------------------------------------------------
@@ -130,7 +141,7 @@ url_country_plot <- ggplot() +
   theme_void() +
   labs(fill = "Count")
 
-ggsave("analysis/figures/ip_countries.png",
+ggsave(file.path(out_dir, "ip_countries.png"),
        url_country_plot)
 
 ## Author locations ---------------------------------------------------------
@@ -172,7 +183,7 @@ author_plot <- ggplot() +
   theme_void() +
   labs(fill = "Count")
 
-ggsave("analysis/figures/author_countries.png",
+ggsave(file.path(out_dir, "author_countries.png"),
        author_plot)
 
 print("Done. Location data processed successfully.")
