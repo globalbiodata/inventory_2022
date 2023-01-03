@@ -27,7 +27,8 @@ get_args <- function() {
     "inventory_file",
     help  = "Final inventory file",
     metavar = "FILE",
-    type = "character"
+    type = "character",
+    default = "data/final_inventory_2022.csv"
   )
   
   args <- parser$parse_args()
@@ -39,17 +40,15 @@ get_args <- function() {
 
 print("Parsing command-line arguments.")
 
-#args <- get_args()
+args <- get_args()
 
 full_inventory <-
-  read_csv("out/original_query/processed_countries/predictions.csv",
+  read_csv(args$inventory_file,
            show_col_types = FALSE)
-# read_csv(args$inventory_file,
-#          show_col_types = FALSE)
 
 ## Articles -----------------------------------------------------------------
 
-num_articles <- full_inventory %>% 
+num_articles <- full_inventory %>%
   mutate(ID = strsplit(ID, ", ")) %>%
   unnest(ID) %>%
   distinct(ID) %>%
@@ -84,22 +83,18 @@ num_resources_with_wayback <- full_inventory %>%
   distinct(ID) %>%
   count()
 
-print(
-  paste(
-    "Number of resources with at least 1 WayBack URL:",
-    num_resources_with_wayback
-  )
-)
+print(paste(
+  "Number of resources with at least 1 WayBack URL:",
+  num_resources_with_wayback
+))
 
 ## Funding ------------------------------------------------------------------
 
-num_with_grant_agency <- full_inventory %>% 
-  drop_na(grant_agencies) %>% 
+num_with_grant_agency <- full_inventory %>%
+  drop_na(grant_agencies) %>%
   count()
 
-print(
-  paste(
-    "Number of resources with grant agency data:",
-    num_with_grant_agency
-  )
-)
+print(paste(
+  "Number of resources with grant agency data:",
+  num_with_grant_agency
+))
