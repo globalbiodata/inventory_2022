@@ -145,41 +145,41 @@ classif_train_stats <- raw_classif_train_stats %>%
   relabel_models()
 
 tidy_class_train_stats <- classif_train_stats %>%
-  filter(dataset == 'Validation') %>%
+  filter(dataset == "Validation") %>%
   group_by(model) %>%
   slice(which.max(precision)) %>%
   ungroup() %>%
-  rename('Precision' = 'precision',
-         'Recall' = 'recall',
-         'F1-score' = 'f1') %>%
+  rename("Precision" = "precision",
+         "Recall" = "recall",
+         "F1-score" = "f1") %>%
   mutate(model = fct_reorder(model, Precision, .desc = TRUE)) %>%
   pivot_longer(
-    names_to = 'metric',
-    values_to = 'value',
-    cols = c(Precision, Recall, 'F1-score', loss),
+    names_to = "metric",
+    values_to = "value",
+    cols = c(Precision, Recall, "F1-score", loss),
   ) %>%
   mutate(metric = factor(metric, levels = c("Recall", "Precision", "F1-score"))) %>%
-  filter(metric != 'loss')
+  filter(metric != "loss")
 
 class_val_plot <- tidy_class_train_stats %>%
   ggplot(aes(y = metric, x = value)) +
   facet_wrap(~ model, ncol = 3, ) +
-  geom_col(position = 'dodge',
+  geom_col(position = "dodge",
            alpha = 0.8,
-           fill = '#29477e') +
-  labs(x = '', y = '') +
+           fill = "#29477e") +
+  labs(x = "", y = "") +
   scale_x_continuous(breaks = seq(0, 1, by = 0.2)) +
-  theme(strip.background = element_rect(fill = '#454545'),
+  theme(strip.background = element_rect(fill = "#454545"),
         axis.text.y = element_blank())
 
 ggsave(
-  'analysis/figures/class_val_set_performances.svg',
+  "analysis/figures/class_val_set_performances.svg",
   class_val_plot,
   width = 5,
   height = 6
 )
 ggsave(
-  'analysis/figures/class_val_set_performances.png',
+  "analysis/figures/class_val_set_performances.png",
   class_val_plot,
   width = 5,
   height = 6
@@ -194,40 +194,40 @@ ner_train_stats <- raw_ner_train_stats %>%
   relabel_models()
 
 tidy_ner_train_stats <- ner_train_stats %>%
-  filter(dataset == 'Validation') %>%
+  filter(dataset == "Validation") %>%
   group_by(model) %>%
   slice(which.max(f1)) %>%
   ungroup() %>%
-  rename('Precision' = 'precision',
-         'Recall' = 'recall',
-         'F1-score' = 'f1') %>%
-  mutate(model = fct_reorder(model, .[['F1-score']], .desc = TRUE)) %>%
+  rename("Precision" = "precision",
+         "Recall" = "recall",
+         "F1-score" = "f1") %>%
+  mutate(model = fct_reorder(model, .[["F1-score"]], .desc = TRUE)) %>%
   pivot_longer(
-    names_to = 'metric',
-    values_to = 'value',
-    cols = c(Precision, Recall, 'F1-score', loss),
+    names_to = "metric",
+    values_to = "value",
+    cols = c(Precision, Recall, "F1-score", loss),
   ) %>%
   mutate(metric = factor(metric, levels = c("Recall", "Precision", "F1-score"))) %>%
-  filter(metric != 'loss')
+  filter(metric != "loss")
 
 ner_val_plot <- tidy_ner_train_stats %>%
   ggplot(aes(y = metric, x = value)) +
   facet_wrap(~ model, ncol = 3, ) +
-  geom_col(position = 'dodge',
+  geom_col(position = "dodge",
            alpha = 0.8,
-           fill = '#29477e') +
-  labs(x = '', y = '') +
+           fill = "#29477e") +
+  labs(x = "", y = "") +
   theme(strip.text = element_text(color = "#1a1a1a"),
         axis.text.y = element_blank())
 
 ggsave(
-  'analysis/figures/ner_val_set_performances.svg',
+  "analysis/figures/ner_val_set_performances.svg",
   ner_val_plot,
   width = 5,
   height = 6
 )
 ggsave(
-  'analysis/figures/ner_val_set_performances.png',
+  "analysis/figures/ner_val_set_performances.png",
   ner_val_plot,
   width = 5,
   height = 6
@@ -243,17 +243,17 @@ print("Generating classification metrics table.")
 
 classif_test_stats <- raw_classif_test_stats %>%
   rename(
-    'model_name' = 'model',
-    'Precision' = 'precision',
-    'Recall' = 'recall',
-    'F1-score' = 'f1'
+    "model_name" = "model",
+    "Precision" = "precision",
+    "Recall" = "recall",
+    "F1-score" = "f1"
   ) %>%
   relabel_models() %>%
   select(-model_name) %>%
   pivot_longer(
-    names_to = 'metric',
-    values_to = 'value',
-    cols = c(Precision, Recall, 'F1-score', loss),
+    names_to = "metric",
+    values_to = "value",
+    cols = c(Precision, Recall, "F1-score", loss),
   ) %>%
   mutate(metric = factor(metric, levels = c("Recall", "Precision", "F1-score")))
 
@@ -312,19 +312,19 @@ print("Generating NER metrics table.")
 
 ner_test_stats <- raw_ner_test_stats %>%
   rename(
-    'model_name' = 'model',
-    'Precision' = 'precision',
-    'Recall' = 'recall',
-    'F1-score' = 'f1'
+    "model_name" = "model",
+    "Precision" = "precision",
+    "Recall" = "recall",
+    "F1-score" = "f1"
   ) %>%
   relabel_models() %>%
   select(-model_name) %>%
   pivot_longer(
-    names_to = 'metric',
-    values_to = 'value',
-    cols = c(Precision, Recall, 'F1-score', loss),
+    names_to = "metric",
+    values_to = "value",
+    cols = c(Precision, Recall, "F1-score", loss),
   ) %>%
-  filter(metric != 'loss') %>%
+  filter(metric != "loss") %>%
   mutate(metric = factor(metric, levels = c("Recall", "Precision", "F1-score")))
 
 combined_ner_table <- ner_test_stats %>%
