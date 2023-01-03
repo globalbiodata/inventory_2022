@@ -333,15 +333,18 @@ rule analyze_performance_metrics:
         ner_train=config["ner_train_stats"],
         ner_test=config["ner_test_stats"],
     output:
-        "analysis/figures/class_val_set_performances.svg",
-        "analysis/figures/class_val_set_performances.png",
-        "analysis/figures/ner_val_set_performances.svg",
-        "analysis/figures/ner_val_set_performances.png",
-        "analysis/figures/combined_classification_table.docx",
-        "analysis/figures/combined_ner_table.docx",
+        config["figures_dir"] + "class_val_set_performances.svg",
+        config["figures_dir"] + "class_val_set_performances.png",
+        config["figures_dir"] + "ner_val_set_performances.svg",
+        config["figures_dir"] + "ner_val_set_performances.png",
+        config["figures_dir"] + "combined_classification_table.docx",
+        config["figures_dir"] + "combined_ner_table.docx",
+    params:
+        out_dir=config["figures_dir"],
     shell:
         """
         Rscript analysis/performance_metrics.R \
+            -o {params.out_dir} \
             -cv {input.class_train} \
             -ct {input.class_test} \
             -nv {input.ner_train} \
@@ -354,11 +357,30 @@ rule process_location_data:
     input:
         config["final_inventory_file"],
     output:
-        "analysis/figures/ip_coordinates.png",
-        "analysis/figures/ip_countries.png",
-        "analysis/figures/author_countries.png",
+        config["figures_dir"] + "ip_coordinates.png",
+        config["figures_dir"] + "ip_countries.png",
+        config["figures_dir"] + "author_countries.png",
+    params:
+        out_dir=config["figures_dir"],
     shell:
         """
         Rscript analysis/location_information.R \
+            -o {params.out_dir} \
+            {input}
+        """
+
+
+# Analyse inventory metadata
+rule process_metadata:
+    input:
+        config["final_inventory_file"],
+    output:
+        config["analysis_dir"] + "analysed_metadata.txt",
+    params:
+        out_dir=config["analysis_dir"],
+    shell:
+        """
+        Rscript analysis/metadata_analysis.R \
+            -o {params.out_dir} \
             {input}
         """
