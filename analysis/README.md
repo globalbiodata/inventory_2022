@@ -13,7 +13,7 @@ All R scripts are command-line executable and take output files from the invento
 
 ## `location_information.R`
 
-The final inventory file is supplied as input, and 3 maps are generated:
+The final inventory file is supplied as input, output directory is specified with `-o|--out-dir`, and 3 maps are generated:
 
 * `ip_coordinates.png`: IP host coordinates dot plot
 * `ip_countries.png`: IP host countries heatmap, with country fill color scaled to country name count
@@ -40,8 +40,7 @@ Information included in this analysis:
 
 ## `performance_metrics.R`
 
-This script conducts analysis on the model performance metrics on the validation and test sets.
-Four files are needed as input:
+This script conducts analysis on the model performance metrics on the validation and test sets., Output directory is specified with `-o|--out-dir`. Four files are needed as input:
 
 * `-cv|--class-train`: Classification training and validation set statistics
 * `-ct|--class-test`: Classification test set statistics
