@@ -142,9 +142,7 @@ def get_command(url: str, key: str) -> str:
     command = ('curl -X POST '
                '-H "Accept: application/json" '
                f'-H "Authorization: LOW myaccesskey:{key}" '
-               '-d\'url={}\' https://web.archine.org/save')
-
-    command = command.format(url)
+               f'-d\'url={url}\' https://web.archine.org/save')
 
     return command
 
