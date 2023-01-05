@@ -333,12 +333,12 @@ rule analyze_performance_metrics:
         ner_train=config["ner_train_stats"],
         ner_test=config["ner_test_stats"],
     output:
-        config["figures_dir"] + "class_val_set_performances.svg",
-        config["figures_dir"] + "class_val_set_performances.png",
-        config["figures_dir"] + "ner_val_set_performances.svg",
-        config["figures_dir"] + "ner_val_set_performances.png",
-        config["figures_dir"] + "combined_classification_table.docx",
-        config["figures_dir"] + "combined_ner_table.docx",
+        config["figures_dir"] + "/class_val_set_performances.svg",
+        config["figures_dir"] + "/class_val_set_performances.png",
+        config["figures_dir"] + "/ner_val_set_performances.svg",
+        config["figures_dir"] + "/ner_val_set_performances.png",
+        config["figures_dir"] + "/combined_classification_table.docx",
+        config["figures_dir"] + "/combined_ner_table.docx",
     params:
         out_dir=config["figures_dir"],
     shell:
@@ -357,9 +357,9 @@ rule process_location_data:
     input:
         config["final_inventory_file"],
     output:
-        config["figures_dir"] + "ip_coordinates.png",
-        config["figures_dir"] + "ip_countries.png",
-        config["figures_dir"] + "author_countries.png",
+        config["figures_dir"] + "/ip_coordinates.png",
+        config["figures_dir"] + "/ip_countries.png",
+        config["figures_dir"] + "/author_countries.png",
     params:
         out_dir=config["figures_dir"],
     shell:
