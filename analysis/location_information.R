@@ -54,6 +54,10 @@ args <- get_args()
 
 out_dir <- args$out_dir
 
+if (!dir.exists(out_dir)) {
+  dir.create(out_dir)
+}
+
 full_inventory <-
   read_csv(args$inventory_file,
            show_col_types = FALSE)

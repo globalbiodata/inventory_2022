@@ -146,6 +146,10 @@ raw_ner_test_stats <-
 
 out_dir <- args$out_dir
 
+if (!dir.exists(out_dir)) {
+  dir.create(out_dir)
+}
+
 ## Plots --------------------------------------------------------------------
 
 print("Generating plots.")
