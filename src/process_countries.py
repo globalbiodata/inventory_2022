@@ -33,8 +33,7 @@ def get_args() -> Args:
     """ Parse command-line arguments """
 
     desc = ('Extract country information from affiliations '
-            'and make IP countries consistent'
-            'ABCDEFGHIJKLMNOPQURSTUVWXYZabcdefghijklmnopqrstuvwxyz')
+            'and make IP countries consistent')
     parser = argparse.ArgumentParser(description=desc,
                                      formatter_class=CustomHelpFormatter)
 
