@@ -376,11 +376,9 @@ rule process_metadata:
         config["final_inventory_file"],
     output:
         config["analysis_dir"] + "analysed_metadata.txt",
-    params:
-        out_dir=config["analysis_dir"],
     shell:
         """
         Rscript analysis/metadata_analysis.R \
-            -o {params.out_dir} \
-            {input}
+            {input} \
+            > {output}
         """
