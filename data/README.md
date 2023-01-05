@@ -2,7 +2,7 @@
 
 This directory contains the data used for model training, testing, and validation as well as several final output files.
 
-```sh
+```
 .
 ├── classif_metrics/               # Article classification model performance metrics
 |   ├── combined_train_stats.csv   # Performance on training and validation sets
