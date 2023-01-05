@@ -183,9 +183,11 @@ rule process_countries:
         config["processed_countries"] + "/predictions.csv",
     params:
         out_dir=config["processed_countries"],
+        out_format=config["country_format"],
     shell:
         """
         python3 src/process_countries.py \
             -o {params.out_dir} \
+            -f {params.out_format} \
             {input}
         """
