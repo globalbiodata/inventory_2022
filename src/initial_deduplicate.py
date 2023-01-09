@@ -137,6 +137,8 @@ def prep_previous(df: pd.DataFrame) -> pd.DataFrame:
     Return: Dataframe with same columns as new results
     """
 
+    df['text'] = ''
+
     columns = [
         'ID', 'text', 'extracted_url', 'best_common', 'best_common_prob',
         'best_full', 'best_full_prob', 'best_name', 'best_name_prob',
