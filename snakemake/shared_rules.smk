@@ -80,22 +80,6 @@ rule process_names:
         """
 
 
-# Perform deduplication on exact match names and URLs
-rule initial_deduplication:
-    input:
-        config["processed_names_dir"] + "/predictions.csv",
-    output:
-        config["initial_dedupe_dir"] + "/predictions.csv",
-    params:
-        out_dir=config["initial_dedupe_dir"],
-    shell:
-        """
-        python3 src/initial_deduplicate.py \
-            -o {params.out_dir} \
-            {input}
-        """
-
-
 # Flag rows for manual review
 rule flag_for_review:
     input:
