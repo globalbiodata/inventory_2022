@@ -261,22 +261,30 @@ $ snakemake -s snakemake/train_predict.smk --configfile config/train_predict.yml
 
 The above commands run the Snakemake pipeline. If you wish to run the steps manually, see [src/README.md](src/README.md#training-and-prediction).
 
+
+
 ## Updating the inventory
 
-Before running the automated pipelines, if there is not a file `out/last_query_date/last_query_date.txt`, it must first be created. In that file place the date at which you want the query to begin (should align with date of last query).
+Before running the automated pipelines, first update the configuration file [config/update_inventory.yml](config/update_inventory.yml):
 
-*Note*: There should only be one file matching each pattern `out/classif_train_out/best/best_checkpt.txt` and `out/ner_train_out/best/best_checkpt.txt`
+* **Europe PMC query publication date range**: These are stored as variables `query_from_date` and `query_to_date` in that file. Note that the dates are inclusive. For example to get papers published in 2022, both of those varibles should be 2022.
+* **Previous inventory file**: During strict deduplication and flagging for manual review, the results of the previous inventory are taken into account. Specify the location of the most recent inventory output file in the variable `previous_inventory`.
 
 To run the pipeline from a notebook in Colab, follow the steps in [updating_inventory.ipynb](updating_inventory.ipynb). To run from the command line, follow these steps.
 
-First, make sure that the trained classifier and NER models are present at `out/classif_train_out/best/best_checkpt.txt` and `out/ner_train_out/best/best_checkpt.txt`.
+First, make sure that the files specifying the best trained classifier and NER models are present at `out/classif_train_out/best/best_checkpt.txt` and `out/ner_train_out/best/best_checkpt.txt`. Those files specify which checkpoints to use. Check that the checkpoints those files point to are on your system.
 
-If you do not have trained models, and do not want to perform training, they can be downloaded with:
+If you do not have the trained models, and do not want to perform training, they can be downloaded with:
 ```sh
 # Add code here for getting models!
 ```
 
-Next, **make sure that output from previous updates have been saved elsewhere, as the old results must be deleted**.
+Next, **make sure that output from previous updates have been saved elsewhere, as the old results must be deleted**. For example
+
+```sh
+$ mv out/new_query out/update_2022
+```
+
 
 To remove the outputs of previous run:
 ```sh
