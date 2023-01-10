@@ -48,6 +48,10 @@ epmc_meta_dir: 'out/original_query/epmc_meta'
 ## Processed country codes
 processed_countries: 'out/original_query/processed_countries'
 
+## Data analysis
+analysis_dir: 'analysis/'
+figures_dir: 'analysis/figures'
+
 # Input files
 classif_data: 'data/manual_classifications.csv'
 ner_data: 'data/manual_ner_extraction.csv'
@@ -61,7 +65,7 @@ initial_query_end: 2021
 query_string: 'config/query.txt'
 
 # Ratios used for data splitting
-split_ratios: '0.8 0.1 0.1'
+split_ratios: '0.75 0.15 0.15'
 
 # Metrics used for choosing best model/epoch
 class_criteria_metric: 'precision'
@@ -82,3 +86,25 @@ backoff: 0.5
 
 # Getting metadata from EuropePMC
 epmc_chunk_size: 20
+
+# Processng country names
+country_format: 'full'
+
+# Input files for data analysis
+## Data analysis can either be run on the newly generated output files
+## or on the files stored in the repository. Comment/uncomment below
+## to choose which files to use.
+
+## Newly generated files
+classification_train_stats: 'out/classif_train_out/combined_train_stats/combined_stats.csv'
+classification_test_stats: 'out/classif_train_out/combined_test_stats/combined_stats.csv'
+ner_train_stats: 'out/ner_train_out/combined_train_stats/combined_stats.csv'
+ner_test_stats: 'out/ner_train_out/combined_test_stats/combined_stats.csv'
+final_inventory_file: 'out/original_query/processed_countries/predictions.csv'
+
+## Stored files
+# classification_train_stats: 'data/classif_metrics/combined_train_stats.csv'
+# classification_test_stats: 'data/classif_metrics/combined_test_stats.csv'
+# ner_train_stats: 'data/ner_metrics/combined_train_stats.csv'
+# ner_test_stats: 'data/ner_metrics/combined_test_stats.csv'
+# final_inventory_file: 'data/final_inventory_2022.csv'

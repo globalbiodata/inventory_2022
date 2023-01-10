@@ -323,3 +323,78 @@ rule combine_ner_test_stats:
             -o {params.out_dir} \
             {input}
         """
+
+
+# Perform deduplication on exact match names and URLs
+rule initial_deduplication:
+    input:
+        config["processed_names_dir"] + "/predictions.csv",
+    output:
+        config["initial_dedupe_dir"] + "/predictions.csv",
+    params:
+        out_dir=config["initial_dedupe_dir"],
+    shell:
+        """
+        python3 src/initial_deduplicate.py \
+            -o {params.out_dir} \
+            {input}
+        """
+
+
+# Create model metric plots and tables
+rule analyze_performance_metrics:
+    input:
+        class_train=config["classification_train_stats"],
+        class_test=config["classification_test_stats"],
+        ner_train=config["ner_train_stats"],
+        ner_test=config["ner_test_stats"],
+    output:
+        config["figures_dir"] + "/class_val_set_performances.svg",
+        config["figures_dir"] + "/class_val_set_performances.png",
+        config["figures_dir"] + "/ner_val_set_performances.svg",
+        config["figures_dir"] + "/ner_val_set_performances.png",
+        config["figures_dir"] + "/combined_classification_table.docx",
+        config["figures_dir"] + "/combined_ner_table.docx",
+    params:
+        out_dir=config["figures_dir"],
+    shell:
+        """
+        Rscript analysis/performance_metrics.R \
+            -o {params.out_dir} \
+            -cv {input.class_train} \
+            -ct {input.class_test} \
+            -nv {input.ner_train} \
+            -nt {input.ner_test}
+        """
+
+
+# Create location data figures
+rule process_location_data:
+    input:
+        config["final_inventory_file"],
+    output:
+        config["figures_dir"] + "/ip_coordinates.png",
+        config["figures_dir"] + "/ip_countries.png",
+        config["figures_dir"] + "/author_countries.png",
+    params:
+        out_dir=config["figures_dir"],
+    shell:
+        """
+        Rscript analysis/location_information.R \
+            -o {params.out_dir} \
+            {input}
+        """
+
+
+# Analyse inventory metadata
+rule process_metadata:
+    input:
+        config["final_inventory_file"],
+    output:
+        config["analysis_dir"] + "analysed_metadata.txt",
+    shell:
+        """
+        Rscript analysis/metadata_analysis.R \
+            {input} \
+            > {output}
+        """

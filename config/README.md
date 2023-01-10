@@ -41,7 +41,9 @@ This text file contains a single string, which is the search query sent to Europ
 
 ## `train_predict.yml`
 
-This YAML file contains the majority of the configurations used in the Snakemake pipelines, such as directories and model training configurations. These are the configurations used for reproducing the original results
+This YAML file contains the majority of the configurations used in the Snakemake pipelines, such as directories and model training configurations. These are the configurations used for reproducing the original results.
+
+Toward the end of this file, you can chose which output files are used for data analysis. Currently it is set to use the newly generaly output files. However, you can uncomment the file names that are stored in the repository to reproduce the figures/analyses exactly in case something changes over time, sucha s the metadata retrieved from EuropePMC.
 
 ## `update_inventory.yml`
 
