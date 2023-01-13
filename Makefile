@@ -12,6 +12,11 @@ setup:
 	Rscript -e 'install.packages("renv")'
 	Rscript -e 'renv::restore()'
 
+setup_for_updating:
+	pip install -r requirements.txt
+	echo "import nltk \nnltk.download('punkt')" | python3 /dev/stdin
+	pip install --upgrade numpy
+
 test:
 	python3 -m pytest -v \
 	--flake8 --mypy --pylint  \
