@@ -49,7 +49,7 @@ def get_args() -> Args:
                         '--out-dir',
                         metavar='',
                         type=str,
-                        default='data/',
+                        default='data/classif_splits',
                         help='Output directory')
     parser.add_argument('--splits',
                         metavar='',

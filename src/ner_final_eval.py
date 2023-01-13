@@ -50,7 +50,6 @@ def get_args():
                         metavar='DIR',
                         type=str,
                         default='out/',
-                        required=True,
                         help='Directory to output metrics')
 
     args = parser.parse_args()

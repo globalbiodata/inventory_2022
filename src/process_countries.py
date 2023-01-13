@@ -61,21 +61,6 @@ def get_args() -> Args:
 
 
 # ---------------------------------------------------------------------------
-# @pytest.fixture(name='raw_data')
-# def fixture_raw_data() -> pd.DataFrame:
-#     """ DataFrame representative of the input data """
-
-#     columns = [
-#         'ID', 'text', 'extracted_url', 'best_common', 'best_common_prob',
-#         'best_full', 'best_full_prob', 'best_name', 'best_name_prob',
-#         'article_count', 'duplicate_urls', 'duplicate_names', 'low_prob',
-#         'review_low_prob', 'review_dup_urls', 'review_dup_names',
-#         'review_notes_low_prob', 'review_notes_dup_urls',
-#         'review_notes_dup_names', 'publication_date'
-#     ]
-
-
-# ---------------------------------------------------------------------------
 def extract_countries(strings: pd.Series, country_format: str) -> pd.Series:
     """
     Extract country names from column of strings
