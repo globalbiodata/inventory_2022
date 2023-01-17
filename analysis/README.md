@@ -7,6 +7,8 @@ This directory contains R scripts for some analysis of the inventory conducted i
 ├── location_information.R   # Generate maps of resource location metadata
 ├── metadata_analysis.R      # Perform high-level metadata analysis
 └── performance_metrics.R    # Create plots and tables of model performances
+└── epmc_metadata.R          # Retrieve ePMC metadata to determine OA, full text, etc.
+└── comparison.R             # Retrieve life sci resources from FAIRsharing and re3data
 ```
 
 All R scripts are command-line executable and take output files from the inventory as inputs for analysis. Usage statements are available through the `-h|--help` flag.
@@ -55,3 +57,19 @@ Six files are output:
 * `ner_val_set_performance.svg` and `ner_val_set_performance.png`: Bar chart showing the performance of all NER models on the validation set. Metrics include *F*1-score, precision, and recall. Models are in decreasing order of *F*1-score.
 * `combined_classification_table.docx`: A Microsoft Word doc with a table showing the performance of all article classification models on the validation and test sets. Models are in decreasing order of precision on the validation set.
 * `combined_ner_table.docx`: A Microsoft Word doc with a table showing the performance of all NER models on the validation and test sets. Models are in decreasing order of *F*1-score on the validation set.
+
+## `epmc_metadata.R`
+
+The final inventory file is supplied as input and the Europe PMC API is queried to determined if the article has a CC license, is open access, has full text available, has text mined term, and has text mined accession numbers. Note that all but full text are found by querying the PMIDs found in the final inventory file; for full text, the original query was restricted to return only those as OA and having full text availability for the entire corpus and then those PMIDs were matched against the PMIDs found in the final inventory.
+
+1 file is output:
+* `text_mining_potential.csv` which is a summary table of article counts (Y (Yes) or N (No)) and percentages
+
+## `comparison.R`
+
+Inputs are retrieved by querying the records available from the re3data.org API and the FAIRsharing API. Returns are filtered to life science resources and then compared resources identified in the final inventory.
+
+n files are output:
+
+tbd: Venn Diagram?
+
