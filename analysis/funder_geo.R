@@ -18,7 +18,7 @@ com <- top %>%
   group_by(country) %>% 
     mutate(count_agencies = length(agency)) %>%
         mutate(agency_names = str_c(agency, collapse = ", ")) %>%
-          mutate(resource_names = str_c(unique(associated_biodata_resources), collapse = ","))
+          mutate(resource_names = str_c(associated_biodata_resources, collapse = ","))
 
 ## need to same reshaping to be able to dedupliate
 com$resource_names_split <- strsplit(com$resource_names, ",")
