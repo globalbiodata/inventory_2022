@@ -146,7 +146,7 @@ full_inventory <-
            show_col_types = FALSE)
 
 # out_dir <- args$out_dir
-out_dir <- "analysis"
+out_dir <- "analysis/figures"
 
 ## Queries ------------------------------------------------------------------
 
@@ -161,7 +161,9 @@ long_inventory <- full_inventory %>%
 
 cat("Getting metadata from Europe PMC... ")
 
-metadata_df <- get_metadata(long_inventory$id)
+id_list <- long_inventory$id
+
+metadata_df <- get_metadata(id_list)
 
 long_inventory <- full_join(long_inventory, metadata_df)
 
@@ -204,8 +206,8 @@ open_full_ids <-
 
 cat("Done.\n")
 
-oa_ft_inventory <- get_oa_ft_inventory(id_list %>%
-                                         rename("id" = "ID"), open_full_ids)
+oa_ft_inventory <-
+  get_oa_ft_inventory(long_inventory %>% select(id), open_full_ids)
 
 ## Analysis -----------------------------------------------------------------
 
@@ -221,7 +223,7 @@ summary <- tibble(
 ### Full text availability --------------------------------------------------
 
 articles_w_full_text <- nrow(oa_ft_inventory)
-articles_wo_full_text <- nrow(id_list) - nrow(oa_ft_inventory)
+articles_wo_full_text <- length(id_list) - nrow(oa_ft_inventory)
 
 oa_ft_resources <- oa_ft_inventory %>%
   mutate(oa_ft = "true") %>%
@@ -303,11 +305,11 @@ summary <- summary %>%
   rbind(
     tibble(
       type = "CC Licensed",
-      resources_yes = resources_w_cc_license,
-      resources_no = resources_wo_cc_license,
-      resources_mixed = resources_w_mixed_license,
-      articles_yes = articles_w_cc_license,
-      articles_no = articles_wo_cc_license
+      resources_yes = resources_w_cc_license$count,
+      resources_no = resources_wo_cc_license$count,
+      resources_mixed = resources_w_mixed_license$count,
+      articles_yes = articles_w_cc_license$count,
+      articles_no = articles_wo_cc_license$count
     )
   )
 
@@ -354,11 +356,11 @@ summary <- summary %>%
   rbind(
     tibble(
       type = "Open Access",
-      resources_yes = open_access_resources,
-      resources_no = not_open_access_resources,
-      resources_mixed = mixed_access_resources,
-      articles_yes = open_access_articles,
-      articles_no = not_open_access_articles
+      resources_yes = open_access_resources$count,
+      resources_no = not_open_access_resources$count,
+      resources_mixed = mixed_access_resources$count,
+      articles_yes = open_access_articles$count,
+      articles_no = not_open_access_articles$count
     )
   )
 
@@ -405,11 +407,11 @@ summary <- summary %>%
   rbind(
     tibble(
       type = "Text Mined Terms",
-      resources_yes = res_has_text_mined_terms,
-      resources_no = res_no_text_mined_terms,
-      resources_mixed = res_mixed_text_mined_terms,
-      articles_yes = has_text_mined_terms,
-      articles_no = no_text_mined_terms
+      resources_yes = res_has_text_mined_terms$count,
+      resources_no = res_no_text_mined_terms$count,
+      resources_mixed = res_mixed_text_mined_terms$count,
+      articles_yes = has_text_mined_terms$count,
+      articles_no = no_text_mined_terms$count
     )
   )
 
@@ -448,11 +450,11 @@ summary <- summary %>%
   rbind(
     tibble(
       type = "Text Mined Accession Numbers",
-      resources_yes = res_has_text_minedacc_nums,
-      resources_no = res_no_text_mined_acc_nums,
-      resources_mixed = res_mixed_text_mined_acc_nums,
-      articles_yes = has_text_mined_acc_nums,
-      articles_no = no_text_mined_acc_nums
+      resources_yes = res_has_text_minedacc_nums$count,
+      resources_no = res_no_text_mined_acc_nums$count,
+      resources_mixed = res_mixed_text_mined_acc_nums$count,
+      articles_yes = has_text_mined_acc_nums$count,
+      articles_no = no_text_mined_acc_nums$count
     )
   )
 
@@ -461,9 +463,9 @@ rm(
   has_text_mined_acc_nums,
   no_text_mined_acc_nums,
   res_text_mined_acc_nums,
-  res_has_text_minedacc_nums,
-  res_no_text_minedacc_nums,
-  res_mixed_text_minedacc_nums
+  res_has_text_mined_acc_nums,
+  res_no_text_mined_acc_nums,
+  res_mixed_text_mined_acc_nums
 )
 
 ### Summarization -----------------------------------------------------------
@@ -520,7 +522,7 @@ summary_long <- summary %>%
 summary_plot <- summary_long %>%
   ggplot(aes(x = percent / 100, y = type, fill = label)) +
   facet_wrap(~ asset) +
-  geom_col(width = 0.5) +
+  geom_col(width = 0.5, alpha = 0.8) +
   scale_fill_manual(values = c("#D95F02", "#666666", "#7570B3")) +
   scale_x_continuous(labels = percent) +
   labs(x = "",
@@ -528,6 +530,8 @@ summary_plot <- summary_long %>%
        fill = "") +
   guides(fill = guide_legend(reverse = T)) +
   theme(legend.position = "bottom")
+
+summary_plot
 
 ## Output -------------------------------------------------------------------
 
