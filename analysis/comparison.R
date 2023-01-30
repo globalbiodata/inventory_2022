@@ -22,13 +22,13 @@
 
 ## Library calls ------------------------------------------------------------
 
-# library(data.table)
 library(dplyr)
 library(glue)
 library(httr)
 library(jsonlite)
 library(magrittr)
-# library(RCurl)
+library(readr)
+library(stringr)
 library(tibble)
 library(tidyr)
 library(xml2)
@@ -43,10 +43,20 @@ library(xml2)
 get_args <- function() {
   parser <- argparse::ArgumentParser()
   
-  parser$add_argument("credentials",
-                      help  = "FAIRsharing login credentials file",
-                      metavar = "JSON",
-                      type = "character")
+  parser$add_argument(
+    "inventory_file",
+    help  = "Final inventory file",
+    metavar = "FILE",
+    type = "character",
+    default = "data/final_inventory_2022.csv"
+  )
+  parser$add_argument(
+    "-c",
+    "--credentials",
+    help  = "FAIRsharing login credentials file",
+    metavar = "JSON",
+    type = "character"
+  )
   parser$add_argument(
     "-o",
     "--out-dir",
@@ -70,9 +80,9 @@ get_args <- function() {
 #' @return List of repository metadata
 extract_repository_info <- function(metadata) {
   metadata_list <- list(
-    re3data_ID = xml_text(
-      xml_find_all(metadata, "//r3d:re3data.orgIdentifier")
-    ),
+    re3data_ID = xml_text(xml_find_all(
+      metadata, "//r3d:re3data.orgIdentifier"
+    )),
     type = paste(unique(xml_text(
       xml_find_all(metadata, "//r3d:type")
     )), collapse = "_AND_"),
@@ -234,13 +244,93 @@ get_fairsharing_contents <- function(token) {
   return(query_return)
 }
 
+## clean_re3data ------------------------------------------------------------
+
+#' Clean re3data fields
+#'
+#' @param df re3data repositories dataframe
+#'
+#' @return cleaned dataframe
+clean_re3data <- function(df) {
+  df %>%
+    select(re3data_ID, repositoryName, repositoryURL) %>%
+    rename("r3_id" = "re3data_ID",
+           "r3_name" = "repositoryName",
+           "r3_url" = "repositoryURL") %>%
+    mutate(across(where(is.character), str_trim)) %>%
+    drop_na(r3_url) %>%
+    mutate(
+      r3_url = str_remove(r3_url, "^https?://(www.)?"),
+      r3_url = str_remove(r3_url, "/$"),
+      r3_url = str_to_lower(r3_url)
+    )
+}
+
+## clean_fairsharing -------------------------------------------------------
+
+#' Clean FAIRsharing fields
+#'
+#' @param df FAIRsharing repositories dataframe
+#'
+#' @return cleaned dataframe
+clean_fairsharing <- function(df) {
+  df %>%
+    select(doi, name, homepage) %>%
+    rename("fs_id" = "doi",
+           "fs_name" = "name",
+           "fs_url" = "homepage") %>%
+    mutate(across(where(is.character), str_trim)) %>%
+    drop_na(fs_url) %>%
+    mutate(
+      fs_url = str_remove(fs_url, "^https?://(www.)?"),
+      fs_url = str_remove(fs_url, "/$"),
+      fs_url = str_to_lower(fs_url)
+    )
+}
+
+## clean_inventory -------------------------------------------------------
+
+#' Clean biodata inventory
+#'
+#' @param df Inventory dataframe
+#'
+#' @return cleaned dataframe
+clean_inventory <- function(df) {
+  ## note that 2 URLs extracted in inventory for ~5% of inventory resources
+  ## - testing for matches on first URL only
+  df %>%
+    select(ID, best_name, best_common, best_full, extracted_url) %>%
+    rename(
+      "inv_id" = "ID",
+      "inv_name" = "best_name",
+      "inv_comm_name" = "best_common",
+      "inv_full_name" = "best_full",
+      "inv_url" = "extracted_url"
+    ) %>%
+    mutate(across(where(is.character), str_trim)) %>%
+    mutate(
+      inv_url = str_remove(inv_url, ",.*$"),
+      inv_url = str_remove(inv_url, "^https?://(www.)?"),
+      inv_url = str_remove(inv_url, "/$"),
+      inv_url = str_to_lower(inv_url)
+    )
+}
+
 # Main ----------------------------------------------------------------------
+
+## Parse arguments ----------------------------------------------------------
 
 args <- get_args()
 
 credentials_file <- args$credentials
 
-## Querying APIs ------------------------------------------------------------
+inventory <-
+  read_csv(args$inventory_file,
+           show_col_types = FALSE)
+
+out_dir <- args$out_dir
+
+## Query APIs ---------------------------------------------------------------
 
 ### re3data -----------------------------------------------------------------
 
@@ -258,149 +348,214 @@ fairsharing_return <- get_fairsharing_contents(fairsharing_token)
 
 fairsharing_repos <- extract_fairsharing_info(fairsharing_return)
 
+## Clean data ---------------------------------------------------------------
 
-# Analysis ------------------------------------------------------------------
+re3data_cleaned <- clean_re3data(re3data_repos)
 
-## start by cleaning data frames to prep for comparison
+fairsharing_cleaned <- clean_fairsharing(fairsharing_repos)
 
-## re3data
+inventory_cleaned <- clean_inventory(inventory)
 
-life_sci_r3 <- select(life_sci_r3, 1, 4, 3)
+## Analysis ------------------------------------------------------------------
 
-## trim white space
-life_sci_r3 %>%
-  mutate(across(where(is.character), str_trim))
+summary <- tibble(
+  inventory = logical(),
+  re3data = logical(),
+  fairsharing = logical(),
+  names_shared = numeric(),
+  urls_shared = numeric(),
+  total_matches = numeric()
+)
 
-## remove any blank urls
-life_sci_r3 <-
-  life_sci_r3[(which(nchar(life_sci_r3$repositoryURL) > 0)),]
+### inventory and re3data ----------------------------------------------------
 
-## clean urls
-life_sci_r3$repositoryURL <-
-  sub("^http://(?:www[.])", "\\1", life_sci_r3$repositoryURL)
-life_sci_r3$repositoryURL <-
-  sub("^https://(?:www[.])", "\\1", life_sci_r3$repositoryURL)
-life_sci_r3$repositoryURL <-
-  sub("^http://", "\\1", life_sci_r3$repositoryURL)
-life_sci_r3$repositoryURL <-
-  sub("^https://", "\\1", life_sci_r3$repositoryURL)
-life_sci_r3$repositoryURL <-
-  sub("/$", "", life_sci_r3$repositoryURL)
-life_sci_r3$repositoryURL <- tolower(life_sci_r3$repositoryURL)
+same_comm_name_inv_re3 <-
+  inner_join(inventory_cleaned,
+             re3data_cleaned,
+             by = c("inv_comm_name" = "r3_name"))
+same_full_name_inv_re3 <-
+  inner_join(inventory_cleaned,
+             re3data_cleaned,
+             by = c("inv_full_name" = "r3_name"))
 
-names(life_sci_r3)[1] <- "r3_id"
-names(life_sci_r3)[2] <- "r3_name"
-names(life_sci_r3)[3] <- "r3_url"
+same_name_inv_re3 <- tibble(
+  names_found_in_re3 =
+    c(
+      same_comm_name_inv_re3$inv_comm_name,
+      same_full_name_inv_re3$inv_full_name
+    )
+) %>%
+  distinct(names_found_in_re3)
 
-## FAIRsharing
-
-life_sci_fs <- as.data.frame(life_sci_fs)
-life_sci_fs <- select(life_sci_fs, 1, 2, 3)
-
-## trim white space
-life_sci_fs %>%
-  mutate(across(where(is.character), str_trim))
-
-## remove any blank urls
-life_sci_fs <- life_sci_fs[(which(nchar(life_sci_fs$url) > 0)),]
-
-## clean urls
-life_sci_fs$url <- sub("^http://(?:www[.])", "\\1", life_sci_fs$url)
-life_sci_fs$url <-
-  sub("^https://(?:www[.])", "\\1", life_sci_fs$url)
-life_sci_fs$url <- sub("^http://", "\\1", life_sci_fs$url)
-life_sci_fs$url <- sub("^https://", "\\1", life_sci_fs$url)
-life_sci_fs$url <- sub("/$", "", life_sci_fs$url)
-life_sci_fs$url <- tolower(life_sci_fs$url)
-
-names(life_sci_fs)[1] <- "fs_id"
-names(life_sci_fs)[2] <- "fs_name"
-names(life_sci_fs)[3] <- "fs_url"
-
-## inventory
-
-inv <-
-  read.csv("final_inventory_2022.csv") ## reminder - setwd to data folder
-## select just id, best name and URL columns
-inv <- select(inv, 1, 2, 9)
-
-## note that 2 URLs extracted in inventory for ~5% of inventory resources - testing for matches on first URL only
-inv <-
-  separate(inv,
-           'extracted_url',
-           paste("url", 1:2, sep = "_"),
-           sep = ",",
-           extra = "drop")
-inv <- select(inv, 1:3)
-
-inv %>%
-  mutate(across(where(is.character), str_trim))
-
-names(inv)[1] <- "inv_id"
-names(inv)[2] <- "inv_name"
-names(inv)[3] <- "inv_url_1"
-
-inv$inv_url_1 <- sub("^http://(?:www[.])", "\\1", inv$inv_url_1)
-inv$inv_url_1 <- sub("^https://(?:www[.])", "\\1", inv$inv_url_1)
-inv$inv_url_1 <- sub("^http://", "\\1", inv$inv_url_1)
-inv$inv_url_1 <- sub("^https://", "\\1", inv$inv_url_1)
-inv$inv_url_1 <- sub("/$", "", inv$inv_url_1)
-inv$inv_url_1 <- tolower(inv$inv_url_1)
-
-## comparison
-
-## inventory and re3data
-same_name_inv_re3 <-
-  inner_join(inv, life_sci_r3, by = c("inv_name" = "r3_name"))
 same_url_inv_re3 <-
-  inner_join(inv, life_sci_r3, by = c("inv_url_1" = "r3_url"))
+  inner_join(inventory_cleaned, re3data_cleaned, by = c("inv_url" = "r3_url"))
 
-unique_inv_re3 <-
-  as.data.frame(unique(c(
-    same_name_inv_re3$inv_name, same_url_inv_re3$inv_name
-  )))
-names(unique_inv_re3)[1] <- "unique_inv_re3"
+unique_inv_re3 <- tibble(
+  unique_inv_re3 = c(
+    same_comm_name_inv_re3$inv_name,
+    same_full_name_inv_re3$inv_name,
+    same_url_inv_re3$inv_name
+  )
+) %>%
+  distinct(unique_inv_re3)
 
-## create table
-summary <- NULL
-summary$count_same_name_inv_re3 <- length(same_name_inv_re3$inv_id)
-summary$count_same_url_inv_re3 <- length(same_url_inv_re3$inv_id)
-summary$count_unique_inv_re3 <-
-  length(unique_inv_re3$unique_inv_re3)
 
-## inventory and FAIRsharing
+res <- tibble(
+  inventory = T,
+  re3data = T,
+  fairsharing = F,
+  names_shared = nrow(same_name_inv_re3),
+  urls_shared = nrow(same_url_inv_re3),
+  total_matches = nrow(unique_inv_re3)
+)
 
-same_name_inv_fs <-
-  inner_join(inv,
-             life_sci_fs,
-             by = c("inv_name" = "fs_name"),
-             keep = TRUE)
+summary <- summary %>%
+  rbind(res)
+
+rm(same_comm_name_inv_re3,
+   same_full_name_inv_re3,
+   res)
+
+### inventory and FAIRsharing ------------------------------------------------
+
+same_comm_name_inv_fs <-
+  inner_join(inventory_cleaned,
+             fairsharing_cleaned,
+             by = c("inv_comm_name" = "fs_name"))
+same_full_name_inv_fs <-
+  inner_join(inventory_cleaned,
+             fairsharing_cleaned,
+             by = c("inv_full_name" = "fs_name"))
+
+same_name_inv_fs <- tibble(
+  names_found_in_fs =
+    c(
+      same_comm_name_inv_fs$inv_comm_name,
+      same_full_name_inv_fs$inv_full_name
+    )
+) %>%
+  distinct(names_found_in_fs)
+
 same_url_inv_fs <-
-  inner_join(inv, life_sci_fs, by = c("inv_url_1" = "fs_url"))
+  inner_join(inventory_cleaned,
+             fairsharing_cleaned,
+             by = c("inv_url" = "fs_url"))
 
-unique_inv_fs <-
-  as.data.frame(unique(c(
-    same_name_inv_fs$inv_name, same_url_inv_fs$inv_name
-  )))
-names(unique_inv_fs)[1] <- "unique_inv_fs"
+unique_inv_fs <- tibble(
+  unique_inv_fs = c(
+    same_comm_name_inv_fs$inv_name,
+    same_full_name_inv_fs$inv_name,
+    same_url_inv_fs$inv_name
+  )
+) %>%
+  distinct(unique_inv_fs)
 
-## add to table
-summary$count_same_name_inv_fs <- length(same_name_inv_fs$inv_id)
-summary$count_same_url_inv_fs <- length(same_url_inv_fs$inv_id)
-summary$count_unique_inv_fs <- length(unique_inv_fs$unique_inv_fs)
+res <- tibble(
+  inventory = T,
+  re3data = F,
+  fairsharing = T,
+  names_shared = nrow(same_name_inv_fs),
+  urls_shared = nrow(same_url_inv_fs),
+  total_matches = nrow(unique_inv_fs)
+)
 
-## find unique names between re3data and fairsharing
-total_unique <-
-  as.data.frame(unique(unique(
-    c(unique_inv_fs$unique_inv_fs, unique_inv_re3$unique_inv_re3)
-  )))
-names(total_unique)[1] <- "names_unique_inv_re3_fs"
+summary <- summary %>%
+  rbind(res)
 
-## add to table
-summary$count_total_unique <-
-  length(total_unique$names_unique_inv_re3_fs)
-summary$percent <- ((summary$count_total_unique) / 3112) * 100
+rm(same_comm_name_inv_fs,
+   same_full_name_inv_fs,
+   res)
 
-summary <- as.data.frame(summary)
+### re3data and FAIRsharing --------------------------------------------------
 
-## write.csv(summary,"inventory_re3data_FAIRsharing_2022-11-21.csv", row.names = FALSE)
+same_name_re3_fs <-
+  inner_join(re3data_cleaned,
+             fairsharing_cleaned,
+             by = c("r3_name" = "fs_name"))
+
+same_url_re3_fs <-
+  inner_join(re3data_cleaned, fairsharing_cleaned, by = c("r3_url" = "fs_url"))
+
+unique_re3_fs <- tibble(unique_re3_fs = c(same_name_re3_fs$r3_name,
+                                          same_url_re3_fs$r3_name)) %>%
+  distinct(unique_re3_fs)
+
+res <- tibble(
+  inventory = F,
+  re3data = T,
+  fairsharing = T,
+  names_shared = nrow(same_name_re3_fs),
+  urls_shared = nrow(same_url_re3_fs),
+  total_matches = nrow(unique_re3_fs)
+)
+
+summary <- summary %>%
+  rbind(res)
+
+rm(res)
+
+### inventory and re3data and FAIRsharing -----------------------------------
+
+same_name_inv_re3_fs <-
+  inner_join(
+    same_name_inv_re3,
+    same_name_inv_fs,
+    by = c("names_found_in_re3" = "names_found_in_fs")
+  )
+
+same_url_inv_re3_fs <-
+  inner_join(same_url_inv_re3,
+             same_url_inv_fs, by = c("inv_url" = "inv_url")) %>%
+  distinct(inv_url, .keep_all = T)
+
+unique_inv_re3_fs <- tibble(
+  unique_inv_re3_fs = c(
+    same_name_inv_re3_fs$names_found_in_re3,
+    same_url_inv_re3_fs$inv_name.x
+  )
+) %>%
+  distinct(unique_inv_re3_fs)
+
+res <- tibble(
+  inventory = T,
+  re3data = T,
+  fairsharing = T,
+  names_shared = nrow(same_name_inv_re3_fs),
+  urls_shared = nrow(same_url_inv_re3_fs),
+  total_matches = nrow(unique_inv_re3_fs)
+)
+
+summary <- summary %>%
+  rbind(res)
+
+rm(res)
+
+### pivoting for venn diagram -----------------------------------------------
+
+venn_df <- summary %>%
+  select(-names_shared, -urls_shared) %>%
+  mutate(
+    combo = case_when(
+      inventory & re3data & !fairsharing ~ "inv_re3",
+      inventory & !re3data & fairsharing ~ "inv_fs",
+      !inventory &
+        re3data & fairsharing ~ "re3_fs",
+      inventory & re3data & fairsharing ~ "inv_re3_fs",
+    )
+  ) %>%
+  select(combo, total_matches) %>%
+  pivot_wider(names_from = combo, values_from = total_matches) %>%
+  mutate(
+    inv_re3 = inv_re3 - inv_re3_fs,
+    inv_fs = inv_fs - inv_re3_fs,
+    re3_fs = re3_fs - inv_re3_fs,
+    inv = nrow(inventory_cleaned) - (inv_re3 + inv_fs + inv_re3_fs),
+    re3 = nrow(re3data_cleaned) - (inv_re3 + re3_fs + inv_re3_fs),
+    fs = nrow(fairsharing_cleaned) - (inv_fs + re3_fs + inv_re3_fs)
+  )
+
+## Outputs ------------------------------------------------------------------
+
+write_csv(summary,
+          file.path(out_dir, "inventory_re3data_fairsharing_summary.csv"))
+write_csv(venn_df, file.path(out_dir, "venn_diagram_sets.csv"))
