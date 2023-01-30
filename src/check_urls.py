@@ -116,7 +116,6 @@ def get_args() -> Args:
                         '--partial',
                         metavar='FILE',
                         type=argparse.FileType('rt', encoding='ISO-8859-1'),
-                        required=True,
                         help='Partially completed output file')
     inputs.add_argument('-o',
                         '--out-dir',
