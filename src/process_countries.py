@@ -78,7 +78,7 @@ def extract_countries(strings: pd.Series, country_format: str) -> pd.Series:
         for country in pycountry.countries:
             for country_code in [
                     country.name,
-                    country.alpha_3  #, country.alpha_2
+                    country.alpha_3  # country.alpha_2
             ]:
                 matches = re.findall(fr'\b{country_code}\b', string)
 
