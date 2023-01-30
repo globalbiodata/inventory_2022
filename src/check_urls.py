@@ -44,7 +44,7 @@ Fill in template with `API_REQ_DICT[api].format(ip)`
 class Args(NamedTuple):
     """ Command-line arguments """
     file: TextIO
-    partial: TextIO
+    partial: Optional[TextIO]
     out_dir: str
     verbose: bool
     cores: Optional[int]
