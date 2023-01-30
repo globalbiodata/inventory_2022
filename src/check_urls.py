@@ -111,7 +111,6 @@ def get_args() -> Args:
     inputs.add_argument('file',
                         metavar='FILE',
                         type=argparse.FileType('rt', encoding='ISO-8859-1'),
-                        required=True,
                         help='CSV File with extracted_url column')
     inputs.add_argument('-p',
                         '--partial',
