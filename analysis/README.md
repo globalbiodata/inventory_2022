@@ -10,6 +10,7 @@ This directory contains R scripts for some analysis of the inventory conducted i
 └── epmc_metadata.R          # Retrieve ePMC metadata to determine OA, full text, etc.
 └── comparison.R             # Retrieve life sci resources from FAIRsharing and re3data
 └── funders.R                # Analyse funder metadata by article and biodata resource
+└── funders_geo.R            # Analyse top 200 funders by country
 ```
 
 All R scripts are command-line executable and take output files from the inventory as inputs for analysis. Usage statements are available through the `-h|--help` flag.
