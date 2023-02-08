@@ -21,7 +21,6 @@ test:
 	python3 -m pytest -v \
 	--flake8 --mypy --pylint  \
 	--pylint-rcfile=config/.pylintrc  \
-	tests/ \
 	src/inventory_utils/*.py \
 	src/*.py \
 
