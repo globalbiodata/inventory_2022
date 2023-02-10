@@ -2,7 +2,7 @@
 ## Parts: 1) reshape dataframe and 2) save output
 ## Package(s): tidyverse
 ## Input file(s): funders_geo_200.csv
-## Output file(s): funders_geo_counts_2023-02-03.csv
+## Output file(s): funders_geo_counts_2023-02-10.csv
 
 library(tidyverse)
 
@@ -41,5 +41,5 @@ com3 <- select(com2, 1, 2, 3, 8, 4, 9)
 ####### PART 2: Save output files ####### 
 ##=====================================##
 
-write.csv(com3,"funders_geo_counts_2023-02-03.csv", row.names = FALSE)
+write.csv(com3,"funders_geo_counts_2023-02-10.csv", row.names = FALSE)
 

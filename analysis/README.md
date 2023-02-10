@@ -84,9 +84,9 @@ The final inventory file is supplied as input and the Europe PMC API is queried 
 
 ## `funders_geo.R`
 
-The output file from funders.R (inventory_funders_2023-01-20.csv) was manually curated to determine countries for funders mentioned >2 times and mapped to ISO.3166-1.alpha-3 country codes. The resulting file, funders_geo_200.csv, is used as the input for this script which groups by unique country to get count unique agency names, count unique biodata resources, agency names (list) and biodata resource names (list). Note that for agency names, there is some ambiguity via either unclear parent-child relationships (e.g. NIH vs. NIGMS) or inconsistent naming (e.g. National Key Research and Development Program vs. National Key Research Program of China).
+The output file from funders.R (inventory_funders_2023-01-20.csv) was manually curated to determine countries for funders mentioned >2 times and mapped to ISO.3166-1.alpha-3 country codes. The resulting file, funders_geo_200.csv, is used as the input for this script which groups by unique country to get summary statistics. Note that for agency names, there is some ambiguity via either unclear parent-child relationships (e.g. NIH vs. NIGMS) or inconsistent naming (e.g. National Key Research and Development Program vs. National Key Research Program of China).
 
 1 file is output:
-* `funders_geo_counts_2023-02-03.csv`: 
+* `funders_geo_counts_2023-02-10.csv`: By country summary with count unique agency names, count unique biodata resources, agency names (list) and biodata resource names (list).
 
 
