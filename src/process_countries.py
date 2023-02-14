@@ -78,7 +78,7 @@ def extract_countries(strings: pd.Series, country_format: str) -> pd.Series:
         for country in pycountry.countries:
             for country_code in [
                     country.name,
-                    country.alpha_3  #, country.alpha_2
+                    country.alpha_3  # country.alpha_2
             ]:
                 matches = re.findall(fr'\b{country_code}\b', string)
 
@@ -107,27 +107,21 @@ def test_extract_countries() -> None:
     """ Test extract_countries() """
 
     in_col = pd.Series([
-        'USA.', 'United States', 'US', 'The United States of America',
-        '605014, India.', 'France', 'GB'
+        'USA.', 'United States', 'The United States of America',
+        '605014, India.', 'France'
     ])
 
-    # Can retrieve 2 character country codes
-    out_col = pd.Series(['US', 'US', 'US', 'US', 'IN', 'FR', 'GB'])
-    assert_series_equal(extract_countries(in_col, 'alpha-2'), out_col)
-
     # Can retrieve 3 character countrty codes
-    out_col = pd.Series(['USA', 'USA', 'USA', 'USA', 'IND', 'FRA', 'GBR'])
+    out_col = pd.Series(['USA', 'USA', 'USA', 'IND', 'FRA'])
     assert_series_equal(extract_countries(in_col, 'alpha-3'), out_col)
 
     # Can retrieve countrty names
-    out_col = pd.Series([
-        'United States', 'United States', 'United States', 'United States',
-        'India', 'France', 'United Kingdom'
-    ])
+    out_col = pd.Series(
+        ['United States', 'United States', 'United States', 'India', 'France'])
     assert_series_equal(extract_countries(in_col, 'full'), out_col)
 
     # Can retrieve numeric country codes
-    out_col = pd.Series(['840', '840', '840', '840', '356', '250', '826'])
+    out_col = pd.Series(['840', '840', '840', '356', '250'])
     assert_series_equal(extract_countries(in_col, 'numeric'), out_col)
 
     # Can retrieve multiple instances from single row

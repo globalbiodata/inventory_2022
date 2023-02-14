@@ -44,7 +44,7 @@ Fill in template with `API_REQ_DICT[api].format(ip)`
 class Args(NamedTuple):
     """ Command-line arguments """
     file: TextIO
-    partial: TextIO
+    partial: Optional[TextIO]
     out_dir: str
     verbose: bool
     cores: Optional[int]
@@ -111,13 +111,11 @@ def get_args() -> Args:
     inputs.add_argument('file',
                         metavar='FILE',
                         type=argparse.FileType('rt', encoding='ISO-8859-1'),
-                        required=True,
                         help='CSV File with extracted_url column')
     inputs.add_argument('-p',
                         '--partial',
                         metavar='FILE',
                         type=argparse.FileType('rt', encoding='ISO-8859-1'),
-                        required=True,
                         help='Partially completed output file')
     inputs.add_argument('-o',
                         '--out-dir',

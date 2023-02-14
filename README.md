@@ -161,7 +161,6 @@ affiliation_countries | list(string) | Country codes of countries mentioned in a
 ├── data/            # Manual curation files and data splits
 ├── snakemake/       # Snakemake pipelines and rules
 ├── src/             # Python scripts and modules
-├── tests/           # pytest scripts
 ├── .gitignore
 ├── LICENSE
 ├── Makefile         # Make targets for easy running of steps

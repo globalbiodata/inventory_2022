@@ -398,3 +398,42 @@ rule process_metadata:
             {input} \
             > {output}
         """
+
+
+# Compare against re3data and FAIRsharing
+rule compare_repositories:
+    input:
+        inventory=config["final_inventory_file"],
+    output:
+        config["analysis_dir"] + "inventory_re3data_fairsharing_summary.csv",
+        config["analysis_dir"] + "venn_diagram_sets.csv",
+    params:
+        out_dir=config["analysis_dir"],
+        login=config["fair_login_file"],
+    shell:
+        """
+        Rscript analysis/comparison.R \
+            -o {params.out_dir} \
+            -c {params.login} \
+            {input.inventory}
+        """
+
+
+# Gather and analyze additional metadata from EuropePMC
+rule analyze_text_mining_potential:
+    input:
+        inventory=config["final_inventory_file"],
+    output:
+        config["figures_dir"] + "text_mining_potential.csv",
+        config["figures_dir"] + "text_mining_potential_plot.png",
+        config["figures_dir"] + "text_mining_potential_plot.svg",
+    params:
+        out_dir=config["figures_dir"],
+        query=config["query_string"],
+    shell:
+        """
+        Rscript analysis/epmc_metadata.R \
+            -o {params.out_dir} \
+            -q {params.query} \
+            {input.inventory}
+        """
