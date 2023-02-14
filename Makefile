@@ -12,11 +12,15 @@ setup:
 	Rscript -e 'install.packages("renv")'
 	Rscript -e 'renv::restore()'
 
+setup_for_updating:
+	pip install -r requirements.txt
+	echo "import nltk \nnltk.download('punkt')" | python3 /dev/stdin
+	pip install --upgrade numpy
+
 test:
 	python3 -m pytest -v \
 	--flake8 --mypy --pylint  \
 	--pylint-rcfile=config/.pylintrc  \
-	tests/ \
 	src/inventory_utils/*.py \
 	src/*.py \
 
@@ -50,6 +54,18 @@ process_manually_reviewed_original:
 	--configfile config/train_predict.yml \
 	-c 1 \
 	--until process_metadata
+# Compare repositories
+	snakemake \
+	-s snakemake/train_predict.smk \
+	--configfile config/train_predict.yml \
+	-c 1 \
+	--until compare_repositories
+# Text mining potential
+	snakemake \
+	-s snakemake/train_predict.smk \
+	--configfile config/train_predict.yml \
+	-c 1 \
+	--until analyze_text_mining_potential
 
 update_inventory:
 	snakemake \

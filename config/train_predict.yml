@@ -108,3 +108,6 @@ final_inventory_file: 'out/original_query/processed_countries/predictions.csv'
 # ner_train_stats: 'data/ner_metrics/combined_train_stats.csv'
 # ner_test_stats: 'data/ner_metrics/combined_test_stats.csv'
 # final_inventory_file: 'data/final_inventory_2022.csv'
+
+# Credentials file for FAIRsharing
+fair_login_file: "config/fairsharing_login.json"

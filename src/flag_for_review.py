@@ -287,7 +287,7 @@ def add_review_columns(df: pd.DataFrame) -> pd.DataFrame:
 
     df[[
         'review_low_prob', 'review_dup_urls', 'review_dup_names',
-        'review_notes_low_prob', 'review_notes_dup_url',
+        'review_notes_low_prob', 'review_notes_dup_urls',
         'review_notes_dup_names'
     ]] = ''
 

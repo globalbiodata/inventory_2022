@@ -60,13 +60,13 @@ def get_args() -> Args:
                         '--train-file',
                         metavar='FILE',
                         type=str,
-                        default='data/ner_train.pkl',
+                        required=True,
                         help='Training data file (.pkl)')
     inputs.add_argument('-v',
                         '--val-file',
                         metavar='FILE',
                         type=str,
-                        default='data/ner_val.pkl',
+                        required=True,
                         help='Validation data file (.pkl)')
     inputs.add_argument('-o',
                         '--out-dir',

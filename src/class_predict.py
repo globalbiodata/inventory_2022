@@ -55,7 +55,7 @@ def get_args() -> Args:
                         '--input-file',
                         metavar='FILE',
                         type=argparse.FileType('rt', encoding='ISO-8859-1'),
-                        default='data/val.csv',
+                        required=True,
                         help='Input file for prediction')
     inputs.add_argument('-o',
                         '--out-dir',

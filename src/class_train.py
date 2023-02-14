@@ -63,13 +63,13 @@ def get_args():
                         '--train-file',
                         metavar='FILE',
                         type=argparse.FileType('rt'),
-                        default='data/train.csv',
+                        required=True,
                         help='Training data file')
     inputs.add_argument('-v',
                         '--val-file',
                         metavar='FILE',
                         type=argparse.FileType('rt'),
-                        default='data/val.csv',
+                        required=True,
                         help='Validation data file')
     inputs.add_argument('-o',
                         '--out-dir',

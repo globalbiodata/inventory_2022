@@ -4,13 +4,14 @@ This directory contains configuration files for several aspects of this project.
 
 ```sh
 .
-├── .pylintrc             # Configurations for pylint
-├── environment.yml       # Conda environment description
-├── models_info.tsv       # Model training parameters
-├── query.txt             # EuropePMC query string
-├── README.md
-├── train_predict.yml     # Configs for reproducing results
-└── update_inventory.yml  # Configs for updating inventory
+├── .pylintrc               # Configurations for pylint
+├── environment.yml         # Conda environment description
+├── fairsharing_login.json  # Login info for FAIRsharing
+├── models_info.tsv         # Model training parameters
+├── query.txt               # EuropePMC query string
+├── README.md 
+├── train_predict.yml       # Configs for reproducing results
+└── update_inventory.yml    # Configs for updating inventory
 ```
 
 # File Descriptions
@@ -22,6 +23,10 @@ Since the test suite includes linting of all Python files with pylint, this conf
 ## `environment.yml`
 
 This YAML file can be used to directly create a conda environment with all of the dependencies of this project.
+
+## `fairsharing_login.json`
+
+FAIRsharing requires login credentials for using their API. Before running the reproduction pipeline, you must create and account at FAIRsharing, and enter your email and password into this JSON file. *This is not necessary for updating the intventory*.
 
 ## `models_info.tsv`
 

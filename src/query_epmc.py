@@ -42,7 +42,7 @@ def get_args() -> Args:
                         '--from-date',
                         metavar='DATE',
                         type=str,
-                        default='2011',
+                        required=True,
                         help='Articles published after (file or string)')
     parser.add_argument('-t',
                         '--to-date',
