@@ -19,6 +19,29 @@ rule all:
         config["ner_train_outdir"] + "/combined_test_stats/combined_stats.csv",
 
 
+rule all_analysis:
+    input:
+        config["processed_countries"] + "/predictions.csv",
+        config["figures_dir"] + "/class_val_set_performances.svg",
+        config["figures_dir"] + "/class_val_set_performances.png",
+        config["figures_dir"] + "/ner_val_set_performances.svg",
+        config["figures_dir"] + "/ner_val_set_performances.png",
+        config["figures_dir"] + "/combined_classification_table.docx",
+        config["figures_dir"] + "/combined_ner_table.docx",
+        config["figures_dir"] + "/ip_coordinates.png",
+        config["figures_dir"] + "/ip_countries.png",
+        config["figures_dir"] + "/author_countries.png",
+        config["analysis_dir"] + "analysed_metadata.txt",
+        config["analysis_dir"] + "inventory_re3data_fairsharing_summary.csv",
+        config["analysis_dir"] + "venn_diagram_sets.csv",
+        config["figures_dir"] + "text_mining_potential.csv",
+        config["figures_dir"] + "text_mining_potential_plot.png",
+        config["figures_dir"] + "text_mining_potential_plot.svg",
+        config["figures_dir"] + "inventory_funders.csv",
+        config["figures_dir"] + "funders_geo_counts.csv",
+        config["figures_dir"] + "funder_countries.png",
+
+
 # Run EruopePMC query
 rule query_epmc:
     output:
