@@ -10,10 +10,14 @@
 
 library(argparse)
 library(dplyr)
+library(ggmap)
+library(ggplot2)
 library(magrittr)
+library(maps)
 library(purrr)
 library(readr)
 library(stringr)
+library(tidyr)
 
 # Function Definitions ------------------------------------------------------
 
@@ -49,8 +53,11 @@ print("Parsing command-line arguments.")
 
 args <- get_args()
 
+# funders <-
+#   read_csv(args$curated_funders,
+#            show_col_types = FALSE)
 funders <-
-  read_csv(args$curated_funders,
+  read_csv("analysis/funders_geo_200.csv",
            show_col_types = FALSE)
 
 out_dir <- args$out_dir
@@ -79,7 +86,35 @@ funders_by_country <- funders %>%
   ) %>%
   select(-resource_names,-names_split,-unique_names_split)
 
+## Plotting -----------------------------------------------------------------
+
+countries_plotting <- funders_by_country %>% 
+  select(country, country_3, count_resources) %>% 
+  mutate(
+    country = case_when(
+      country == "US" ~ "USA",
+      country == "United Kingdom" ~ "UK",
+      country == "Korea" ~ "South Korea",
+      T ~ country
+    )
+  ) %>%
+  right_join(map_data("world"), by = c("country" = "region"))
+
+
+country_plot <- ggplot() +
+  geom_polygon(data = countries_plotting, aes(
+    x = long,
+    y = lat,
+    fill = count_resources,
+    group = group
+  )) +
+  theme_void() +
+  labs(fill = "Count")
+
 ## Output -------------------------------------------------------------------
 
 write_csv(funders_by_country,
           file.path(out_dir, "funders_geo_counts.csv"))
+
+ggsave(file.path(out_dir, "funder_countries.png"),
+       country_plot, height = 4, width = 6.5)
