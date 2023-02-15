@@ -111,3 +111,6 @@ final_inventory_file: 'out/original_query/processed_countries/predictions.csv'
 
 # Credentials file for FAIRsharing
 fair_login_file: "config/fairsharing_login.json"
+
+# Manually curated funding agency countries
+curated_funders: "analysis/funders_geo_200.csv"

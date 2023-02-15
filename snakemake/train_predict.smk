@@ -437,3 +437,36 @@ rule analyze_text_mining_potential:
             -q {params.query} \
             {input.inventory}
         """
+
+
+# Gather and analyze funder data
+rule analyze_funding_agencies:
+    input:
+        inventory=config["final_inventory_file"],
+    output:
+        config["figures_dir"] + "inventory_funders.csv",
+    params:
+        config["figures_dir"],
+    shell:
+        """
+        Rscript analysis/funders.R \
+            -o {params.out_dir} \
+            {input.inventory}
+        """
+
+
+# Gather and analyze funder data
+rule analyze_funding_countries:
+    input:
+        config["curated_funders"],
+    output:
+        config["figures_dir"] + "funders_geo_counts.csv",
+        config["figures_dir"] + "funder_countries.png",
+    params:
+        config["figures_dir"],
+    shell:
+        """
+        Rscript analysis/funders.R \
+            -o {params.out_dir} \
+            {input}
+        """

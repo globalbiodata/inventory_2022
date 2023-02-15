@@ -66,6 +66,18 @@ process_manually_reviewed_original:
 	--configfile config/train_predict.yml \
 	-c 1 \
 	--until analyze_text_mining_potential
+# Funding agencies
+	snakemake \
+	-s snakemake/train_predict.smk \
+	--configfile config/train_predict.yml \
+	-c 1 \
+	--until analyze_funding_agencies
+# Funding countries
+	snakemake \
+	-s snakemake/train_predict.smk \
+	--configfile config/train_predict.yml \
+	-c 1 \
+	--until analyze_funding_countries
 
 update_inventory:
 	snakemake \
