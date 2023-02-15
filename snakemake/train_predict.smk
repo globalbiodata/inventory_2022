@@ -31,15 +31,15 @@ rule all_analysis:
         config["figures_dir"] + "/ip_coordinates.png",
         config["figures_dir"] + "/ip_countries.png",
         config["figures_dir"] + "/author_countries.png",
-        config["analysis_dir"] + "analysed_metadata.txt",
-        config["analysis_dir"] + "inventory_re3data_fairsharing_summary.csv",
-        config["analysis_dir"] + "venn_diagram_sets.csv",
-        config["figures_dir"] + "text_mining_potential.csv",
-        config["figures_dir"] + "text_mining_potential_plot.png",
-        config["figures_dir"] + "text_mining_potential_plot.svg",
-        config["figures_dir"] + "inventory_funders.csv",
-        config["figures_dir"] + "funders_geo_counts.csv",
-        config["figures_dir"] + "funder_countries.png",
+        config["analysis_dir"] + "/analysed_metadata.txt",
+        config["analysis_dir"] + "/inventory_re3data_fairsharing_summary.csv",
+        config["analysis_dir"] + "/venn_diagram_sets.csv",
+        config["figures_dir"] + "/text_mining_potential.csv",
+        config["figures_dir"] + "/text_mining_potential_plot.png",
+        config["figures_dir"] + "/text_mining_potential_plot.svg",
+        config["figures_dir"] + "/inventory_funders.csv",
+        config["figures_dir"] + "/funders_geo_counts.csv",
+        config["figures_dir"] + "/funder_countries.png",
 
 
 # Run EruopePMC query
@@ -414,7 +414,7 @@ rule process_metadata:
     input:
         config["final_inventory_file"],
     output:
-        config["analysis_dir"] + "analysed_metadata.txt",
+        config["analysis_dir"] + "/analysed_metadata.txt",
     shell:
         """
         Rscript analysis/metadata_analysis.R \
@@ -428,8 +428,8 @@ rule compare_repositories:
     input:
         inventory=config["final_inventory_file"],
     output:
-        config["analysis_dir"] + "inventory_re3data_fairsharing_summary.csv",
-        config["analysis_dir"] + "venn_diagram_sets.csv",
+        config["analysis_dir"] + "/inventory_re3data_fairsharing_summary.csv",
+        config["analysis_dir"] + "/venn_diagram_sets.csv",
     params:
         out_dir=config["analysis_dir"],
         login=config["fair_login_file"],
@@ -447,9 +447,9 @@ rule analyze_text_mining_potential:
     input:
         inventory=config["final_inventory_file"],
     output:
-        config["figures_dir"] + "text_mining_potential.csv",
-        config["figures_dir"] + "text_mining_potential_plot.png",
-        config["figures_dir"] + "text_mining_potential_plot.svg",
+        config["figures_dir"] + "/text_mining_potential.csv",
+        config["figures_dir"] + "/text_mining_potential_plot.png",
+        config["figures_dir"] + "/text_mining_potential_plot.svg",
     params:
         out_dir=config["figures_dir"],
         query=config["query_string"],
@@ -467,7 +467,7 @@ rule analyze_funding_agencies:
     input:
         inventory=config["final_inventory_file"],
     output:
-        config["figures_dir"] + "inventory_funders.csv",
+        config["figures_dir"] + "/inventory_funders.csv",
     params:
         config["figures_dir"],
     shell:
@@ -483,8 +483,8 @@ rule analyze_funding_countries:
     input:
         config["curated_funders"],
     output:
-        config["figures_dir"] + "funders_geo_counts.csv",
-        config["figures_dir"] + "funder_countries.png",
+        config["figures_dir"] + "/funders_geo_counts.csv",
+        config["figures_dir"] + "/funder_countries.png",
     params:
         config["figures_dir"],
     shell:
