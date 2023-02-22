@@ -1,103 +1,143 @@
-## Purpose: Retrieve and analyze funder metadata
-## Parts: 1) Retrieve funder metadata from Europe PMC, 2) analyze, and 3) save output files
-## Package(s): europepmc, tidyverse, reshape2
-## Input file(s): final_inventory_2022.csv
-## Output file(s): inventory_funders_2023-01-20.csv
+#!/usr/bin/env Rscript
 
-##========================================================================##
-####### PART 1: Retrieve funder metadata per article from Europe PMC ####### 
-##========================================================================##
+# Author : Heidi Imker <hjimker@gmail.com>
+#          Kenneth Schackart <schackartk1@gmail.com>
+# Purpose: Retrieve and analyze funder metadata
 
-## Note: biodata resources in the inventory have concatenated funder info when they have >1 article. The step below retrieves metadata for each article for analysis by article. 
+# Imports -------------------------------------------------------------------
 
+## Library calls ------------------------------------------------------------
+
+library(argparse)
+library(dplyr)
 library(europepmc)
-library(tidyverse)
-library(reshape2)
+library(magrittr)
+library(readr)
+library(stringr)
 
-## split and melt IDs from the inventory into a list of just IDs 
-inv <- read.csv("final_inventory_2022.csv") ## reminder - setwd to data folder
-inventory <- inv ## will use later in script
-inv <- separate(inv, 'ID', paste("ID", 1:30, sep="_"), sep=",", extra="drop")
-inv <- inv[,colSums(is.na(inv))<nrow(inv)]
-inv[, c(1:14)] <- sapply(inv[, c(1:14)],as.numeric)
+# Function Definitions ------------------------------------------------------
 
-ids <- select(inv, 1:14)
-ids <- melt(ids, na.rm = TRUE, value.name = "ID")
-id_list <- ids$ID
-
-## Retrieve funder metadata via Europe PMC API
-
-## Retrieve funder metadata
-## Takes 10-15 minutes on several thousand
-
-a  <- NULL;
-for (i in id_list) {
-  r <- sapply(i, epmc_details) 
-  id <- r[[1]]["id"]
-  title <- r[[1]]["title"]
-  agency <- tryCatch(r[[9]]["agency"], error = function(cond) {
-    message(paste("funder issue"))
-    message(cond, sep="\n")
-    return(NA)
-    force(do.next)})
-  report <- cbind(id, title, agency)
-  a <- rbind(a, report)
+#' Parse command-line arguments
+#'
+#' @return args list with input filenames
+get_args <- function() {
+  parser <- argparse::ArgumentParser()
+  
+  parser$add_argument(
+    "inventory_file",
+    help  = "Final inventory file",
+    metavar = "FILE",
+    type = "character",
+    default = "data/final_inventory_2022.csv"
+  )
+  parser$add_argument(
+    "-o",
+    "--out-dir",
+    help  = "Output directory",
+    metavar = "DIR",
+    type = "character",
+    default = "analysis/figures"
+  )
+  
+  args <- parser$parse_args()
+  
+  return(args)
 }
 
-## double check for any lost PMIDs 
-a_id <- as.data.frame(a$id)
-names(a_id)[1] ="id"
-id_l <- as.data.frame(id_list)
-names(id_l)[1] ="id"
-a_id$id <- as.numeric(a_id$id)
-id_l$id <- as.numeric(id_l$id)
-lost <- anti_join(id_l, a_id)
-lost_id <- lost$id
+#' Get metadata from Europe PMC
+#'
+#' @param ids list of article IDs
+#'
+#' @return dataframe with article metadata
+get_metadata <- function(ids) {
+  out_df <- tibble()
+  
+  for (id_i in ids) {
+    epmc_return <- epmc_details(id_i)
+    metadata <- epmc_return[[1]]
+    id <- metadata["id"]
+    title <- metadata["title"]
+    agency <- tryCatch(
+      epmc_return[[9]]["agency"],
+      error = function(cond) {
+        return(NA)
+        force(do.next)
+      }
+    )
+    
+    article_report <-
+      cbind(id,
+            title,
+            agency)
+    
+    out_df <- rbind(out_df, article_report)
+  }
+  
+  return(out_df)
+}
 
-##===========================================================##
-####### PART 2: Analyze funder metadata from Europe PMC ####### 
-##===========================================================##
 
-## number of articles that have funder metadata
+# Main ----------------------------------------------------------------------
 
-hasFunderInfo <- a %>% 
-  group_by(id) %>% 
-      mutate(funderpresent = (test = ifelse((is.na(agency)),
-                                  yes = "N",
-                                  no = "Y")))
+print("Parsing command-line arguments.")
 
-hasFunderInfo <- unique(select(hasFunderInfo, 1, 4))
-sumhasFunderInfo <- sum(hasFunderInfo$funderpresent == "Y")
+args <- get_args()
 
-## isolate funders returned to tally number of unique papers and biodata resources
-f <- a %>% filter(complete.cases(.))
-f_ids <- unique(f$id)
-f <- select(f, -2)
-## get resource names to be able to associate with funders
-sep <- separate_rows(inventory, ID, sep = ",")
-names(sep)[1] ="id"
-sep_ids <- unique(sep$id)
-best_names <- select(sep, 1, 2)
+full_inventory <-
+  read_csv(args$inventory_file,
+           show_col_types = FALSE)
 
-##join
-best_names$id <- trimws(best_names$id)
-f$id <- trimws(f$id)
-f_dbs <- left_join(f, best_names)
+out_dir <- args$out_dir
 
-funders <- f_dbs %>%
+long_inventory <- full_inventory %>%
+  rename("id" = "ID") %>%
+  mutate(resource_num = row_number()) %>%
+  mutate(id = strsplit(id, ", ")) %>%
+  unnest(id) %>%
+  distinct(id, .keep_all = T)
+
+## Query Europe PMC ---------------------------------------------------------
+
+cat("Getting metadata from Europe PMC... ")
+
+id_list <- long_inventory$id
+
+metadata_df <- get_metadata(id_list)
+
+## Analyze funder metadata --------------------------------------------------
+
+### Number of articles that have funder metadata ----------------------------
+
+num_articles_w_funder_info <- metadata_df %>%
+  group_by(id) %>%
+  summarize(agencies = paste(agency, collapse = "")) %>%
+  filter(agencies != "NA") %>%
+  summarize(count = n())
+
+### Analyze funders by resource ---------------------------------------------
+
+funders <- long_inventory %>%
+  select(id, best_name) %>%
+  drop_na() %>%
+  distinct(id, .keep_all = T) %>%
+  right_join(metadata_df %>% drop_na()) %>%
   group_by(agency) %>%
-    mutate(count_all_article_instances = length(id)) %>%
-      mutate(count_unique_articles = length(unique(id))) %>%
-        mutate(count_unique_biodata_resources = length(unique(best_name))) %>%
-           mutate(associated_PMIDs = str_c(unique(id), collapse = ", ")) %>%
-              mutate(associated_biodata_resources = str_c(unique(best_name), collapse = ", "))
+  summarize(
+    count_all_article_instances = length(id),
+    count_unique_articles = length(unique(id)),
+    count_unique_biodata_resources = length(unique(best_name)),
+    associated_PMIDs = str_c(unique(id), collapse = ", "),
+    associated_biodata_resources = str_c(unique(best_name), collapse = ", ")
+  )
 
-## simplifying to just "unique" funders
-funders <- unique(select(funders, 2,4:8)) 
+## Output -------------------------------------------------------------------
 
-##=====================================##
-####### PART 3: Save output files ####### 
-##=====================================##
+cat("Number of articles with funder information:",
+    has_funder_info$count)
+cat("Number of \"unique\" funders:", nrow(funders))
+cat("Greatest # resources per funder:",
+    max(funders$count_unique_biodata_resources))
+cat("Average # resources per funder:",
+    mean(funders$count_unique_biodata_resources))
 
-write.csv(funders,"inventory_funders_2023-01-20.csv", row.names = FALSE)
-
+write_csv(funders, file.path(out_dir, "inventory_funders.csv"))

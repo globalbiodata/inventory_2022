@@ -4,13 +4,13 @@ This directory contains R scripts for some analysis of the inventory conducted i
 
 ```sh
 .
+├── comparison.R             # Retrieve life sci resources from FAIRsharing and re3data
+├── epmc_metadata.R          # Retrieve ePMC metadata to determine OA, full text, etc.
+├── funders.R                # Analyse funder metadata by article and biodata resource
+├── funders_geo.R            # Analyse top 200 funders by country
 ├── location_information.R   # Generate maps of resource location metadata
 ├── metadata_analysis.R      # Perform high-level metadata analysis
 └── performance_metrics.R    # Create plots and tables of model performances
-└── epmc_metadata.R          # Retrieve ePMC metadata to determine OA, full text, etc.
-└── comparison.R             # Retrieve life sci resources from FAIRsharing and re3data
-└── funders.R                # Analyse funder metadata by article and biodata resource
-└── funders_geo.R            # Analyse top 200 funders by country
 ```
 
 All R scripts are command-line executable and take output files from the inventory as inputs for analysis. Usage statements are available through the `-h|--help` flag.
@@ -69,24 +69,25 @@ The final inventory file is supplied as input and the Europe PMC API is queried 
 
 ## `comparison.R`
 
-Inputs are retrieved by querying the records available from the re3data.org API and the FAIRsharing API. Returns are filtered to life science resources and then compared resources identified in the final inventory. 
+Inputs are retrieved by querying the records available from the re3data.org API and the FAIRsharing API. Returns are filtered to life science resources and then compared resources identified in the final inventory. The resources in these two repositories are compared against one another and the inventory to get a sense of the overlap.
 
-n files are output:
+2 files are output:
 
-tbd: Venn Diagram?
+* `inventory_re3data_fairsharing_summary.csv`: Number of overlapping resources in the inventory, re3data, and FAIRsharing.
+* `venn_diagram_set.csv`: Intersection set sizes between resources in the inventory, re3data, and FAIRsharing.
 
 ## `funders.R`
 
 The final inventory file is supplied as input and the Europe PMC API is queried to retrieve "agency" metadata from individual articles (note that biodata resources in the inventory have concatenated "grantID" and "agency" values for resources with >1 article). This scripts retrieves "agency" for each article, when present, to analyze the supporting funding organizations identified.
 
 1 file is output:
-* `inventory_funders_2023-01-20.csv`: Deduplicated funder names with total unique article count, total unique biodata resource count, associated article PMIDs (list) and associated biodata resources (list).
+* `inventory_funders.csv`: Deduplicated funder names with total unique article count, total unique biodata resource count, associated article PMIDs (list) and associated biodata resources (list).
 
 ## `funders_geo.R`
 
 The output file from funders.R (inventory_funders_2023-01-20.csv) was manually curated to determine countries for funders mentioned >2 times and mapped to ISO.3166-1.alpha-3 country codes. The resulting file, funders_geo_200.csv, is used as the input for this script which groups by unique country to get summary statistics. Note that for agency names, there is some ambiguity via either unclear parent-child relationships (e.g. NIH vs. NIGMS) or inconsistent naming (e.g. National Key Research and Development Program vs. National Key Research Program of China).
 
-1 file is output:
-* `funders_geo_counts_2023-02-10.csv`: By country summary with count unique agency names, count unique biodata resources, agency names (list) and biodata resource names (list).
-
-
+2 files are output:
+* `funders_geo_counts.csv`: By country summary with count unique agency names, count unique biodata resources, agency names (list) and biodata resource names (list).
+* `funder_countries.png`: A (heat)map showing the number of biodata resources that were funded by
+at least one agency from a given country.

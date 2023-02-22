@@ -9,7 +9,7 @@ setup:
 	pip install -r requirements.txt
 	echo "import nltk \nnltk.download('punkt')" | python3 /dev/stdin
 	pip install --upgrade numpy
-	Rscript -e 'install.packages("renv")'
+	Rscript -e 'install.packages("renv"), repos="http://cran.us.r-project.org"'
 	Rscript -e 'renv::restore()'
 
 setup_for_updating:
@@ -30,42 +30,11 @@ train_and_predict:
 	--configfile config/train_predict.yml -c1
 
 process_manually_reviewed_original:
-# process manually reviewed
 	snakemake \
 	-s snakemake/train_predict.smk \
 	--configfile config/train_predict.yml \
 	-c 1 \
-	--until process_countries
-# analyze performance metrics
-	snakemake \
-	-s snakemake/train_predict.smk \
-	--configfile config/train_predict.yml \
-	-c 1 \
-	--until analyze_performance_metrics
-# process location data
-	snakemake \
-	-s snakemake/train_predict.smk \
-	--configfile config/train_predict.yml \
-	-c 1 \
-	--until process_location_data
-# process metadata
-	snakemake \
-	-s snakemake/train_predict.smk \
-	--configfile config/train_predict.yml \
-	-c 1 \
-	--until process_metadata
-# Compare repositories
-	snakemake \
-	-s snakemake/train_predict.smk \
-	--configfile config/train_predict.yml \
-	-c 1 \
-	--until compare_repositories
-# Text mining potential
-	snakemake \
-	-s snakemake/train_predict.smk \
-	--configfile config/train_predict.yml \
-	-c 1 \
-	--until analyze_text_mining_potential
+	--until all_analysis
 
 update_inventory:
 	snakemake \
@@ -73,7 +42,6 @@ update_inventory:
 	--configfile config/update_inventory.yml -c1
 
 process_manually_reviewed_update:
-# process manually reviewed
 	snakemake \
 	-s snakemake/update_inventory.smk \
 	--configfile config/update_inventory.yml \

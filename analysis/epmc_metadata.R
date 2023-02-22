@@ -137,16 +137,13 @@ print("Parsing command-line arguments.")
 
 args <- get_args()
 
-# query_string <- read_file(args$query)
-query_string <- modify_query(read_file("config/query.txt"))
+query_string <- read_file(args$query)
 
 full_inventory <-
-  # read_csv(args$inventory_file,
-  read_csv("data/final_inventory_2022.csv",
+  read_csv(args$inventory_file,
            show_col_types = FALSE)
 
-# out_dir <- args$out_dir
-out_dir <- "analysis/figures"
+out_dir <- args$out_dir
 
 ## Queries ------------------------------------------------------------------
 
@@ -521,7 +518,7 @@ summary_long <- summary %>%
 
 summary_plot <- summary_long %>%
   ggplot(aes(x = percent / 100, y = type, fill = label)) +
-  facet_wrap(~ asset) +
+  facet_wrap( ~ asset) +
   geom_col(width = 0.5, alpha = 0.8) +
   scale_fill_manual(values = c("#D95F02", "#666666", "#7570B3")) +
   scale_x_continuous(labels = percent) +

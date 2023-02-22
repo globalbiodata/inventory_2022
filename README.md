@@ -172,7 +172,7 @@ affiliation_countries | list(string) | Country codes of countries mentioned in a
 
 # Installation
 
-There are several ways to install the dependencies for this workflow.
+There are several ways to install the dependencies for this workflow. The workflow has been developed and tested on Linux (Ubuntu 20.04 via Windows System for Linux) and Google Colaboratory.
 
 ## Pip
 
@@ -185,7 +185,16 @@ Python 3.8.12
 
 Then you can install Python dependencies using pip.
 
-A make command is available for installing dependencies.
+Additionally, ensure that R is installed. R version 3.6.3 was originally used, but newer versions should work.
+
+```sh
+$ Rscript --version
+R scripting front-end version 3.6.3
+```
+
+If R is not installed, [install it](https://cran.r-project.org/) before running the following command.
+
+A make command is available for installing all other dependencies.
 
 ```sh
 $ make setup

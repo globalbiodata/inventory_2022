@@ -1,45 +1,120 @@
-## Purpose: Analyze funders by country w/ associated agency and biodata resource names and counts
-## Parts: 1) reshape dataframe and 2) save output
-## Package(s): tidyverse
-## Input file(s): funders_geo_200.csv
-## Output file(s): funders_geo_counts_2023-02-10.csv
+#!/usr/bin/env Rscript
 
-library(tidyverse)
+# Author : Heidi Imker <hjimker@gmail.com>
+#          Kenneth Schackart <schackartk1@gmail.com>
+# Purpose: Analyze funders by country w/ associated agency and biodata resource names and counts
 
-##======================================##
-####### PART 1: Reshape data frame ####### 
-##======================================##
+# Imports -------------------------------------------------------------------
 
-## manually curated output from funders.R (inventory_funders_2023-01-20.csv) to determine countries for funders mentioned >2 times for file funders_geo_200.csv
+## Library calls ------------------------------------------------------------
 
-top <- read.csv("funders_geo_200.csv") ## reminder; set to analysis folder
+library(argparse)
+library(dplyr)
+library(ggmap)
+library(ggplot2)
+library(magrittr)
+library(maps)
+library(purrr)
+library(readr)
+library(stringr)
+library(tidyr)
 
-## count number of agencies per country
+# Function Definitions ------------------------------------------------------
 
-##remove extra spaces or won't deduplicate cleanly below
-top$associated_biodata_resources <- gsub('[\" ]', '', top$associated_biodata_resources)
+#' Parse command-line arguments
+#'
+#' @return args list with input filenames
+get_args <- function() {
+  parser <- argparse::ArgumentParser()
+  
+  parser$add_argument(
+    "curated_funders",
+    help  = "Manually curated output from funders.R",
+    metavar = "FILE",
+    type = "character"
+  )
+  parser$add_argument(
+    "-o",
+    "--out-dir",
+    help  = "Output directory",
+    metavar = "DIR",
+    type = "character",
+    default = "analysis/figures"
+  )
+  
+  args <- parser$parse_args()
+  
+  return(args)
+}
 
-com <- top %>% 
-  group_by(country) %>% 
-    mutate(count_agencies = length(agency)) %>%
-        mutate(agency_names = str_c(agency, collapse = ", ")) %>%
-          mutate(resource_names = str_c(associated_biodata_resources, collapse = ","))
+# Main ----------------------------------------------------------------------
 
-## reshaping to deduplicate
-com$resource_names_split <- strsplit(com$resource_names, ",")
-com2 <- unique(select(com, 2,3, 10:13))
-com2$resource_names_split_u <- sapply(com2$resource_names_split, unique)
+print("Parsing command-line arguments.")
 
-## count and assemble table
-com2 <- com2 %>% 
-  group_by(country) %>% 
-    mutate(count_resources = length(unlist(resource_names_split_u)))  %>% 
-      mutate(biodata_resource_names = str_c(flatten(resource_names_split_u), collapse = ", "))
-com3 <- select(com2, 1, 2, 3, 8, 4, 9)
+args <- get_args()
 
-##=====================================##
-####### PART 2: Save output files ####### 
-##=====================================##
+# funders <-
+#   read_csv(args$curated_funders,
+#            show_col_types = FALSE)
+funders <-
+  read_csv("analysis/funders_geo_200.csv",
+           show_col_types = FALSE)
 
-write.csv(com3,"funders_geo_counts_2023-02-10.csv", row.names = FALSE)
+out_dir <- args$out_dir
 
+## Analysis -----------------------------------------------------------------
+
+funders_by_country <- funders %>%
+  select(agency,
+         country,
+         country_3,
+         known_parent,
+         associated_biodata_resources) %>%
+  mutate(associated_biodata_resources = gsub('[\" ]', '', associated_biodata_resources)) %>%
+  group_by(country, country_3) %>%
+  summarize(
+    count_agencies = length(agency),
+    agency_names = str_c(agency, collapse = ", "),
+    resource_names = str_c(associated_biodata_resources, collapse = ",")
+  ) %>%
+  group_by(country) %>%
+  mutate(
+    names_split = strsplit(resource_names, ","),
+    unique_names_split = map(names_split, ~ unique(.x)),
+    count_resources = length(unlist(unique_names_split)),
+    biodata_resource_names = str_c(flatten(unique_names_split), collapse = ", ")
+  ) %>%
+  select(-resource_names,-names_split,-unique_names_split)
+
+## Plotting -----------------------------------------------------------------
+
+countries_plotting <- funders_by_country %>% 
+  select(country, country_3, count_resources) %>% 
+  mutate(
+    country = case_when(
+      country == "US" ~ "USA",
+      country == "United Kingdom" ~ "UK",
+      country == "Korea" ~ "South Korea",
+      T ~ country
+    )
+  ) %>%
+  right_join(map_data("world"), by = c("country" = "region"))
+
+
+country_plot <- ggplot() +
+  geom_polygon(data = countries_plotting, aes(
+    x = long,
+    y = lat,
+    fill = count_resources,
+    group = group
+  )) +
+  theme_void() +
+  labs(fill = "Count")
+
+## Output -------------------------------------------------------------------
+
+write_csv(funders_by_country,
+          file.path(out_dir, "funders_geo_counts.csv"))
+
+ggsave(file.path(out_dir, "funder_countries.png"),
+       country_plot, height = 4, width = 6.5)
