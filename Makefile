@@ -9,7 +9,7 @@ setup:
 	pip install -r requirements.txt
 	echo "import nltk \nnltk.download('punkt')" | python3 /dev/stdin
 	pip install --upgrade numpy
-	Rscript -e 'install.packages("renv")'
+	Rscript -e 'install.packages("renv"), repos="http://cran.us.r-project.org"'
 	Rscript -e 'renv::restore()'
 
 setup_for_updating:
