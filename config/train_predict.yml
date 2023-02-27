@@ -65,7 +65,7 @@ initial_query_end: 2021
 query_string: 'config/query.txt'
 
 # Ratios used for data splitting
-split_ratios: '0.75 0.15 0.15'
+split_ratios: '0.7 0.15 0.15'
 
 # Metrics used for choosing best model/epoch
 class_criteria_metric: 'precision'
