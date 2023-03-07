@@ -54,6 +54,9 @@ def get_args():
 
     args = parser.parse_args()
 
+    if ".pkl" not in args.test_file:
+        parser.error(f'Invalid input file "{args.test_file}". Must be .pkl')
+
     return Args(args.test_file, args.checkpoint, args.out_dir)
 
 
