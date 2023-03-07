@@ -132,6 +132,10 @@ def get_args() -> Args:
 
     args = parser.parse_args()
 
+    for infile in [args.train_file, args.val_file]:
+        if ".pkl" not in infile:
+            parser.error(f'Invalid input file "{infile}". Must be .pkl')
+
     return Args(args.train_file, args.val_file, args.out_dir, args.metric,
                 args.model_name, args.learning_rate, args.weight_decay,
                 args.num_training, args.num_epochs, args.batch_size,
