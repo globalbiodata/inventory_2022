@@ -208,11 +208,6 @@ def train(settings: Settings,
             best_train = train_metrics
             best_model = copy.deepcopy(model)
 
-        # Stop training once validation F1 goes down
-        # Overfitting has begun
-        # if val_metrics.f1 < best_val.f1 and epoch > 0:
-        #     break
-
         epoch_row = pd.DataFrame(
             {
                 'epoch': epoch,
