@@ -10,6 +10,7 @@ Authors: Ana-Maria Istrate and Kenneth Schackart
 import sys
 from typing import Any, List, Optional, cast
 
+import numpy as np
 import torch
 from datasets import load_metric
 from torch.functional import Tensor
@@ -76,6 +77,7 @@ def get_ner_metrics(model: Any, dataloader: DataLoader,
     Return:
     A `Metrics` NamedTuple
     """
+    # pylint: disable=too-many-locals
     calc_seq_metrics = load_metric('seqeval')
     total_loss = 0.
     num_seen_datapoints = 0
@@ -84,13 +86,16 @@ def get_ner_metrics(model: Any, dataloader: DataLoader,
         with torch.no_grad():
             outputs = model(**batch)
         num_seen_datapoints += len(batch['input_ids'])
-        predictions = torch.argmax(outputs.logits, dim=-1)  # Diff from class
-        predictions = predictions.detach().cpu().clone().numpy()
+        predictions = torch.argmax(outputs.logits, dim=-1)
+        predictions_array = predictions.detach().cpu().clone().numpy()
+        predictions_array = cast(np.ndarray, predictions)
 
         labels = cast(Tensor, batch['labels'])
-        labels = labels.detach().cpu().clone().numpy()
+        labels_array = labels.detach().cpu().clone().numpy()
+        labels_array = cast(np.ndarray, labels)
 
-        pred_labels, true_labels = convert_to_tags(predictions, labels)
+        pred_labels, true_labels = convert_to_tags(predictions_array,
+                                                   labels_array)
 
         calc_seq_metrics.add_batch(predictions=pred_labels,
                                    references=true_labels)

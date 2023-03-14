@@ -174,7 +174,7 @@ def main() -> None:
 
     # Predict labels
     df = pd.read_csv(open(args.infile.name, encoding='ISO-8859-1'), dtype=str)
-    df.fillna('', inplace=True)
+    df = df.fillna('')
     df = df[~df.duplicated('id')]
     df = df[df['id'] != '']
     predicted_labels = predict(model, dataloader, class_labels, device)

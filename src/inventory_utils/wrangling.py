@@ -245,7 +245,7 @@ def preprocess_data(file: TextIO) -> pd.DataFrame:
         sys.exit(f'Data file {file.name} must contain columns '
                  'labeled "title" and "abstract".')
 
-    df.fillna('', inplace=True)
+    df = df.fillna('')
     df = df[~df.duplicated('id')]
     df = df[df['id'] != '']
 
@@ -283,8 +283,9 @@ def test_preprocess_data() -> None:
 
 
 # ---------------------------------------------------------------------------
-def convert_to_tags(batch_predictions: array,
-                    batch_labels: array) -> Tuple[TaggedBatch, TaggedBatch]:
+def convert_to_tags(
+        batch_predictions: np.ndarray,
+        batch_labels: np.ndarray) -> Tuple[TaggedBatch, TaggedBatch]:
     """
     Convert numeric labels to string tags
 
