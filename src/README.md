@@ -63,7 +63,7 @@ If the query has no placeholders, the `--from-date` and `--to-date` arguments ar
 
 Once the query is completed two files are created in `--out-dir`:
 
-* `last_query_date.txt`: File with the `--to-date`, defaulting to today's date
+* `last_query_dates.txt`: File with the date range used in the query for later reference (formatted as `from_date`-`to_date`)
 * `new_query_results.csv`: Containing IDs, titles, abstracts, and first publication dates from query
 
 # Data Generation
