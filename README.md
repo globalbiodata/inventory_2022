@@ -347,12 +347,13 @@ Configurations regarding model training parameters are stored in [config/models_
 
 The EuropePMC query string is stored in [config/query.txt](config/query.txt).
 
-# How to Cite
+# Associated publications
 
-
+The primary article of the biodata resource inventory can be found at https://doi.org/10.5281/zenodo.7768416.
+A case study describing the efforts taken to make this project reproducible and to uphold code and data standards can be found at https://doi.org/10.5281/zenodo.7767794.
 
 # Authorship
 
 * [Dr. Heidi Imker](hjimker@gmail.com), Global Biodata Coalition
-* [Kenneth Schackart](schackartk1@gmail.com), Global Biodata Coalition
+* [Dr. Kenneth Schackart](schackartk1@gmail.com), Global Biodata Coalition
 * [Ana-Maria Istrate](aistrate@chanzuckerberg.com), Chan Zuckerberg Initiative
