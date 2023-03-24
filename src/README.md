@@ -63,7 +63,7 @@ If the query has no placeholders, the `--from-date` and `--to-date` arguments ar
 
 Once the query is completed two files are created in `--out-dir`:
 
-* `last_query_date.txt`: File with the `--to-date`, defaulting to today's date
+* `last_query_dates.txt`: File with the date range used in the query for later reference (formatted as `from_date`-`to_date`)
 * `new_query_results.csv`: Containing IDs, titles, abstracts, and first publication dates from query
 
 # Data Generation
@@ -192,7 +192,7 @@ Articles that have the same URL are marked in the `duplicate_urls` column. The v
 
 ## Processing Manually Reviewed Inventory
 
-Once the flagged inventory has been manually reviewed, the determinations made during review are executed (*e.g.* removing certain rows, merging duplicates) by `process_manual_review.py`.
+Once the flagged inventory has been manually reviewed according to the instructions on Zenodo ([doi: 10.5281/zenodo.7768363](https://doi.org/10.5281/zenodo.7768363)), the determinations made during review are executed (*e.g.* removing certain rows, merging duplicates) by `process_manual_review.py`.
 
 There are quite a few validations to ensure that the manual review process was conducted in a way that it can be properly processed. If there any errors are discovered during this evaluation, an error message with the ID values of bad rows will be given, as well as a description of the problem(s).
 

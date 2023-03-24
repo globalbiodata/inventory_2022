@@ -2,7 +2,11 @@
 
 This code repository represents work done as part of a collaborative effort between the Chan Zuckerberg Initiative (CZI) and Global Biodata Coalition (GBC) to create an inventory of biodata resources found in scientific articles. CZI Research Scientist Ana-Maria Istrate designed the machine learning framework for the project and wrote the code to implement and evaluate the NLP models used to classify articles and extract individual resources. Ana’s code was used by GBC consultant Ken Schackart as the starting point for a pipeline to create an ML-predicted preliminary inventory, which is then further refined with code that includes steps for deduplication, processing for selective manual review, and augmentation with additional attributes to create the final inventory of biodata resources.
 
-## Overview of Methods
+## Motivation
+
+GBC initiated this project with the objective of gaining an understanding of the global infrastructure of biological data resources. While registries of data resources exist (such as [re3data](https://www.re3data.org/) and [FAIRsharing](https://fairsharing.org/)), their scopes are different from that intended by GBC. So this project was initiated to create an inventory of the blobal biodata resource infrastructure using methodologies that are reproducible so the inventory could be periodically updated.
+
+## Overview of methods
 
 EuropePMC is queried to obtain titles and abstracts of scientific articles. A BERT model is used to classify those articles as describing or not describing a biodata resource. A BERT model is also used to perform named entity recoginition to extract the resource name for those articles that are predicted to describe a biodata resource. Resource URLs are extracted using a regular expression.
 
@@ -13,6 +17,18 @@ The manually reviewed inventory is processed to further deduplicate the inventor
 The final inventory gives a list of biodata resources, the PMIDs of the articles describing those resources, and the metadata described above.
 
 Snakemake is used as a workflow manager to automate these processes.
+
+## Inteded uses
+
+The code and pipelines here have been designed with a few intended use cases:
+
+- **Reproduction**: We intend that the results of this study are directly reproducible using the pipelines presented here. That includes fine-tuning the models on the manually curated datasets, selecting the best model, using the models for prediction, and all downstream processes.
+
+- **Updating**: It should be possible to get an updated inventory with minimal changes to the code. A pipeline was developed that allows the user to provide a new publication date range, and then the fine-tuned models are used to process the new data to yield an updated list of resources and their associated metadata.
+
+- **Generalization**: With some extra work, it should be possible for a future user to manually curate new training data, and use the existing pipelines to finetune the models and perform all downstream analysis. We note that while much of the existing code would be useful, some changes to the code are likely in this case.
+
+To help with the usability of this code, it has been tested on Google Colab. If a user would like to run the code on Colab, [this protocol](https://dx.doi.org/10.17504/protocols.io.5jyl89o36v2w/v3) provides instructions on how to set up colab and clone this project there. Note that Google and GitHub accounts are required to follow those instructions.
 
 # Workflow overview
 
@@ -103,7 +119,7 @@ graph TD
 
 The process up to this point is run without human intervention. As a quality control measure, the inventory must be manually reviewed for articles that are potentially duplicate descriptions of a common resource, or potential false positives based on a low name probability score.
 
-During manual review, the inventory is annotated to determine which potential duplicates should be merged, and which low-probability articles should be removed.
+During manual review, the inventory is annotated to determine which potential duplicates should be merged, and which low-probability articles should be removed. Instructions for this process are available on Zenodo ([doi: 10.5281/zenodo.7768363](https://doi.org/10.5281/zenodo.7768363))
 
 ## Final Processing
 
@@ -170,9 +186,13 @@ affiliation_countries | list(string) | Country codes of countries mentioned in a
 └── updating_inventory.ipynb
 ```
 
-# Installation
+# Systems
 
-There are several ways to install the dependencies for this workflow. The workflow has been developed and tested on Linux (Ubuntu 20.04 via Windows System for Linux) and Google Colaboratory.
+The code for this project was developed using [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install) connected to an [Ubuntu 20.04](https://releases.ubuntu.com/focal/) kernel. It has also been run on [Google Colaboratory](https://colab.research.google.com/). Compatibility to other systems may vary. In particular, certain functionality (like GNU Make) may not work on Windows.
+
+If you would like to run the code on a Windows machine, we recommend using WSL2. [This protocol](https://www.protocols.io/view/install-wsl-and-vscode-on-windows-10-q26g78e1klwz/v1) may be helpful for getting that set up.
+
+# Installation
 
 ## Pip
 
@@ -236,6 +256,14 @@ $ python3
 >>> nltk.download('punkt')
 ```
 
+# Allow for execution
+
+To avoid file permission problems, run the following (on Linux) to allow for exeuction of the scripts:
+
+```sh
+$ chmod +x src/*.py analysis/*.py analysis/*.R
+```
+
 # Running Tests
 
 A full test suite is included to help ensure that everything is running as expected. To run the full test suite, run:
@@ -268,8 +296,6 @@ $ snakemake -s snakemake/train_predict.smk --configfile config/train_predict.yml
 ```
 
 The above commands run the Snakemake pipeline. If you wish to run the steps manually, see [src/README.md](src/README.md#training-and-prediction).
-
-
 
 ## Updating the inventory
 
@@ -321,12 +347,13 @@ Configurations regarding model training parameters are stored in [config/models_
 
 The EuropePMC query string is stored in [config/query.txt](config/query.txt).
 
-# How to Cite
+# Associated publications
 
-
+The primary article of the biodata resource inventory can be found at https://doi.org/10.5281/zenodo.7768416.
+A case study describing the efforts taken to make this project reproducible and to uphold code and data standards can be found at https://doi.org/10.5281/zenodo.7767794.
 
 # Authorship
 
 * [Dr. Heidi Imker](hjimker@gmail.com), Global Biodata Coalition
-* [Kenneth Schackart](schackartk1@gmail.com), Global Biodata Coalition
+* [Dr. Kenneth Schackart](schackartk1@gmail.com), Global Biodata Coalition
 * [Ana-Maria Istrate](aistrate@chanzuckerberg.com), Chan Zuckerberg Initiative

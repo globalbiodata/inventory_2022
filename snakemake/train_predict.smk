@@ -46,8 +46,8 @@ rule all_analysis:
 rule query_epmc:
     output:
         query_results=config["query_out_dir"] + "/query_results.csv",
-        date_file1=config["query_out_dir"] + "/last_query_date.txt",
-        date_file2=config["last_date_dir"] + "/last_query_date.txt",
+        date_file1=config["query_out_dir"] + "/last_query_dates.txt",
+        date_file2=config["last_date_dir"] + "/last_query_dates.txt",
     params:
         out_dir=config["query_out_dir"],
         begin_date=config["initial_query_start"],

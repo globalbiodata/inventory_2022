@@ -31,7 +31,7 @@ def get_args() -> Args:
 
     parser = argparse.ArgumentParser(
         description=('Query EuropePMC to retrieve articles. '
-                     'Saves csv of results and file of today\'s date'),
+                     'Saves csv of results and file of query dates'),
         formatter_class=CustomHelpFormatter)
 
     parser.add_argument('query',
@@ -94,7 +94,7 @@ def make_filenames(outdir: str) -> Tuple[str, str]:
     '''
 
     csv_out = os.path.join(outdir, 'query_results.csv')
-    txt_out = os.path.join(outdir, 'last_query_date.txt')
+    txt_out = os.path.join(outdir, 'last_query_dates.txt')
 
     return csv_out, txt_out
 
@@ -196,10 +196,12 @@ def main() -> None:
     else:
         to_date = args.to_date
 
-    results = run_query(args.query, args.from_date, to_date)
+    from_date = args.from_date
+
+    results = run_query(args.query, from_date, to_date)
 
     results.to_csv(out_df, index=False)
-    print(to_date, file=open(date_out, 'wt'))
+    print(f"{from_date}-{to_date}", file=open(date_out, 'wt'))
 
     print(f'Done. Wrote 2 files to {out_dir}.')
 

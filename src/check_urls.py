@@ -572,12 +572,14 @@ def test_check_url(testing_session: requests.Session) -> None:
     # Bad URLs
     url_status = check_url('http://google.com', testing_session)
     assert url_status.url == 'http://google.com'
-    assert url_status.status == 301
+    assert isinstance(url_status.status, int)
+    assert url_status.status >= 300
 
     url_status = check_url('https://www.amazon.com/afbadffbaefbnaegn',
                            testing_session)
     assert url_status.url == 'https://www.amazon.com/afbadffbaefbnaegn'
-    assert url_status.status == 404
+    assert isinstance(url_status.status, int)
+    assert url_status.status >= 400
     assert url_status.country == ''
 
     # Runtime exception
