@@ -119,7 +119,7 @@ graph TD
 
 The process up to this point is run without human intervention. As a quality control measure, the inventory must be manually reviewed for articles that are potentially duplicate descriptions of a common resource, or potential false positives based on a low name probability score.
 
-During manual review, the inventory is annotated to determine which potential duplicates should be merged, and which low-probability articles should be removed.
+During manual review, the inventory is annotated to determine which potential duplicates should be merged, and which low-probability articles should be removed. Instructions for this process are available on Zenodo ([doi: 10.5281/zenodo.7768363](https://doi.org/10.5281/zenodo.7768363))
 
 ## Final Processing
 
