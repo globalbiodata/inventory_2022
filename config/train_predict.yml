@@ -1,0 +1,116 @@
+# Environments
+project_env: './env'
+
+# Directories
+
+## Querying
+query_out_dir: 'out/original_query'
+last_date_dir: 'out/last_query_date'
+
+## Classification
+classif_splits_dir: 'data/classif_splits'
+classif_train_outdir: 'out/classif_train_out'
+classif_benchmark_dir: 'out/benchmarks/classif'
+classif_log_dir: 'out/logs/classif'
+classif_out_dir: 'out/original_query/classification'
+
+## NER
+ner_splits_dir: 'data/ner_splits'
+ner_train_outdir: 'out/ner_train_out'
+ner_benchmark_dir: 'out/benchmarks/ner'
+ner_log_dir: 'out/logs/ner'
+ner_out_dir: 'out/original_query/ner'
+
+## URL Extraction
+extract_url_dir: 'out/original_query/url_extraction'
+
+## Name processing
+processed_names_dir: 'out/original_query/processed_names'
+
+## Initial deduplication
+initial_dedupe_dir: 'out/original_query/initial_deduplication'
+
+## For manual review
+for_manual_review_dir: 'out/original_query/for_manual_review'
+
+## Manually reviewed
+manually_reviewed_dir: 'out/original_query/manually_reviewed'
+
+## Processed manual review
+processed_manual_review: 'out/original_query/processed_manual_review'
+
+## URL Checking
+check_url_dir: 'out/original_query/url_checking'
+
+## Additional metadata from EuropePMC
+epmc_meta_dir: 'out/original_query/epmc_meta'
+
+## Processed country codes
+processed_countries: 'out/original_query/processed_countries'
+
+## Data analysis
+analysis_dir: 'analysis/'
+figures_dir: 'analysis/figures'
+
+# Input files
+classif_data: 'data/manual_classifications.csv'
+ner_data: 'data/manual_ner_extraction.csv'
+
+# File with configuration settings for the models
+models: 'config/models_info.tsv'
+
+# Dates used for initial query
+initial_query_start: 2011
+initial_query_end: 2021
+query_string: 'config/query.txt'
+
+# Ratios used for data splitting
+split_ratios: '0.7 0.15 0.15'
+
+# Metrics used for choosing best model/epoch
+class_criteria_metric: 'precision'
+ner_criteria_metric: 'f1'
+
+# Number of epochs
+classif_epochs: 10
+ner_epochs: 10
+
+# Filtering parameters
+max_urls: 2
+min_best_name_prob: 0.978
+
+# URL checking
+chunk_size: 200
+num_tries: 3
+backoff: 0.5
+
+# Getting metadata from EuropePMC
+epmc_chunk_size: 20
+
+# Processng country names
+country_format: 'full'
+
+# Input files for data analysis
+## Data analysis can either be run on the newly generated output files
+## or on the files stored in the repository. Comment/uncomment below
+## to choose which files to use.
+
+## Newly generated files
+classification_train_stats: 'out/classif_train_out/combined_train_stats/combined_stats.csv'
+classification_test_stats: 'out/classif_train_out/combined_test_stats/combined_stats.csv'
+ner_train_stats: 'out/ner_train_out/combined_train_stats/combined_stats.csv'
+ner_test_stats: 'out/ner_train_out/combined_test_stats/combined_stats.csv'
+final_inventory_file: 'out/original_query/processed_countries/predictions.csv'
+
+## Stored files
+# classification_train_stats: 'data/classif_metrics/combined_train_stats.csv'
+# classification_test_stats: 'data/classif_metrics/combined_test_stats.csv'
+# ner_train_stats: 'data/ner_metrics/combined_train_stats.csv'
+# ner_test_stats: 'data/ner_metrics/combined_test_stats.csv'
+# final_inventory_file: 'data/final_inventory_2022.csv'
+
+# Credentials file for FAIRsharing
+fair_login_file: "config/fairsharing_login.json"
+
+# Manually curated funding agency countries
+curated_funders: "analysis/funders_geo_200.csv"

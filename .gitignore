@@ -1,0 +1,14 @@
+env/
+r_env/
+out*/
+__pycache__/
+.snakemake/
+.vscode/
+.Rproj.user
+.Rhistory
+.Rprofile
+*.html
+data/classif_splits/
+data/ner_splits/
+config/ia_access_key.txt
+config/ia_secret_key.txt

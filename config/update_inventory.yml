@@ -1,0 +1,68 @@
+# Environments
+project_env: './env'
+
+# Directories
+
+## Querying
+query_out_dir: 'out/new_query'
+last_date_dir: 'out/last_query_date'
+
+## Classification
+classif_train_outdir: 'out/classif_train_out'
+classif_out_dir: 'out/new_query/classification'
+
+## NER
+ner_train_outdir: 'out/ner_train_out'
+ner_out_dir: 'out/new_query/ner'
+
+## URL Extraction
+extract_url_dir: 'out/new_query/url_extraction'
+
+## Name processing
+processed_names_dir: 'out/new_query/processed_names'
+
+## Initial deduplication
+initial_dedupe_dir: 'out/new_query/initial_deduplication'
+
+## For manual review
+for_manual_review_dir: 'out/new_query/for_manual_review'
+
+## Manually reviewed
+manually_reviewed_dir: 'out/new_query/manually_reviewed'
+
+## Processed manual review
+processed_manual_review: 'out/new_query/processed_manual_review'
+
+## URL Checking
+check_url_dir: 'out/new_query/url_checking'
+
+## Additional metadata from EuropePMC
+epmc_meta_dir: 'out/new_query/epmc_meta'
+
+## Processed country codes
+processed_countries: 'out/new_query/processed_countries'
+
+# Parameters
+
+## Europe PMC query
+query_from_date: 2022
+query_to_date: 2022
+query_string: 'config/query.txt'
+
+# Previous inventory to be merged
+previous_inventory: 'data/final_inventory_2022.csv'
+
+## Filtering and marking for manual review
+max_urls: 2
+min_best_name_prob: 0.978
+
+## URL checking
+chunk_size: 200
+num_tries: 3
+backoff: 0.5
+
+## Getting metadata from EuropePMC
+epmc_chunk_size: 20
+
+## Processng country names
+country_format: 'full'
