@@ -6,19 +6,19 @@ dryrun_reproduction:
 	--configfile config/train_predict.yml
 
 setup:
-	pip install -r requirements.txt
+	python3.8 -m pip install -r requirements.txt
 	echo "import nltk \nnltk.download('punkt')" | python3 /dev/stdin
 	pip install --upgrade numpy
 	Rscript -e 'install.packages("renv"), repos="http://cran.us.r-project.org"'
 	Rscript -e 'renv::restore()'
 
 setup_for_updating:
-	pip install -r requirements.txt
+	python3.8 -m pip install -r requirements.txt
 	echo "import nltk \nnltk.download('punkt')" | python3 /dev/stdin
 	pip install --upgrade numpy==1.23
 
 test:
-	python3 -m pytest -v \
+	python3.8 -m pytest -v \
 	--flake8 --mypy --pylint  \
 	--pylint-rcfile=config/.pylintrc  \
 	src/inventory_utils/*.py \
