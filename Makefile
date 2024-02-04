@@ -5,6 +5,14 @@ dryrun_reproduction:
 	-s snakemake/train_predict.smk -np \
 	--configfile config/train_predict.yml
 
+setup_colab:
+	apt-get update -y
+	apt-get install python3.8 python3.8-distutils
+	update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.8 1
+	update-alternatives --config python3
+	apt-get install python3-pip
+	python3 -m pip install --upgrade pip --user
+
 setup:
 	python3.8 -m pip install -r requirements.txt
 	echo "import nltk \nnltk.download('punkt')" | python3 /dev/stdin
