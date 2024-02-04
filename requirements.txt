@@ -7,7 +7,9 @@ plotly == 5.1.0
 pyyaml
 scikit-learn == 0.24.1
 seqeval == 1.2.2
+pulp < 2.8
 snakemake == 7.1.1
+tabulate == 0.8
 torch == 1.9.0
 transformers == 4.16.2
 tqdm == 4.63.0
