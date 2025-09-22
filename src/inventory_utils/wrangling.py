@@ -362,6 +362,35 @@ def test_join_commas() -> None:
 
 
 # ---------------------------------------------------------------------------
+def join_semicolons(ls: List[str], remove_empty: bool = False) -> str:
+    """
+    Create a string by placing a semicolon and space between each element in a
+    list of strings.
+
+    Parameters
+    `ls`: List of strings
+    `remove_empty`: Optionally, filter out empty strings before joining
+
+    Return: Joined string
+    """
+
+    if remove_empty:
+        ls = [item for item in ls if item != '']
+
+    ls = [str(item) for item in ls]
+    return '; '.join(ls)
+
+
+# ---------------------------------------------------------------------------
+def test_join_semicolons() -> None:
+    """ Test join_semicolons() """
+
+    assert join_semicolons(['', ''], True) == ''
+    assert join_semicolons(['foo']) == 'foo'
+    assert join_semicolons(['foo', 'bar', 'baz']) == 'foo; bar; baz'
+
+
+# ---------------------------------------------------------------------------
 def chunk_rows(
         in_item: Union[pd.DataFrame, pd.Series],
         chunk_size: Optional[int]) -> List[Union[pd.DataFrame, pd.Series]]:

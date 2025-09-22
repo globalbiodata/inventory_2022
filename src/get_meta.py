@@ -16,7 +16,7 @@ import requests
 from pandas.testing import assert_frame_equal
 
 from inventory_utils.custom_classes import CustomHelpFormatter
-from inventory_utils.wrangling import chunk_rows, join_commas
+from inventory_utils.wrangling import chunk_rows, join_commas, join_semicolons
 
 
 # ---------------------------------------------------------------------------
@@ -35,7 +35,7 @@ def get_args() -> Args:
         description=('Get metadata from EuropePMC query'),
         formatter_class=CustomHelpFormatter)
 
-    parser.add_argument('file',
+    parser.add_argument('--file',
                         metavar='FILE',
                         type=argparse.FileType('rt', encoding='ISO-8859-1'),
                         help='CSV File with ID column for articles')
@@ -225,6 +225,7 @@ def remerge_resources(df: pd.DataFrame) -> pd.DataFrame:
     """
 
     join_commas_no_empty = partial(join_commas, remove_empty=True)
+    join_semis_no_empty = partial(join_semicolons, remove_empty=True)
 
     df = df.groupby('resource_num').agg({
         'ID': join_commas,
@@ -241,10 +242,10 @@ def remerge_resources(df: pd.DataFrame) -> pd.DataFrame:
         'extracted_url_coordinates': 'first',
         'wayback_url': 'first',
         'publication_date': 'first',
-        'affiliation': join_commas_no_empty,
+        'affiliation': join_semis_no_empty,
         'authors': join_commas_no_empty,
         'grant_ids': join_commas_no_empty,
-        'grant_agencies': join_commas_no_empty,
+        'grant_agencies': join_semis_no_empty,
         'num_citations': sum
     }).reset_index()
 
