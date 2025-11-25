@@ -5,20 +5,27 @@ dryrun_reproduction:
 	-s snakemake/train_predict.smk -np \
 	--configfile config/train_predict.yml
 
+setup_colab:
+	apt-get update -y
+	apt-get install python3.8 python3.8-distutils
+	update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.8 1
+	update-alternatives --set python3 /usr/bin/python3.8
+	apt-get install python3-pip
+	python3 -m pip install --upgrade pip --user
+
 setup:
-	pip install -r requirements.txt
+	python3.8 -m pip install -r requirements.txt
 	echo "import nltk \nnltk.download('punkt')" | python3 /dev/stdin
-	pip install --upgrade numpy
-	Rscript -e 'install.packages("renv"), repos="http://cran.us.r-project.org"'
+	python3.8 -m pip install --upgrade numpy
+	Rscript -e 'install.packages("renv", repos="http://cran.us.r-project.org")'
 	Rscript -e 'renv::restore()'
 
 setup_for_updating:
-	pip install -r requirements.txt
+	python3.8 -m pip install -r requirements.txt
 	echo "import nltk \nnltk.download('punkt')" | python3 /dev/stdin
-	pip install --upgrade numpy
 
 test:
-	python3 -m pytest -v \
+	python3.8 -m pytest -v \
 	--flake8 --mypy --pylint  \
 	--pylint-rcfile=config/.pylintrc  \
 	src/inventory_utils/*.py \
